@@ -1,976 +1,3189 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Go Live</title>
-  <style>
-    :root {
-      --bg: #0a0a0c; --card: #16161a; --card2: #1c1c22; --accent: #ff2d55;
-      --text: #f2f2f5; --muted: #8b8b96; --green: #30d158; --danger: #ff453a;
-      --border: #2a2a32; --gold: #ffd60a;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
-      background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden;
-      -webkit-tap-highlight-color: transparent;
-    }
-    button { cursor: pointer; border: none; font-family: inherit; background: none; color: inherit; }
-    input { font-family: inherit; }
-    .screen { display: none; min-height: 100vh; flex-direction: column; }
-    .screen.active { display: flex; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Go Live</title>
 
-    /* LOGIN */
-    #login-screen { align-items: center; justify-content: center; padding: 24px; background: radial-gradient(ellipse at top, #1a0a12 0%, var(--bg) 60%); }
-    .login-box { width: 100%; max-width: 360px; text-align: center; }
-    .login-logo { font-size: 2.4rem; font-weight: 800; letter-spacing: -1px; margin-bottom: 8px; }
-    .login-logo span { color: var(--accent); }
-    .login-sub { color: var(--muted); font-size: 0.95rem; margin-bottom: 40px; }
-    .btn-google {
-      width: 100%; background: #fff; color: #1f1f1f; padding: 14px 20px; border-radius: 14px;
-      font-weight: 600; font-size: 1rem; display: flex; align-items: center; justify-content: center; gap: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    }
-    .btn-google:active { transform: scale(0.98); }
-    .btn-google:disabled { opacity: 0.6; }
-    .btn-google svg { width: 20px; height: 20px; flex-shrink: 0; }
-    .login-note { margin-top: 24px; font-size: 0.8rem; color: var(--muted); }
+<style>
+:root{
+  --bg:#0a0a0c;
+  --card:#16161a;
+  --card2:#1c1c22;
+  --accent:#ff2d55;
+  --text:#f2f2f5;
+  --muted:#8b8b96;
+  --green:#30d158;
+  --danger:#ff453a;
+  --border:#2a2a32;
+  --gold:#ffd60a
+}
 
-    /* MENU */
-    #menu { padding: 20px 16px 160px; }
-    .broadcast-label { font-size: 0.7rem; font-weight: 600; letter-spacing: 1.5px; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; }
-    .menu-title { font-size: 2.1rem; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 10px; }
-    .menu-title span { color: var(--accent); }
-    .signed-in { font-size: 0.95rem; color: var(--muted); margin-bottom: 28px; }
-    .signed-in strong { color: var(--green); font-weight: 600; }
-    .section-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 1.2px; color: var(--muted); text-transform: uppercase; margin-bottom: 12px; }
-    .lives-list { display: flex; flex-direction: column; gap: 10px; }
-    .live-card {
-      background: var(--card); border: 1px solid var(--border); border-radius: 16px;
-      padding: 14px 14px 14px 16px; display: flex; align-items: center; gap: 12px;
-    }
-    .live-info { flex: 1; min-width: 0; }
-    .live-name { font-weight: 700; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .live-meta { font-size: 0.82rem; color: var(--muted); margin-top: 3px; display: flex; align-items: center; gap: 6px; }
-    .live-meta .dot { width: 7px; height: 7px; background: var(--accent); border-radius: 50%; flex-shrink: 0; }
-    .btn-join { background: var(--accent); color: #fff; font-weight: 700; font-size: 0.9rem; padding: 10px 18px; border-radius: 999px; flex-shrink: 0; }
-    .btn-join:active { transform: scale(0.96); }
-    .btn-x-small { width: 32px; height: 32px; border-radius: 50%; background: var(--card2); color: var(--muted); font-size: 0.9rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .empty-state { text-align: center; padding: 48px 20px; color: var(--muted); background: var(--card); border-radius: 16px; border: 1px dashed var(--border); font-size: 0.95rem; line-height: 1.5; }
-    .bottom-actions {
-      position: fixed; bottom: 0; left: 0; right: 0; padding: 16px 16px 28px;
-      background: linear-gradient(transparent, var(--bg) 25%); display: flex; flex-direction: column; gap: 10px; z-index: 30;
-    }
-    .btn-go-live {
-      background: var(--accent); color: #fff; font-size: 1.15rem; font-weight: 700; padding: 16px; border-radius: 999px;
-      display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 8px 28px rgba(255,45,85,0.35);
-    }
-    .btn-go-live:active { transform: scale(0.98); }
-    .btn-secondary { background: transparent; color: var(--muted); font-size: 0.95rem; font-weight: 500; padding: 12px; border-radius: 999px; border: 1px solid var(--border); }
-    .btn-secondary:active { background: var(--card); }
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0
+}
 
-    /* LIVE ROOM */
-    #live-room { position: relative; background: #000; height: 100vh; height: 100dvh; overflow: hidden; }
-    #video-wrap { position: absolute; inset: 0; background: #0d0d10; display: flex; align-items: center; justify-content: center; }
-    #local-video, #remote-video { width: 100%; height: 100%; object-fit: cover; display: none; }
-    #local-video.mirror { transform: scaleX(-1); }
-    .cam-off { text-align: center; color: var(--muted); }
-    .cam-off .icon { font-size: 3.5rem; margin-bottom: 10px; opacity: 0.5; }
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+  -webkit-tap-highlight-color:transparent
+}
 
-    .live-header {
-      position: absolute; top: 0; left: 0; right: 0; padding: 12px 12px 0;
-      display: flex; justify-content: space-between; align-items: flex-start; z-index: 40; pointer-events: none;
-    }
-    .live-header > * { pointer-events: auto; }
-    .live-pill {
-      background: rgba(0,0,0,0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-      border-radius: 999px; padding: 8px 14px; display: flex; align-items: center; gap: 8px;
-      font-size: 0.88rem; font-weight: 600; max-width: 65%;
-    }
-    .live-pill .red-dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; animation: blink 1.4s infinite; flex-shrink: 0; }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.35} }
-    .live-pill .title-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .live-pill .watchers { color: var(--muted); font-weight: 500; white-space: nowrap; }
-    .header-btns { display: flex; gap: 8px; }
-    .icon-btn {
-      width: 40px; height: 40px; border-radius: 50%;
-      background: rgba(0,0,0,0.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.08); color: #fff; font-size: 1.05rem;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .icon-btn:active { transform: scale(0.92); }
-    .icon-btn.muted { background: var(--danger); border-color: transparent; }
-    .icon-btn.b-btn { background: linear-gradient(135deg, #7c3aed, #06b6d4); font-weight: 800; font-size: 0.95rem; border: none; }
+button{
+  cursor:pointer;
+  border:0;
+  font:inherit;
+  background:none;
+  color:inherit
+}
 
-    .chat-wrap {
-      position: absolute; bottom: 0; left: 0; right: 0; height: 32%;
-      display: flex; flex-direction: column;
-      background: linear-gradient(to top, rgba(0,0,0,0.88) 50%, transparent); z-index: 30; pointer-events: none;
-    }
-    .chat-list {
-      flex: 1; overflow-y: auto; padding: 10px 12px 6px;
-      display: flex; flex-direction: column; gap: 4px; pointer-events: auto; scrollbar-width: none;
-    }
-    .chat-list::-webkit-scrollbar { display: none; }
-    .msg { font-size: 0.86rem; line-height: 1.3; animation: msgIn 0.2s ease; word-break: break-word; }
-    @keyframes msgIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
-    .msg .uname { font-weight: 700; margin-right: 5px; }
-    .msg .c0{color:#ff6b9d} .msg .c1{color:#5ac8fa} .msg .c2{color:#30d158}
-    .msg .c3{color:#ffd60a} .msg .c4{color:#bf5af2} .msg .c5{color:#ff9f0a}
-    .msg .c6{color:#64d2ff} .msg .c7{color:#ff375f}
-    .msg.host .uname { color: var(--accent); }
-    .msg.gift-msg { color: var(--gold); font-weight: 600; }
+input{
+  font:inherit
+}
 
-    .chat-bar { display: flex; gap: 8px; padding: 6px 10px 16px; pointer-events: auto; align-items: center; }
-    #chat-input {
-      flex: 1; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 999px; padding: 11px 16px; color: #fff; font-size: 0.9rem; outline: none;
-    }
-    #chat-input::placeholder { color: rgba(255,255,255,0.4); }
-    .btn-send { background: var(--accent); color: #fff; font-weight: 700; font-size: 0.85rem; padding: 11px 16px; border-radius: 999px; flex-shrink: 0; }
-    .btn-gift { background: linear-gradient(135deg, #ffd60a, #ff9f0a); color: #1a1a1a; font-weight: 800; font-size: 0.85rem; padding: 11px 14px; border-radius: 999px; flex-shrink: 0; }
-    .btn-send:active, .btn-gift:active { transform: scale(0.96); }
+.screen{
+  display:none;
+  min-height:100vh;
+  flex-direction:column
+}
 
-    .mic-status { position: absolute; bottom: 34%; left: 12px; font-size: 0.78rem; color: var(--green); z-index: 25; pointer-events: none; opacity: 0.85; }
-    .coins-badge {
-      position: absolute; bottom: 34%; right: 12px; z-index: 25;
-      background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); border-radius: 999px;
-      padding: 6px 12px; font-size: 0.82rem; font-weight: 700; display: flex; align-items: center; gap: 5px;
-      border: 1px solid rgba(255,215,0,0.3); pointer-events: none;
-    }
-    .coins-badge .coin-icon { color: var(--gold); }
+.screen.active{
+  display:flex
+}
 
-    /* Gift panel */
-    #gift-panel { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: flex-end; justify-content: center; z-index: 90; }
-    #gift-panel.show { display: flex; }
-    .gift-sheet {
-      background: var(--card); border-radius: 20px 20px 0 0; width: 100%; max-width: 480px;
-      max-height: 62vh; display: flex; flex-direction: column; border: 1px solid var(--border); animation: sheetUp 0.25s ease;
-    }
-    @keyframes sheetUp { from{transform:translateY(100%)} to{transform:none} }
-    .gift-sheet-header { padding: 14px 16px 10px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-    .gift-sheet-header h3 { font-size: 1.05rem; }
-    .gift-close { font-size: 1.3rem; color: var(--muted); padding: 4px 8px; }
-    .gift-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 12px; overflow-y: auto; flex: 1; }
-    .gift-item { background: var(--card2); border-radius: 14px; padding: 10px 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; border: 1px solid transparent; }
-    .gift-item:active { border-color: var(--accent); transform: scale(0.95); }
-    .gift-item .g-emoji { font-size: 1.7rem; }
-    .gift-item .g-name { font-size: 0.68rem; color: var(--muted); text-align: center; line-height: 1.2; }
-    .gift-item .g-cost { font-size: 0.72rem; font-weight: 700; color: var(--gold); }
+/* LOGIN */
 
-    #gift-anim { position: fixed; inset: 0; pointer-events: none; z-index: 100; display: flex; align-items: center; justify-content: center; }
-    .gift-fly { font-size: 4.5rem; animation: giftFly 1.6s ease forwards; text-shadow: 0 0 30px rgba(255,215,0,0.5); }
-    @keyframes giftFly {
-      0% { transform: scale(0.3) translateY(80px); opacity: 0; }
-      30% { transform: scale(1.3) translateY(0); opacity: 1; }
-      70% { transform: scale(1.1) translateY(-20px); opacity: 1; }
-      100% { transform: scale(0.6) translateY(-120px); opacity: 0; }
-    }
-    .gift-label {
-      position: absolute; bottom: 38%; left: 50%; transform: translateX(-50%);
-      background: rgba(0,0,0,0.75); color: var(--gold); padding: 8px 18px; border-radius: 999px;
-      font-weight: 700; font-size: 0.95rem; animation: giftLabel 1.6s ease forwards;
-    }
-    @keyframes giftLabel {
-      0% { opacity: 0; transform: translateX(-50%) translateY(20px); }
-      25% { opacity: 1; transform: translateX(-50%) translateY(0); }
-      75% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-30px); }
-    }
+#login-screen{
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  background:radial-gradient(ellipse at top,#1a0a12 0%,var(--bg) 60%)
+}
 
-    #title-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
-    #title-modal.show { display: flex; }
-    .modal-card { background: var(--card); border-radius: 20px; padding: 28px 22px; width: 100%; max-width: 340px; border: 1px solid var(--border); }
-    .modal-card h3 { text-align: center; font-size: 1.2rem; margin-bottom: 18px; }
-    #title-input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; color: #fff; font-size: 1rem; margin-bottom: 16px; outline: none; }
-    .modal-actions { display: flex; gap: 10px; }
-    .modal-actions button { flex: 1; padding: 13px; border-radius: 12px; font-weight: 600; font-size: 0.95rem; }
-    .btn-cancel { background: var(--card2); color: var(--text); }
-    .btn-confirm { background: var(--accent); color: #fff; }
+.login-box{
+  width:100%;
+  max-width:360px;
+  text-align:center
+}
 
-    #toast {
-      position: fixed; top: 60px; left: 50%; transform: translateX(-50%) translateY(-12px);
-      background: rgba(20,20,24,0.92); color: #fff; padding: 10px 18px; border-radius: 999px;
-      font-size: 0.88rem; opacity: 0; transition: all 0.28s; z-index: 200; pointer-events: none; border: 1px solid var(--border);
-    }
-    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-  </style>
+.login-logo{
+  font-size:2.4rem;
+  font-weight:800;
+  margin-bottom:8px
+}
+
+.login-logo span,
+.menu-title span{
+  color:var(--accent)
+}
+
+.login-sub{
+  color:var(--muted);
+  margin-bottom:40px
+}
+
+.btn-google{
+  width:100%;
+  background:#fff;
+  color:#1f1f1f;
+  padding:14px 20px;
+  border-radius:14px;
+  font-weight:600;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:12px
+}
+
+.btn-google:disabled{
+  opacity:.6
+}
+
+.btn-google svg{
+  width:20px
+}
+
+.login-note{
+  margin-top:24px;
+  font-size:.8rem;
+  color:var(--muted)
+}
+
+/* MENU */
+
+#menu{
+  padding:20px 16px 160px
+}
+
+.broadcast-label,
+.section-label{
+  font-size:.7rem;
+  font-weight:600;
+  letter-spacing:1.5px;
+  color:var(--muted);
+  text-transform:uppercase
+}
+
+.menu-title{
+  font-size:2.1rem;
+  font-weight:800;
+  margin:6px 0 10px
+}
+
+.signed-in{
+  font-size:.95rem;
+  color:var(--muted);
+  margin-bottom:28px
+}
+
+.signed-in strong{
+  color:var(--green)
+}
+
+.lives-list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  margin-top:12px
+}
+
+.live-card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:14px 14px 14px 16px;
+  display:flex;
+  align-items:center;
+  gap:12px
+}
+
+.live-info{
+  flex:1;
+  min-width:0
+}
+
+.live-name{
+  font-weight:700;
+  font-size:1.05rem;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis
+}
+
+.live-meta{
+  font-size:.82rem;
+  color:var(--muted);
+  margin-top:3px
+}
+
+.live-meta .dot{
+  display:inline-block;
+  width:7px;
+  height:7px;
+  background:var(--accent);
+  border-radius:50%;
+  margin-right:6px
+}
+
+.btn-join{
+  background:var(--accent);
+  font-weight:700;
+  padding:10px 18px;
+  border-radius:999px
+}
+
+.btn-x-small{
+  width:32px;
+  height:32px;
+  border-radius:50%;
+  background:var(--card2);
+  color:var(--muted)
+}
+
+.empty-state{
+  text-align:center;
+  padding:48px 20px;
+  color:var(--muted);
+  background:var(--card);
+  border-radius:16px;
+  border:1px dashed var(--border);
+  line-height:1.5
+}
+
+.bottom-actions{
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
+  padding:16px 16px 28px;
+  background:linear-gradient(transparent,var(--bg) 25%);
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  z-index:30
+}
+
+.btn-go-live{
+  background:var(--accent);
+  font-size:1.15rem;
+  font-weight:700;
+  padding:16px;
+  border-radius:999px;
+  box-shadow:0 8px 28px rgba(255,45,85,.35)
+}
+
+.btn-secondary{
+  background:transparent;
+  color:var(--muted);
+  padding:12px;
+  border-radius:999px;
+  border:1px solid var(--border)
+}
+
+/* LIVE ROOM */
+
+#live-room{
+  position:relative;
+  background:#000;
+  height:100vh;
+  height:100dvh;
+  overflow:hidden
+}
+
+#video-wrap{
+  position:absolute;
+  inset:0;
+  background:#0d0d10;
+  display:flex;
+  align-items:center;
+  justify-content:center
+}
+
+#local-video,
+#remote-video{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:none
+}
+
+#local-video.mirror{
+  transform:scaleX(-1)
+}
+
+.cam-off{
+  text-align:center;
+  color:var(--muted)
+}
+
+.cam-off .icon{
+  font-size:3.5rem;
+  margin-bottom:10px
+}
+
+/* HEADER */
+
+.live-header{
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  padding:12px;
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  z-index:40;
+  pointer-events:none
+}
+
+.live-header>*{
+  pointer-events:auto
+}
+
+.live-pill{
+  background:rgba(0,0,0,.6);
+  backdrop-filter:blur(12px);
+  border-radius:999px;
+  padding:8px 14px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:.88rem;
+  font-weight:600;
+  max-width:65%
+}
+
+.red-dot{
+  width:8px;
+  height:8px;
+  background:var(--accent);
+  border-radius:50%;
+  animation:blink 1.4s infinite
+}
+
+.title-text{
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis
+}
+
+.watchers{
+  color:var(--muted);
+  font-weight:500;
+  white-space:nowrap
+}
+
+@keyframes blink{
+  0%,100%{opacity:1}
+  50%{opacity:.35}
+}
+
+.header-btns{
+  display:flex;
+  gap:8px
+}
+
+.icon-btn{
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  background:rgba(0,0,0,.55);
+  backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.08);
+  display:flex;
+  align-items:center;
+  justify-content:center
+}
+
+.icon-btn.b-btn{
+  background:linear-gradient(135deg,#7c3aed,#06b6d4);
+  font-weight:800;
+  border:0
+}
+
+/* CHAT */
+
+.chat-wrap{
+  position:absolute;
+  bottom:0;
+  left:0;
+  right:0;
+  height:34%;
+  display:flex;
+  flex-direction:column;
+  background:linear-gradient(to top,rgba(0,0,0,.92) 45%,transparent);
+  z-index:30;
+  pointer-events:none
+}
+
+.chat-list{
+  flex:1;
+  overflow:hidden;
+  padding:10px 12px 6px;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-end;
+  gap:3px;
+  pointer-events:none;
+  scrollbar-width:none
+}
+
+.msg{
+  font-size:.86rem;
+  line-height:1.3;
+  word-break:break-word;
+  contain:content
+}
+
+.msg .uname{
+  font-weight:700;
+  margin-right:5px
+}
+
+.msg .c0{color:#ff6b9d}
+.msg .c1{color:#5ac8fa}
+.msg .c2{color:#30d158}
+.msg .c3{color:#ffd60a}
+.msg .c4{color:#bf5af2}
+.msg .c5{color:#ff9f0a}
+.msg .c6{color:#64d2ff}
+.msg .c7{color:#ff375f}
+
+.msg.host .uname{
+  color:var(--accent)
+}
+
+.msg.gift-msg{
+  color:var(--gold);
+  font-weight:600
+}
+
+.chat-bar{
+  display:flex;
+  gap:8px;
+  padding:6px 10px 16px;
+  pointer-events:auto;
+  align-items:center
+}
+
+#chat-input{
+  flex:1;
+  background:rgba(255,255,255,.1);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:999px;
+  padding:11px 16px;
+  color:#fff;
+  outline:0
+}
+
+.btn-send,
+.btn-gift{
+  font-weight:700;
+  padding:11px 15px;
+  border-radius:999px
+}
+
+.btn-send{
+  background:var(--accent)
+}
+
+.btn-gift{
+  background:linear-gradient(135deg,#ffd60a,#ff9f0a);
+  color:#1a1a1a
+}
+
+.mic-status{
+  position:absolute;
+  bottom:36%;
+  left:12px;
+  font-size:.78rem;
+  color:var(--green);
+  z-index:25;
+  pointer-events:none;
+  opacity:.85
+}
+
+.coins-badge{
+  position:absolute;
+  bottom:36%;
+  right:12px;
+  z-index:25;
+  background:rgba(0,0,0,.65);
+  backdrop-filter:blur(8px);
+  border-radius:999px;
+  padding:6px 12px;
+  font-size:.82rem;
+  font-weight:700;
+  border:1px solid rgba(255,215,0,.3)
+}
+
+/* BOT + GIFT PANELS */
+
+#gift-panel,
+#bot-panel,
+#title-modal{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.72);
+  display:none;
+  align-items:flex-end;
+  justify-content:center;
+  z-index:90
+}
+
+#gift-panel.show,
+#bot-panel.show,
+#title-modal.show{
+  display:flex
+}
+
+.sheet{
+  background:var(--card);
+  border-radius:20px 20px 0 0;
+  width:100%;
+  max-width:480px;
+  max-height:72vh;
+  border:1px solid var(--border);
+  animation:up .22s ease;
+  overflow:hidden
+}
+
+@keyframes up{
+  from{transform:translateY(100%)}
+  to{transform:none}
+}
+
+.sheet-head{
+  padding:14px 16px;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  justify-content:space-between;
+  align-items:center
+}
+
+.sheet-head h3{
+  font-size:1.05rem
+}
+
+.close{
+  font-size:1.3rem;
+  color:var(--muted);
+  padding:4px 8px
+}
+
+.bot-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:10px;
+  padding:14px;
+  overflow:auto
+}
+
+.bot-choice{
+  background:var(--card2);
+  border:1px solid var(--border);
+  border-radius:15px;
+  padding:15px;
+  text-align:center;
+  font-weight:800;
+  font-size:1rem
+}
+
+.bot-choice small{
+  display:block;
+  color:var(--muted);
+  font-weight:500;
+  margin-top:4px
+}
+
+.bot-choice.selected{
+  border-color:#06b6d4;
+  background:rgba(6,182,212,.12)
+}
+
+/* GIFTS */
+
+.gift-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:8px;
+  padding:12px;
+  overflow:auto;
+  max-height:58vh
+}
+
+.gift-item{
+  background:var(--card2);
+  border-radius:14px;
+  padding:10px 6px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px
+}
+
+.g-emoji{
+  font-size:1.7rem
+}
+
+.g-name{
+  font-size:.68rem;
+  color:var(--muted);
+  text-align:center
+}
+
+.g-cost{
+  font-size:.72rem;
+  font-weight:700;
+  color:var(--gold)
+}
+
+#gift-anim{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:100;
+  display:flex;
+  align-items:center;
+  justify-content:center
+}
+
+.gift-fly{
+  font-size:4.5rem;
+  animation:giftFly 1.6s ease forwards
+}
+
+@keyframes giftFly{
+  0%{transform:scale(.3) translateY(80px);opacity:0}
+  30%{transform:scale(1.3);opacity:1}
+  100%{transform:scale(.6) translateY(-120px);opacity:0}
+}
+
+.gift-label{
+  position:absolute;
+  bottom:38%;
+  left:50%;
+  transform:translateX(-50%);
+  background:rgba(0,0,0,.75);
+  color:var(--gold);
+  padding:8px 18px;
+  border-radius:999px;
+  font-weight:700;
+  animation:label 1.6s ease forwards
+}
+
+@keyframes label{
+  0%{opacity:0;transform:translate(-50%,20px)}
+  25%{opacity:1;transform:translate(-50%,0)}
+  100%{opacity:0;transform:translate(-50%,-30px)}
+}
+
+/* TITLE */
+
+.modal-card{
+  background:var(--card);
+  border-radius:20px;
+  padding:28px 22px;
+  width:100%;
+  max-width:340px;
+  border:1px solid var(--border)
+}
+
+.modal-card h3{
+  text-align:center;
+  margin-bottom:18px
+}
+
+#title-input{
+  width:100%;
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:14px;
+  color:#fff;
+  margin-bottom:16px;
+  outline:0
+}
+
+.modal-actions{
+  display:flex;
+  gap:10px
+}
+
+.modal-actions button{
+  flex:1;
+  padding:13px;
+  border-radius:12px;
+  font-weight:600
+}
+
+.btn-cancel{
+  background:var(--card2)
+}
+
+.btn-confirm{
+  background:var(--accent)
+}
+
+#toast{
+  position:fixed;
+  top:60px;
+  left:50%;
+  transform:translateX(-50%) translateY(-12px);
+  background:rgba(20,20,24,.94);
+  padding:10px 18px;
+  border-radius:999px;
+  font-size:.88rem;
+  opacity:0;
+  transition:.28s;
+  z-index:200;
+  pointer-events:none;
+  border:1px solid var(--border)
+}
+
+#toast.show{
+  opacity:1;
+  transform:translateX(-50%) translateY(0)
+}
+
+@media(max-width:420px){
+  .chat-wrap{height:37%}
+  .msg{font-size:.82rem}
+  .icon-btn{width:38px;height:38px}
+  .live-pill{max-width:60%}
+}
+</style>
 </head>
+
 <body>
 
-  <div id="login-screen" class="screen active">
-    <div class="login-box">
-      <div class="login-logo">GO <span>LIVE</span></div>
-      <div class="login-sub">Broadcast & join lives</div>
-      <button class="btn-google" id="btn-google">
-        <svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
-        Continue with Google
-      </button>
-      <div class="login-note">Real Google login + live streaming</div>
+<!-- LOGIN -->
+
+<div id="login-screen" class="screen active">
+  <div class="login-box">
+    <div class="login-logo">GO <span>LIVE</span></div>
+    <div class="login-sub">Broadcast & join lives</div>
+
+    <button class="btn-google" id="btn-google">
+      <svg viewBox="0 0 48 48">
+        <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+      </svg>
+      Continue with Google
+    </button>
+
+    <div class="login-note">Real Google login + live streaming</div>
+  </div>
+</div>
+
+<!-- MENU -->
+
+<div id="menu" class="screen">
+  <div class="broadcast-label">Broadcast</div>
+  <div class="menu-title">GO <span>LIVE</span></div>
+
+  <div class="signed-in">
+    Signed in as <strong id="display-name">—</strong>
+  </div>
+
+  <div class="section-label">Live now</div>
+
+  <div class="lives-list" id="lives-list">
+    <div class="empty-state" id="empty-state">
+      No one is live right now.<br>
+      Be the first to go live!
     </div>
   </div>
 
-  <div id="menu" class="screen">
-    <div class="broadcast-label">Broadcast</div>
-    <div class="menu-title">GO <span>LIVE</span></div>
-    <div class="signed-in">Signed in as <strong id="display-name">—</strong></div>
-    <div class="section-label">Live now</div>
-    <div class="lives-list" id="lives-list">
-      <div class="empty-state" id="empty-state">No one is live right now.<br>Be the first to go live!</div>
-    </div>
-    <div class="bottom-actions">
-      <button class="btn-go-live" id="btn-go-live">● Go Live</button>
-      <button class="btn-secondary" id="btn-clear">Clear stuck lives</button>
-      <button class="btn-secondary" id="btn-signout">Sign out</button>
+  <div class="bottom-actions">
+    <button class="btn-go-live" id="btn-go-live">● Go Live</button>
+    <button class="btn-secondary" id="btn-clear">Clear stuck lives</button>
+    <button class="btn-secondary" id="btn-signout">Sign out</button>
+  </div>
+</div>
+
+<!-- LIVE ROOM -->
+
+<div id="live-room" class="screen">
+
+  <div id="video-wrap">
+    <video id="local-video" autoplay playsinline muted></video>
+    <video id="remote-video" autoplay playsinline></video>
+
+    <div class="cam-off" id="cam-off">
+      <div class="icon">📷</div>
+      <div>Camera off</div>
     </div>
   </div>
 
-  <div id="live-room" class="screen">
-    <div id="video-wrap">
-      <video id="local-video" autoplay playsinline muted></video>
-      <video id="remote-video" autoplay playsinline></video>
-      <div class="cam-off" id="cam-off"><div class="icon">📷</div><div>Camera off</div></div>
+  <div class="live-header">
+
+    <div class="live-pill">
+      <div class="red-dot"></div>
+      <span class="title-text" id="live-title-text">LIVE</span>
+      <span class="watchers" id="watchers-text">0 watching</span>
     </div>
-    <div class="live-header">
-      <div class="live-pill">
-        <div class="red-dot"></div>
-        <span class="title-text" id="live-title-text">LIVE</span>
-        <span class="watchers" id="watchers-text">0 watching</span>
-      </div>
-      <div class="header-btns">
-        <button class="icon-btn b-btn" id="btn-b" style="display:none;" title="Add bot">B</button>
-        <button class="icon-btn" id="btn-mic" title="Mute">🔇</button>
-        <button class="icon-btn" id="btn-flip" title="Flip camera">🔄</button>
-        <button class="icon-btn" id="btn-leave" title="Leave">✕</button>
-      </div>
+
+    <div class="header-btns">
+      <button class="icon-btn b-btn" id="btn-b" style="display:none" title="Bots">B</button>
+      <button class="icon-btn" id="btn-mic">🎤</button>
+      <button class="icon-btn" id="btn-flip">🔄</button>
+      <button class="icon-btn" id="btn-leave">✕</button>
     </div>
-    <div class="mic-status" id="mic-status">Mic: listening...</div>
-    <div class="coins-badge" id="coins-badge">
-      <span class="coin-icon">🪙</span>
-      <span id="coins-count">0</span>
-    </div>
-    <div class="chat-wrap">
-      <div class="chat-list" id="chat-list"></div>
-      <div class="chat-bar">
-        <input type="text" id="chat-input" placeholder="Say something..." maxlength="140" autocomplete="off" />
-        <button class="btn-gift" id="btn-gift">🎁</button>
-        <button class="btn-send" id="btn-send">Send</button>
-      </div>
-    </div>
+
   </div>
 
-  <div id="gift-panel">
-    <div class="gift-sheet">
-      <div class="gift-sheet-header"><h3>Send a Gift</h3><button class="gift-close" id="gift-close">✕</button></div>
-      <div class="gift-grid" id="gift-grid"></div>
+  <div class="mic-status" id="mic-status">Mic: listening...</div>
+
+  <div class="coins-badge">
+    🪙 <span id="coins-count">0</span>
+  </div>
+
+  <div class="chat-wrap">
+    <div class="chat-list" id="chat-list"></div>
+
+    <div class="chat-bar">
+      <input
+        id="chat-input"
+        placeholder="Say something..."
+        maxlength="140"
+        autocomplete="off"
+      >
+
+      <button class="btn-gift" id="btn-gift">🎁</button>
+      <button class="btn-send" id="btn-send">Send</button>
     </div>
   </div>
-  <div id="gift-anim"></div>
+</div>
 
-  <div id="title-modal">
-    <div class="modal-card">
-      <h3>Name your live</h3>
-      <input type="text" id="title-input" placeholder="e.g. my live" maxlength="40" />
-      <div class="modal-actions">
-        <button class="btn-cancel" id="btn-cancel">Cancel</button>
-        <button class="btn-confirm" id="btn-start">Start Live</button>
-      </div>
+<!-- BOT MENU -->
+
+<div id="bot-panel">
+  <div class="sheet">
+
+    <div class="sheet-head">
+      <h3>Add bots</h3>
+      <button class="close" id="bot-close">✕</button>
     </div>
+
+    <div class="bot-grid" id="bot-grid"></div>
+
   </div>
-  <div id="toast"></div>
+</div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
-    import { getDatabase, ref, set, onValue, remove, update, push, onChildAdded, onChildRemoved } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js";
+<!-- GIFT MENU -->
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyDaQ06E5Zvj6M9XnqOpWgmUsbe5T_EnaPo",
-      authDomain: "golive-ff5ad.firebaseapp.com",
-      projectId: "golive-ff5ad",
-      storageBucket: "golive-ff5ad.firebasestorage.app",
-      messagingSenderId: "994701431927",
-      appId: "1:994701431927:web:4e7615434facc5b54ae272",
-      measurementId: "G-Q99XRZG8EG",
-      databaseURL: "https://golive-ff5ad-default-rtdb.firebaseio.com"
-    };
+<div id="gift-panel">
+  <div class="sheet">
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
-    const db = getDatabase(app);
+    <div class="sheet-head">
+      <h3>Send a Gift</h3>
+      <button class="close" id="gift-close">✕</button>
+    </div>
 
-    const SPECIAL_EMAIL = 'kobik8512@gmail.com';
-    const ICE_SERVERS = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
+    <div class="gift-grid" id="gift-grid"></div>
 
-    let user = null, isHost = false, isSpecialUser = false, isInfinite = false;
-    let liveTitle = '', currentLiveId = null, viewerId = null;
-    let stream = null, facingMode = 'user', isMuted = false;
-    let botCount = 0, realViewers = 0;
-    let botTimer = null, chatTimer = null, realTimer = null;
-    let activeLives = [], coins = 0;
-    let peerConnections = {};   // host: viewerId -> PC
-    let viewerPC = null;        // viewer side PC
-    let unsubViewers = null, unsubLiveEnd = null, unsubChat = null;
-    let offerHandled = false;
+  </div>
+</div>
 
-    // Gifts
-    const GIFTS = [
-      {emoji:'🌹',name:'Rose',cost:1},{emoji:'❤️',name:'Heart',cost:5},{emoji:'🍭',name:'Lollipop',cost:10},
-      {emoji:'🍦',name:'Ice Cream',cost:15},{emoji:'🍩',name:'Donut',cost:20},{emoji:'🎈',name:'Balloon',cost:25},
-      {emoji:'🎀',name:'Ribbon',cost:30},{emoji:'🌸',name:'Cherry Blossom',cost:35},{emoji:'🍀',name:'Clover',cost:40},
-      {emoji:'⭐',name:'Star',cost:50},{emoji:'🌟',name:'Glowing Star',cost:75},{emoji:'💎',name:'Diamond',cost:100},
-      {emoji:'👑',name:'Crown',cost:150},{emoji:'🔥',name:'Fire',cost:200},{emoji:'🚀',name:'Rocket',cost:300},
-      {emoji:'🎉',name:'Party',cost:400},{emoji:'🦄',name:'Unicorn',cost:500},{emoji:'🌈',name:'Rainbow',cost:600},
-      {emoji:'🐻',name:'Bear',cost:800},{emoji:'🐯',name:'Tiger',cost:1000},{emoji:'🦁',name:'Lion',cost:1500},
-      {emoji:'🐉',name:'Dragon',cost:2500},{emoji:'🦅',name:'Eagle',cost:3000},{emoji:'🦈',name:'Shark',cost:4000},
-      {emoji:'🐺',name:'Wolf',cost:5000},{emoji:'🦋',name:'Butterfly',cost:80},{emoji:'🌺',name:'Hibiscus',cost:45},
-      {emoji:'🌻',name:'Sunflower',cost:55},{emoji:'🌷',name:'Tulip',cost:60},{emoji:'💐',name:'Bouquet',cost:120},
-      {emoji:'🍫',name:'Chocolate',cost:70},{emoji:'🍰',name:'Cake',cost:90},{emoji:'🧁',name:'Cupcake',cost:65},
-      {emoji:'🍾',name:'Champagne',cost:250},{emoji:'🥂',name:'Cheers',cost:180},{emoji:'🎁',name:'Gift Box',cost:350},
-      {emoji:'🧸',name:'Teddy',cost:450},{emoji:'💍',name:'Ring',cost:2000},{emoji:'⌚',name:'Watch',cost:3500},
-      {emoji:'🏎️',name:'Race Car',cost:8000},{emoji:'✈️',name:'Airplane',cost:12000},{emoji:'🚁',name:'Helicopter',cost:15000},
-      {emoji:'🛥️',name:'Yacht',cost:25000},{emoji:'🏰',name:'Castle',cost:40000},{emoji:'🦁',name:'Golden Lion',cost:49000},
-      {emoji:'🌌',name:'Galaxy',cost:60000},{emoji:'☄️',name:'Comet',cost:75000},{emoji:'🪐',name:'Planet',cost:90000},
-      {emoji:'🌍',name:'Earth',cost:100000},{emoji:'💫',name:'Dizzy Star',cost:110},{emoji:'✨',name:'Sparkles',cost:85},
-      {emoji:'🎇',name:'Firework',cost:220},{emoji:'🎆',name:'Fireworks',cost:280},{emoji:'🏅',name:'Medal',cost:160},
-      {emoji:'🏆',name:'Trophy',cost:900},{emoji:'🥇',name:'Gold Medal',cost:1200},{emoji:'🎯',name:'Bullseye',cost:95},
-      {emoji:'🎸',name:'Guitar',cost:700},{emoji:'🎹',name:'Piano',cost:1100},{emoji:'🎤',name:'Mic',cost:320},
-      {emoji:'🎧',name:'Headphones',cost:280},{emoji:'📸',name:'Camera',cost:550},{emoji:'🎬',name:'Clapper',cost:400},
-      {emoji:'🎮',name:'Gamepad',cost:650},{emoji:'🕹️',name:'Joystick',cost:480},{emoji:'👾',name:'Alien',cost:750},
-      {emoji:'🤖',name:'Robot',cost:1300},{emoji:'👻',name:'Ghost',cost:175},{emoji:'🎃',name:'Pumpkin',cost:140},
-      {emoji:'🎄',name:'Tree',cost:300},{emoji:'🎅',name:'Santa',cost:850},{emoji:'🧙',name:'Wizard',cost:1600},
-      {emoji:'🧚',name:'Fairy',cost:1400},{emoji:'🧛',name:'Vampire',cost:1700},{emoji:'🧜',name:'Mermaid',cost:1800},
-      {emoji:'🦸',name:'Hero',cost:2200},{emoji:'🧞',name:'Genie',cost:5000},{emoji:'🐉',name:'Fire Dragon',cost:35000},
-      {emoji:'🦚',name:'Peacock',cost:2800},{emoji:'🦩',name:'Flamingo',cost:950},{emoji:'🦢',name:'Swan',cost:1100},
-      {emoji:'🐬',name:'Dolphin',cost:1600},{emoji:'🐳',name:'Whale',cost:7000},{emoji:'🦀',name:'Crab',cost:130},
-      {emoji:'🐙',name:'Octopus',cost:900},{emoji:'🦊',name:'Fox',cost:750},{emoji:'🐨',name:'Koala',cost:600},
-      {emoji:'🐼',name:'Panda',cost:1800},{emoji:'🐸',name:'Frog',cost:120},{emoji:'🐢',name:'Turtle',cost:200},
-      {emoji:'🦖',name:'T-Rex',cost:12000},{emoji:'🦕',name:'Dino',cost:9000},{emoji:'🌋',name:'Volcano',cost:15000},
-      {emoji:'🏔️',name:'Mountain',cost:8000},{emoji:'🌊',name:'Wave',cost:700},{emoji:'⚡',name:'Lightning',cost:450},
-      {emoji:'❄️',name:'Snowflake',cost:90},{emoji:'☀️',name:'Sun',cost:300},{emoji:'🌙',name:'Moon',cost:400},
-      {emoji:'🌠',name:'Shooting Star',cost:2500},{emoji:'💥',name:'Boom',cost:550},{emoji:'💯',name:'100',cost:100},
-      {emoji:'💸',name:'Money Fly',cost:2000},{emoji:'💰',name:'Money Bag',cost:5000},{emoji:'🤑',name:'Rich Face',cost:3000},
-      {emoji:'🔮',name:'Crystal Ball',cost:2200},{emoji:'🪄',name:'Magic Wand',cost:1800},{emoji:'🧨',name:'Firecracker',cost:350},
-      {emoji:'🥇',name:'Champion',cost:10000},{emoji:'🏟️',name:'Stadium',cost:50000},{emoji:'🛸',name:'UFO',cost:30000},
-      {emoji:'🪩',name:'Disco Ball',cost:1200},{emoji:'🎭',name:'Masks',cost:800},{emoji:'🎨',name:'Art',cost:600},
-      {emoji:'🖼️',name:'Painting',cost:1500},{emoji:'🗝️',name:'Key',cost:900},{emoji:'🧱',name:'Brick',cost:50},
-      {emoji:'🧲',name:'Magnet',cost:70},{emoji:'🧬',name:'DNA',cost:1100},{emoji:'🧪',name:'Potion',cost:700},
-      {emoji:'🔭',name:'Telescope',cost:1300},{emoji:'🛰️',name:'Satellite',cost:20000},{emoji:'🚀',name:'SpaceX',cost:45000},
-      {emoji:'👨‍🚀',name:'Astronaut',cost:18000},{emoji:'🌌',name:'Universe',cost:99999}
-    ];
+<div id="gift-anim"></div>
 
-    // Name/msg pools
-    const adjs=['Cool','Epic','Pro','Shadow','Neon','Cyber','Swift','Fire','Ice','Nova','Turbo','Elite','Ace','Ninja','Pixel','Lucky','Wild','Silent','Blaze','Ghost','Royal','Crystal','Golden','Omega','Alpha','Hyper','Magic','Storm','Jade','Violet'];
-    const nouns=['Gamer','Player','Stream','Live','Chat','Fan','Master','Legend','Hero','Star','Soul','Wave','Blade','Flash','Coder','Dev','Cat','Dog','Panda','Wolf','Dragon','Fox','Tiger','Shark','Raven','Owl','Bro','Kid','Pro','Chad'];
-    const tags=['','123','99','X','XX','69','420','YT','TV','GG','OP','Live','Pro','77','01'];
-    const phrases=['w','W','WW','lets go','LETS GO','hi','hello','hey','yo','sup','first','nice stream','fire','🔥','🔥🔥','💯','👏','❤️','😂','lmao','lol','haha','love this','keep going','what game?','pog','POG','based','cringe','mid','ratio','L','W','drop a like','chat is wild','nice cam','10/10','clip that','aura','rizz','no cap','fr','sheesh','yooo','bussin','goated','skill issue','fyp','peak internet','huge W','hello host','mic check','hype train','day 1 viewer','instant classic','respect','I\'m early'];
-    const fillers=['omg','bruh','dude','bro','fam','chat','guys','tbh','ngl','fr','idk','lowkey','highkey','sheesh','yooo','bussin','cooked','mid','goated'];
-    function rand(a){return a[Math.floor(Math.random()*a.length)];}
-    function makeName(){return rand(adjs)+rand(nouns)+rand(tags)+(Math.random()<0.35?Math.floor(Math.random()*900+100):'');}
-    function makeMsg(){if(Math.random()<0.6)return rand(phrases);const p=[];const n=1+Math.floor(Math.random()*3);for(let i=0;i<n;i++)p.push(Math.random()<0.55?rand(phrases):rand(fillers));if(Math.random()<0.25)p.push(String(Math.floor(Math.random()*99)));return p.join(' ').slice(0,90);}
-    const NAMES=[...new Set(Array.from({length:4000},makeName))];
-    const MSGS=[...new Set(Array.from({length:6000},makeMsg))];
-    let ni=0,mi=0;
-    function nextName(){const n=NAMES[ni%NAMES.length];ni++;return ni>NAMES.length?n+Math.floor(Math.random()*50):n;}
-    function nextMsg(){const m=MSGS[mi%MSGS.length];mi++;return mi>MSGS.length&&Math.random()<0.3?m+' '+Math.floor(Math.random()*99):m;}
+<!-- TITLE -->
 
-    function toast(t,ms=1600){const e=document.getElementById('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),ms);}
-    function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
-    function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-    function colorClass(n){let h=0;for(let i=0;i<n.length;i++)h=(h*31+n.charCodeAt(i))>>>0;return 'c'+(h%8);}
-    function formatCoins(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1000)return(n/1000).toFixed(1)+'K';return String(n);}
-    function format(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1000)return(n/1000).toFixed(1)+'K';return String(n);}
+<div id="title-modal">
 
-    // Coins
-    function loadCoins(){
-      if(isInfinite){coins=Infinity;updateCoinsUI();return;}
-      const key='gl_coins_v2_'+(user?.email||'guest');
-      const saved=localStorage.getItem(key);
-      coins=saved!==null?parseInt(saved,10):0;
-      if(isNaN(coins)||coins<0)coins=0;
-      updateCoinsUI();
-    }
-    function saveCoins(){if(isInfinite)return;localStorage.setItem('gl_coins_v2_'+(user?.email||'guest'),String(coins));}
-    function updateCoinsUI(){document.getElementById('coins-count').textContent=isInfinite?'∞':formatCoins(coins);}
+  <div class="modal-card">
 
-    // Auth
-    const btnGoogle=document.getElementById('btn-google');
-    btnGoogle.onclick=async()=>{
-      btnGoogle.disabled=true;
-      try{await signInWithPopup(auth,provider);}
-      catch(err){toast(err.code==='auth/popup-closed-by-user'?'Login cancelled':(err.message||'Login failed'));btnGoogle.disabled=false;}
-    };
-    function checkAdmin(){
-      // Method 1: email
-      const el=(user?.email||'').toLowerCase();
-      if(el===SPECIAL_EMAIL.toLowerCase()||el.includes('kobik8512')||el.includes('kobik')) return true;
-      // Method 2: unlocked via secret PIN (saved forever on this device)
-      if(localStorage.getItem('gl_admin_unlock')==='blue007') return true;
-      return false;
-    }
+    <h3>Name your live</h3>
 
-    onAuthStateChanged(auth,(fu)=>{
-      if(fu){
-        user={name:fu.displayName||(fu.email?fu.email.split('@')[0]:'User'),email:fu.email||'',picture:fu.photoURL};
-        isSpecialUser=checkAdmin();
-        isInfinite=isSpecialUser;
-        document.getElementById('display-name').textContent=user.name+(isSpecialUser?' 🔑':'');
-        loadCoins();show('menu');listenToLives();
-        toast(isSpecialUser?'Signed in as Admin 🔑':'Signed in as '+user.name);
-        btnGoogle.disabled=false;
-      } else {
-        user=null;isInfinite=false;isSpecialUser=false;show('login-screen');btnGoogle.disabled=false;
+    <input
+      id="title-input"
+      placeholder="e.g. my live"
+      maxlength="40"
+    >
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="btn-cancel">Cancel</button>
+      <button class="btn-confirm" id="btn-start">Start Live</button>
+    </div>
+
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+
+/* FIREBASE */
+
+import {
+  initializeApp
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
+
+import {
+  getDatabase,
+  ref,
+  set,
+  onValue,
+  remove,
+  update,
+  push,
+  onChildAdded,
+  onChildRemoved
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js";
+
+
+const firebaseConfig = {
+  apiKey:"AIzaSyDaQ06E5Zvj6M9XnqOpWgmUsbe5T_EnaPo",
+  authDomain:"golive-ff5ad.firebaseapp.com",
+  projectId:"golive-ff5ad",
+  storageBucket:"golive-ff5ad.firebasestorage.app",
+  messagingSenderId:"994701431927",
+  appId:"1:994701431927:web:4e7615434facc5b54ae272",
+  measurementId:"G-Q99XRZG8EG",
+  databaseURL:"https://golive-ff5ad-default-rtdb.firebaseio.com"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+const db = getDatabase(app);
+
+const SPECIAL_EMAIL = "kobik8512@gmail.com";
+
+const ICE_SERVERS = {
+  iceServers:[
+    {urls:"stun:stun.l.google.com:19302"},
+    {urls:"stun:stun1.l.google.com:19302"}
+  ]
+};
+
+
+/* STATE */
+
+let user = null;
+let isHost = false;
+let isSpecialUser = false;
+let isInfinite = false;
+
+let liveTitle = "";
+let currentLiveId = null;
+let viewerId = null;
+
+let stream = null;
+let facingMode = "user";
+let isMuted = false;
+
+let botCount = 0;
+let realViewers = 0;
+let coins = 0;
+
+let selectedBotAmount = 10;
+
+let botTimer = null;
+let chatTimer = null;
+let leaveTimer = null;
+let realTimer = null;
+
+let activeBotIds = new Set();
+let botNames = new Map();
+let botJoinedAt = new Map();
+let botLeaveAt = new Map();
+
+let peerConnections = {};
+let viewerPC = null;
+
+let unsubViewers = null;
+let unsubLiveEnd = null;
+let unsubChat = null;
+
+let offerHandled = false;
+
+let renderQueue = [];
+let renderScheduled = false;
+
+let initialGreetingPhase = true;
+let initialGreetingCount = 0;
+
+
+/* BOT SETTINGS */
+
+const BOT_AMOUNTS = [
+  1,
+  10,
+  100,
+  1000,
+  10000,
+  100000,
+  1000000
+];
+
+
+/* FIRST CHAT */
+
+const GREETINGS = [
+  "hi",
+  "hello",
+  "hiii",
+  "hi kobi",
+  "hi bro",
+  "hello kobi",
+  "hii",
+  "hey kobi",
+  "yo kobi",
+  "hi chat",
+  "hello chat",
+  "hiii bro",
+  "hi everyone",
+  "hey bro",
+  "first",
+  "yo"
+];
+
+
+/* NORMAL CHAT */
+
+const PHRASES = [
+  "w",
+  "W",
+  "WW",
+  "lets go",
+  "LETS GO",
+  "hey",
+  "yo",
+  "sup",
+  "first",
+  "nice stream",
+  "fire",
+  "🔥",
+  "🔥🔥",
+  "💯",
+  "👏",
+  "❤️",
+  "😂",
+  "lmao",
+  "lol",
+  "haha",
+  "love this",
+  "keep going",
+  "what game?",
+  "pog",
+  "POG",
+  "based",
+  "cringe",
+  "mid",
+  "ratio",
+  "L",
+  "drop a like",
+  "chat is wild",
+  "nice cam",
+  "10/10",
+  "clip that",
+  "aura",
+  "rizz",
+  "no cap",
+  "fr",
+  "sheesh",
+  "yooo",
+  "bussin",
+  "goated",
+  "skill issue",
+  "fyp",
+  "peak internet",
+  "huge W",
+  "hello host",
+  "mic check",
+  "hype train",
+  "day 1 viewer",
+  "instant classic",
+  "respect",
+  "I'm early"
+];
+
+const FILLERS = [
+  "omg",
+  "bruh",
+  "dude",
+  "bro",
+  "fam",
+  "chat",
+  "guys",
+  "tbh",
+  "ngl",
+  "fr",
+  "idk",
+  "lowkey",
+  "highkey",
+  "sheesh",
+  "yooo",
+  "cooked",
+  "mid",
+  "goated"
+];
+
+const ADJS = [
+  "Cool",
+  "Epic",
+  "Pro",
+  "Shadow",
+  "Neon",
+  "Cyber",
+  "Swift",
+  "Fire",
+  "Ice",
+  "Nova",
+  "Turbo",
+  "Elite",
+  "Ace",
+  "Ninja",
+  "Pixel",
+  "Lucky",
+  "Wild",
+  "Silent",
+  "Blaze",
+  "Ghost",
+  "Royal",
+  "Crystal",
+  "Golden",
+  "Omega",
+  "Alpha",
+  "Hyper",
+  "Magic",
+  "Storm",
+  "Jade",
+  "Violet"
+];
+
+const NOUNS = [
+  "Gamer",
+  "Player",
+  "Stream",
+  "Live",
+  "Chat",
+  "Fan",
+  "Master",
+  "Legend",
+  "Hero",
+  "Star",
+  "Soul",
+  "Wave",
+  "Blade",
+  "Flash",
+  "Coder",
+  "Dev",
+  "Cat",
+  "Dog",
+  "Panda",
+  "Wolf",
+  "Dragon",
+  "Fox",
+  "Tiger",
+  "Shark",
+  "Raven",
+  "Owl",
+  "Bro",
+  "Kid",
+  "Pro",
+  "Chad"
+];
+
+
+function rand(a){
+  return a[Math.floor(Math.random()*a.length)];
+}
+
+
+function makeName(){
+  return rand(ADJS)+rand(NOUNS)+
+    (Math.random()<.5 ? Math.floor(Math.random()*9999) : "");
+}
+
+
+function normalMsg(){
+
+  if(Math.random()<.62){
+    return rand(PHRASES);
+  }
+
+  const a=[];
+
+  for(
+    let i=0;
+    i<1+Math.floor(Math.random()*3);
+    i++
+  ){
+    a.push(
+      Math.random()<.6
+        ? rand(PHRASES)
+        : rand(FILLERS)
+    );
+  }
+
+  return a.join(" ").slice(0,90);
+}
+
+
+function esc(s){
+  return String(s)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;");
+}
+
+
+function colorClass(n){
+
+  let h=0;
+
+  for(let i=0;i<n.length;i++){
+    h=(h*31+n.charCodeAt(i))>>>0;
+  }
+
+  return "c"+h%8;
+}
+
+
+function format(n){
+
+  if(n>=1000000){
+    return (n/1000000)
+      .toFixed(n>=10000000?0:1)+"M";
+  }
+
+  if(n>=1000){
+    return (n/1000)
+      .toFixed(n>=10000?0:1)+"K";
+  }
+
+  return String(
+    Math.max(0,Math.floor(n))
+  );
+}
+
+
+/* UI */
+
+function toast(t,ms=1500){
+
+  const e=document.getElementById("toast");
+
+  e.textContent=t;
+  e.classList.add("show");
+
+  clearTimeout(e._t);
+
+  e._t=setTimeout(
+    ()=>e.classList.remove("show"),
+    ms
+  );
+}
+
+
+function show(id){
+
+  document
+    .querySelectorAll(".screen")
+    .forEach(x=>x.classList.remove("active"));
+
+  document
+    .getElementById(id)
+    .classList.add("active");
+}
+
+
+/* COINS */
+
+function loadCoins(){
+
+  if(isInfinite){
+    coins=Infinity;
+    updateCoinsUI();
+    return;
+  }
+
+  const k="gl_coins_v2_"+(user?.email||"guest");
+  const s=localStorage.getItem(k);
+
+  coins=s===null
+    ?0
+    :parseInt(s,10)||0;
+
+  updateCoinsUI();
+}
+
+
+function saveCoins(){
+
+  if(!isInfinite){
+    localStorage.setItem(
+      "gl_coins_v2_"+(user?.email||"guest"),
+      String(coins)
+    );
+  }
+}
+
+
+function updateCoinsUI(){
+
+  document.getElementById("coins-count").textContent =
+    isInfinite ? "∞" : format(coins);
+}
+
+
+/* ADMIN */
+
+function checkAdmin(){
+
+  const e=(user?.email||"").toLowerCase();
+
+  return (
+    e===SPECIAL_EMAIL ||
+    e.includes("kobik8512") ||
+    e.includes("kobik") ||
+    localStorage.getItem("gl_admin_unlock")==="blue007"
+  );
+}
+
+
+/* LOGIN */
+
+const btnGoogle=document.getElementById("btn-google");
+
+btnGoogle.onclick=async()=>{
+
+  btnGoogle.disabled=true;
+
+  try{
+    await signInWithPopup(auth,provider);
+  }
+  catch(e){
+
+    toast(
+      e.code==="auth/popup-closed-by-user"
+        ?"Login cancelled"
+        :"Login failed"
+    );
+
+    btnGoogle.disabled=false;
+  }
+};
+
+
+onAuthStateChanged(auth,fu=>{
+
+  if(!fu){
+
+    user=null;
+    isInfinite=false;
+    isSpecialUser=false;
+
+    show("login-screen");
+
+    return;
+  }
+
+  user={
+    name:
+      fu.displayName ||
+      (fu.email||"User").split("@")[0],
+
+    email:fu.email||"",
+    picture:fu.photoURL
+  };
+
+  isSpecialUser=checkAdmin();
+  isInfinite=isSpecialUser;
+
+  document.getElementById("display-name")
+    .textContent=
+      user.name+(isSpecialUser?" 🔑":"");
+
+  loadCoins();
+
+  show("menu");
+
+  listenToLives();
+
+  toast(
+    isSpecialUser
+      ?"Admin mode 🔑"
+      :"Signed in as "+user.name
+  );
+});
+
+
+/* SECRET ADMIN UNLOCK */
+
+let taps=0;
+let tapT;
+
+document
+  .getElementById("display-name")
+  .parentElement
+  .onclick=()=>{
+
+    taps++;
+
+    clearTimeout(tapT);
+
+    tapT=setTimeout(
+      ()=>taps=0,
+      1500
+    );
+
+    if(taps>=5){
+
+      taps=0;
+
+      const p=prompt("Enter admin PIN:");
+
+      if(p==="blue007"){
+
+        localStorage.setItem(
+          "gl_admin_unlock",
+          "blue007"
+        );
+
+        isSpecialUser=true;
+        isInfinite=true;
+
+        loadCoins();
+
+        document.getElementById("display-name")
+          .textContent=
+            (user?.name||"")+" 🔑";
+
+        toast("Admin unlocked!");
+
+      }else if(p!==null){
+
+        toast("Wrong PIN");
       }
-    });
-
-    // Secret: tap "Signed in as" 5 times → enter PIN blue007 to unlock admin forever on this phone
-    let tapCount=0,tapTimer=null;
-    document.getElementById('display-name').parentElement.addEventListener('click',()=>{
-      tapCount++;
-      clearTimeout(tapTimer);
-      tapTimer=setTimeout(()=>{tapCount=0;},1500);
-      if(tapCount>=5){
-        tapCount=0;
-        const pin=prompt('Enter admin PIN:');
-        if(pin==='blue007'){
-          localStorage.setItem('gl_admin_unlock','blue007');
-          isSpecialUser=true;isInfinite=true;
-          loadCoins();
-          document.getElementById('display-name').textContent=(user?.name||'')+' 🔑';
-          toast('Admin unlocked! ∞ coins + B button');
-        } else if(pin!==null){
-          toast('Wrong PIN');
-        }
-      }
-    });
-    document.getElementById('btn-signout').onclick=async()=>{
-      try{if(currentLiveId&&isHost)await endLiveInDb();await signOut(auth);toast('Signed out');}catch(e){toast('Sign out failed');}
-    };
-    document.getElementById('btn-clear').onclick=async()=>{
-      if(!isSpecialUser){toast('Only admin can clear');return;}
-      try{await remove(ref(db,'lives'));toast('Cleared all lives');}catch(e){toast('Clear failed');}
-    };
-
-    // Lives list
-    function listenToLives(){
-      onValue(ref(db,'lives'),(snap)=>{
-        activeLives=[];
-        const val=snap.val()||{};
-        Object.keys(val).forEach(id=>activeLives.push({id,...val[id]}));
-        activeLives.sort((a,b)=>(b.startedAt||0)-(a.startedAt||0));
-        renderLives();
-      });
     }
-    function renderLives(){
-      const list=document.getElementById('lives-list');
-      const empty=document.getElementById('empty-state');
-      list.querySelectorAll('.live-card').forEach(c=>c.remove());
-      if(!activeLives.length){empty.style.display='block';return;}
-      empty.style.display='none';
-      activeLives.forEach(live=>{
-        const isMine=user&&live.hostEmail===user.email;
-        const card=document.createElement('div');
-        card.className='live-card';
-        card.innerHTML=`
+  };
+
+
+/* SIGN OUT */
+
+document.getElementById("btn-signout").onclick=
+  async()=>{
+
+    if(currentLiveId){
+      await stopLive();
+    }
+
+    await signOut(auth);
+  };
+
+
+/* CLEAR LIVES */
+
+document.getElementById("btn-clear").onclick=
+  async()=>{
+
+    if(!isSpecialUser){
+      return toast("Only admin can clear");
+    }
+
+    try{
+      await remove(ref(db,"lives"));
+      toast("Cleared all lives");
+    }
+    catch(e){
+      toast("Clear failed");
+    }
+  };
+
+
+/* LIVE LIST */
+
+function listenToLives(){
+
+  onValue(
+    ref(db,"lives"),
+    snap=>{
+
+      const v=snap.val()||{};
+
+      const lives=
+        Object.entries(v)
+        .map(([id,x])=>({
+          id,
+          ...x
+        }))
+        .sort(
+          (a,b)=>
+            (b.startedAt||0)-
+            (a.startedAt||0)
+        );
+
+      const list=
+        document.getElementById("lives-list");
+
+      const empty=
+        document.getElementById("empty-state");
+
+      list
+        .querySelectorAll(".live-card")
+        .forEach(x=>x.remove());
+
+      empty.style.display=
+        lives.length
+          ?"none"
+          :"block";
+
+      lives.forEach(l=>{
+
+        const mine=
+          user &&
+          l.hostEmail===user.email;
+
+        const c=
+          document.createElement("div");
+
+        c.className="live-card";
+
+        c.innerHTML=`
           <div class="live-info">
-            <div class="live-name">${esc(live.title)}</div>
-            <div class="live-meta"><span class="dot"></span>${esc(live.host)} · ${live.viewers||0} watching</div>
+            <div class="live-name">
+              ${esc(l.title)}
+            </div>
+
+            <div class="live-meta">
+              <span class="dot"></span>
+              ${esc(l.host)} · ${format(l.viewers||0)} watching
+            </div>
           </div>
-          ${isMine||isSpecialUser?`<button class="btn-x-small" data-remove="${live.id}">✕</button>`:''}
-          <button class="btn-join" data-join="${live.id}">Join</button>`;
-        list.appendChild(card);
-      });
-      list.querySelectorAll('[data-join]').forEach(btn=>{
-        btn.onclick=()=>{const live=activeLives.find(l=>l.id===btn.dataset.join);if(live)joinViewer(live);};
-      });
-      list.querySelectorAll('[data-remove]').forEach(btn=>{
-        btn.onclick=async()=>{try{await remove(ref(db,'lives/'+btn.dataset.remove));}catch(e){toast('Remove failed');}};
+
+          ${
+            mine||isSpecialUser
+              ?`<button class="btn-x-small" data-r="${l.id}">✕</button>`
+              :""
+          }
+
+          <button
+            class="btn-join"
+            data-j="${l.id}"
+          >
+            Join
+          </button>
+        `;
+
+        list.appendChild(c);
+
+        c.querySelector("[data-j]").onclick=
+          ()=>joinViewer(l);
+
+        const r=c.querySelector("[data-r]");
+
+        if(r){
+          r.onclick=
+            ()=>remove(ref(db,"lives/"+l.id));
+        }
       });
     }
-    async function endLiveInDb(){
-      if(!currentLiveId)return;
-      try{await remove(ref(db,'lives/'+currentLiveId));}catch(e){}
-      currentLiveId=null;
+  );
+}
+
+
+/* START LIVE */
+
+document.getElementById("btn-go-live").onclick=()=>{
+
+  document.getElementById("title-input").value="";
+
+  document
+    .getElementById("title-modal")
+    .classList.add("show");
+
+  setTimeout(
+    ()=>document.getElementById("title-input").focus(),
+    50
+  );
+};
+
+
+document.getElementById("btn-cancel").onclick=
+  ()=>document
+    .getElementById("title-modal")
+    .classList.remove("show");
+
+
+document.getElementById("btn-start").onclick=startLive;
+
+
+document.getElementById("title-input").onkeydown=
+  e=>{
+    if(e.key==="Enter"){
+      startLive();
     }
+  };
 
-    // Go Live
-    document.getElementById('btn-go-live').onclick=()=>{
-      if(!user)return;
-      document.getElementById('title-input').value='';
-      document.getElementById('title-modal').classList.add('show');
-      setTimeout(()=>document.getElementById('title-input').focus(),80);
-    };
-    document.getElementById('btn-cancel').onclick=()=>document.getElementById('title-modal').classList.remove('show');
-    document.getElementById('btn-start').onclick=startLive;
-    document.getElementById('title-input').onkeydown=e=>{if(e.key==='Enter')startLive();};
 
-    async function startLive(){
-      liveTitle=document.getElementById('title-input').value.trim()||(user.name+"'s Live");
-      document.getElementById('title-modal').classList.remove('show');
-      isHost=true;botCount=0;realViewers=0;ni=0;mi=0;updateCount();
-      peerConnections={};
+async function startLive(){
 
-      currentLiveId='l'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+  liveTitle=
+    document.getElementById("title-input")
+      .value.trim() ||
+    (user.name+"'s Live");
+
+  document
+    .getElementById("title-modal")
+    .classList.remove("show");
+
+  isHost=true;
+
+  botCount=0;
+  realViewers=0;
+
+  activeBotIds.clear();
+  botNames.clear();
+
+  initialGreetingPhase=true;
+  initialGreetingCount=0;
+
+  currentLiveId=
+    "l"+
+    Date.now()+
+    "_"+
+    Math.random().toString(36).slice(2,7);
+
+  peerConnections={};
+
+  try{
+
+    await set(
+      ref(db,"lives/"+currentLiveId),
+      {
+        title:liveTitle,
+        host:user.name,
+        hostEmail:user.email,
+        viewers:0,
+        startedAt:Date.now()
+      }
+    );
+
+  }catch(e){
+
+    toast("Could not publish live");
+    return;
+  }
+
+  document.getElementById("btn-b").style.display=
+    isSpecialUser?"flex":"none";
+
+  document.getElementById("live-title-text")
+    .textContent=liveTitle;
+
+  document.getElementById("chat-list")
+    .innerHTML="";
+
+  document.getElementById("remote-video")
+    .style.display="none";
+
+  show("live-room");
+
+  await startCam();
+
+  listenForViewers();
+  listenToChat(currentLiveId);
+  listenForGifts(currentLiveId);
+
+  startBots();
+  startRealSim();
+}
+
+
+/* CAMERA */
+
+async function startCam(){
+
+  stopCam();
+
+  try{
+
+    stream=
+      await navigator.mediaDevices.getUserMedia({
+        video:{
+          facingMode,
+          width:{ideal:1280},
+          height:{ideal:720}
+        },
+        audio:true
+      });
+
+    const v=
+      document.getElementById("local-video");
+
+    v.srcObject=stream;
+    v.style.display="block";
+
+    document.getElementById("cam-off")
+      .style.display="none";
+
+    v.classList.toggle(
+      "mirror",
+      facingMode==="user"
+    );
+
+    isMuted=false;
+
+    document.getElementById("btn-mic")
+      .textContent="🎤";
+
+  }catch(e){
+
+    document.getElementById("cam-off")
+      .style.display="block";
+
+    toast("Camera permission denied");
+  }
+}
+
+
+function stopCam(){
+
+  if(stream){
+    stream.getTracks().forEach(t=>t.stop());
+  }
+
+  stream=null;
+
+  document.getElementById("local-video")
+    .srcObject=null;
+}
+
+
+/* WEBRTC HOST */
+
+function listenForViewers(){
+
+  if(unsubViewers){
+    unsubViewers();
+  }
+
+  unsubViewers=
+    onChildAdded(
+      ref(db,`lives/${currentLiveId}/viewers`),
+      s=>{
+        if(!peerConnections[s.key]){
+          createHostPeer(s.key);
+        }
+      }
+    );
+
+  onChildRemoved(
+    ref(db,`lives/${currentLiveId}/viewers`),
+    s=>{
+      if(peerConnections[s.key]){
+
+        peerConnections[s.key].close();
+
+        delete peerConnections[s.key];
+      }
+    }
+  );
+}
+
+
+async function createHostPeer(id){
+
+  const pc=
+    new RTCPeerConnection(ICE_SERVERS);
+
+  peerConnections[id]=pc;
+
+  if(stream){
+
+    stream.getTracks().forEach(
+      t=>pc.addTrack(t,stream)
+    );
+  }
+
+  pc.onicecandidate=e=>{
+
+    if(e.candidate){
+
+      push(
+        ref(
+          db,
+          `lives/${currentLiveId}/signals/${id}/hostCandidates`
+        ),
+        e.candidate.toJSON()
+      );
+    }
+  };
+
+  onValue(
+    ref(
+      db,
+      `lives/${currentLiveId}/signals/${id}/answer`
+    ),
+    s=>{
+
+      const a=s.val();
+
+      if(
+        a &&
+        pc.signalingState!=="closed"
+      ){
+
+        pc.setRemoteDescription(
+          new RTCSessionDescription(a)
+        ).catch(()=>{});
+      }
+    }
+  );
+
+  onChildAdded(
+    ref(
+      db,
+      `lives/${currentLiveId}/signals/${id}/viewerCandidates`
+    ),
+    s=>{
+
+      const c=s.val();
+
+      if(c){
+        pc.addIceCandidate(
+          new RTCIceCandidate(c)
+        ).catch(()=>{});
+      }
+    }
+  );
+
+  try{
+
+    const o=await pc.createOffer();
+
+    await pc.setLocalDescription(o);
+
+    await set(
+      ref(
+        db,
+        `lives/${currentLiveId}/signals/${id}/offer`
+      ),
+      {
+        type:o.type,
+        sdp:o.sdp
+      }
+    );
+
+  }catch(e){}
+}
+
+
+/* VIEWER */
+
+async function joinViewer(live){
+
+  cleanupViewer();
+
+  isHost=false;
+
+  currentLiveId=live.id;
+
+  viewerId=
+    "v"+
+    Date.now()+
+    "_"+
+    Math.random().toString(36).slice(2,6);
+
+  document.getElementById("btn-b")
+    .style.display=
+      isSpecialUser?"flex":"none";
+
+  document.getElementById("live-title-text")
+    .textContent=live.title;
+
+  document.getElementById("chat-list")
+    .innerHTML="";
+
+  document.getElementById("local-video")
+    .style.display="none";
+
+  document.getElementById("remote-video")
+    .style.display="none";
+
+  show("live-room");
+
+  await set(
+    ref(
+      db,
+      `lives/${live.id}/viewers/${viewerId}`
+    ),
+    {
+      name:user?.name||"Viewer",
+      joinedAt:Date.now()
+    }
+  );
+
+  listenToChat(live.id);
+
+  unsubLiveEnd=
+    onValue(
+      ref(db,"lives/"+live.id),
+      s=>{
+        if(!s.exists()&&!isHost){
+          forceLeave("Live ended by host");
+        }
+      }
+    );
+
+  viewerPC=
+    new RTCPeerConnection(ICE_SERVERS);
+
+  viewerPC.ontrack=e=>{
+
+    const v=
+      document.getElementById("remote-video");
+
+    v.srcObject=e.streams[0];
+    v.style.display="block";
+
+    document.getElementById("cam-off")
+      .style.display="none";
+
+    v.play().catch(()=>{});
+  };
+
+  let ice=[];
+  let it=null;
+
+  viewerPC.onicecandidate=e=>{
+
+    if(e.candidate){
+
+      ice.push(e.candidate.toJSON());
+
+      if(!it){
+
+        it=setTimeout(()=>{
+
+          ice.splice(0).forEach(
+            c=>
+              push(
+                ref(
+                  db,
+                  `lives/${live.id}/signals/${viewerId}/viewerCandidates`
+                ),
+                c
+              )
+          );
+
+          it=null;
+
+        },250);
+      }
+    }
+  };
+
+
+  onValue(
+    ref(
+      db,
+      `lives/${live.id}/signals/${viewerId}/offer`
+    ),
+    async s=>{
+
+      const o=s.val();
+
+      if(
+        !o ||
+        offerHandled ||
+        !viewerPC
+      ){
+        return;
+      }
+
+      offerHandled=true;
+
       try{
-        await set(ref(db,'lives/'+currentLiveId),{
-          title:liveTitle,host:user.name,hostEmail:user.email,viewers:0,startedAt:Date.now()
-        });
-      }catch(e){console.error(e);toast('Could not publish live');}
 
-      document.getElementById('btn-b').style.display=isSpecialUser?'flex':'none';
-      document.getElementById('live-title-text').textContent=liveTitle;
-      document.getElementById('chat-list').innerHTML='';
-      document.getElementById('mic-status').textContent='Mic: listening...';
-      document.getElementById('mic-status').style.color='var(--green)';
-      document.getElementById('remote-video').style.display='none';
-      show('live-room');
-      await startCam();
-      if(isSpecialUser)startBots();
-      startRealSim();
-      listenForViewers();  // host listens for people joining
-      listenToChat(currentLiveId);  // shared chat
-      listenForGifts(currentLiveId); // receive gift coins
-    }
+        await viewerPC.setRemoteDescription(
+          new RTCSessionDescription(o)
+        );
 
-    // ============ WEBRTC ============
-    async function startCam(){
-      stopCam();
-      const vid=document.getElementById('local-video');
-      const off=document.getElementById('cam-off');
-      try{
-        stream=await navigator.mediaDevices.getUserMedia({
-          video:{facingMode,width:{ideal:1280},height:{ideal:720}},
-          audio:true
-        });
-        vid.srcObject=stream;vid.style.display='block';off.style.display='none';
-        vid.muted=true;isMuted=false;
-        // Fix mirror: front camera should match your real movement
-        if(facingMode==='user') vid.classList.add('mirror');
-        else vid.classList.remove('mirror');
-        document.getElementById('btn-mic').textContent='🎤';
-        document.getElementById('btn-mic').classList.remove('muted');
-        // If already connected to viewers, replace tracks
-        Object.values(peerConnections).forEach(pc=>{
-          stream.getTracks().forEach(track=>{
-            const sender=pc.getSenders().find(s=>s.track&&s.track.kind===track.kind);
-            if(sender)sender.replaceTrack(track);
-          });
-        });
+        const a=
+          await viewerPC.createAnswer();
+
+        await viewerPC.setLocalDescription(a);
+
+        await set(
+          ref(
+            db,
+            `lives/${live.id}/signals/${viewerId}/answer`
+          ),
+          {
+            type:a.type,
+            sdp:a.sdp
+          }
+        );
+
       }catch(e){
-        vid.style.display='none';off.style.display='block';
-        toast('Camera permission denied');
+
+        offerHandled=false;
       }
     }
-    function stopCam(){
-      if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
-      document.getElementById('local-video').srcObject=null;
-    }
+  );
 
-    // Host: listen for new viewers and create peer connections
-    function listenForViewers(){
-      if(unsubViewers)unsubViewers();
-      const viewersRef=ref(db,'lives/'+currentLiveId+'/viewers');
-      unsubViewers=onChildAdded(viewersRef,async(snap)=>{
-        const vid=snap.key;
-        if(peerConnections[vid])return;
-        await createHostPeer(vid);
-      });
-      onChildRemoved(viewersRef,(snap)=>{
-        const vid=snap.key;
-        if(peerConnections[vid]){
-          peerConnections[vid].close();
-          delete peerConnections[vid];
-        }
-      });
-    }
 
-    async function createHostPeer(viewerId){
-      const pc=new RTCPeerConnection(ICE_SERVERS);
-      peerConnections[viewerId]=pc;
+  onChildAdded(
+    ref(
+      db,
+      `lives/${live.id}/signals/${viewerId}/hostCandidates`
+    ),
+    s=>{
 
-      if(stream){
-        stream.getTracks().forEach(track=>pc.addTrack(track,stream));
+      const c=s.val();
+
+      if(c){
+        viewerPC
+          .addIceCandidate(
+            new RTCIceCandidate(c)
+          )
+          .catch(()=>{});
       }
+    }
+  );
+}
 
-      pc.onicecandidate=e=>{
-        if(e.candidate){
-          push(ref(db,`lives/${currentLiveId}/signals/${viewerId}/hostCandidates`),e.candidate.toJSON());
-        }
-      };
 
-      // Listen for answer from this viewer
-      onValue(ref(db,`lives/${currentLiveId}/signals/${viewerId}/answer`),(snap)=>{
-        const answer=snap.val();
-        if(answer&&pc.signalingState!=='closed'){
-          pc.setRemoteDescription(new RTCSessionDescription(answer)).catch(()=>{});
-        }
-      });
+function cleanupViewer(){
 
-      // Listen for ICE from viewer
-      onChildAdded(ref(db,`lives/${currentLiveId}/signals/${viewerId}/viewerCandidates`),(snap)=>{
-        const c=snap.val();
-        if(c)pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
-      });
+  if(unsubLiveEnd){
 
-      try{
-        const offer=await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        await set(ref(db,`lives/${currentLiveId}/signals/${viewerId}/offer`),{
-          type:offer.type,sdp:offer.sdp
-        });
-      }catch(e){console.error('Host offer failed',e);}
+    unsubLiveEnd();
+    unsubLiveEnd=null;
+  }
+
+  if(unsubChat){
+
+    unsubChat();
+    unsubChat=null;
+  }
+
+  if(viewerPC){
+
+    viewerPC.close();
+    viewerPC=null;
+  }
+
+  offerHandled=false;
+}
+
+
+function forceLeave(msg){
+
+  const id=currentLiveId;
+  const v=viewerId;
+
+  cleanupViewer();
+
+  if(v&&id){
+
+    remove(
+      ref(db,`lives/${id}/viewers/${v}`)
+    );
+  }
+
+  currentLiveId=null;
+  viewerId=null;
+
+  show("menu");
+
+  toast(msg);
+}
+
+
+/* CONTROLS */
+
+document.getElementById("btn-mic").onclick=()=>{
+
+  if(!isHost||!stream){
+    return;
+  }
+
+  isMuted=!isMuted;
+
+  stream
+    .getAudioTracks()
+    .forEach(t=>t.enabled=!isMuted);
+
+  document.getElementById("btn-mic")
+    .textContent=
+      isMuted?"🔇":"🎤";
+
+  toast(isMuted?"Muted":"Mic on");
+};
+
+
+document.getElementById("btn-flip").onclick=
+  async()=>{
+
+    if(!isHost){
+      return;
     }
 
-    // Viewer joins
-    async function joinViewer(live){
-      cleanupViewerListeners();
-      isHost=false;currentLiveId=live.id;offerHandled=false;
-      document.getElementById('btn-b').style.display=isSpecialUser?'flex':'none';
-      document.getElementById('live-title-text').textContent=live.title;
-      document.getElementById('chat-list').innerHTML='';
-      document.getElementById('local-video').style.display='none';
-      document.getElementById('remote-video').style.display='none';
-      document.getElementById('cam-off').style.display='block';
-      document.getElementById('mic-status').textContent='Connecting...';
-      document.getElementById('mic-status').style.color='var(--muted)';
-      updateCountDisplay(live.viewers||1);
-      show('live-room');
-      toast('Joining '+live.title+'...');
+    facingMode=
+      facingMode==="user"
+        ?"environment"
+        :"user";
 
-      viewerId='v'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+    await startCam();
+  };
 
-      try{
-        await set(ref(db,`lives/${live.id}/viewers/${viewerId}`),{
-          name:user?.name||'Viewer',joinedAt:Date.now()
-        });
-      }catch(e){}
 
-      // Kick when host ends live (only fire once when deleted)
-      const liveRef=ref(db,'lives/'+live.id);
-      unsubLiveEnd=onValue(liveRef,(snap)=>{
-        if(!snap.exists() && currentLiveId===live.id && !isHost){
-          forceLeaveLive('Live ended by host');
-        }
-      });
+document.getElementById("btn-leave").onclick=
+  stopLive;
 
-      listenToChat(live.id);
 
-      if(viewerPC){try{viewerPC.close();}catch(e){} viewerPC=null;}
-      viewerPC=new RTCPeerConnection(ICE_SERVERS);
+/* STOP */
 
-      viewerPC.ontrack=async(e)=>{
-        const remoteVid=document.getElementById('remote-video');
-        remoteVid.srcObject=e.streams[0];
-        remoteVid.style.display='block';
-        document.getElementById('cam-off').style.display='none';
-        document.getElementById('mic-status').textContent='Connected';
-        document.getElementById('mic-status').style.color='var(--green)';
-        try{ await remoteVid.play(); }catch(err){}
-      };
-      viewerPC.onconnectionstatechange=()=>{
-        if(viewerPC.connectionState==='connected'){
-          document.getElementById('mic-status').textContent='Connected';
-          document.getElementById('mic-status').style.color='var(--green)';
-        } else if(viewerPC.connectionState==='failed'){
-          document.getElementById('mic-status').textContent='Connection failed';
-          document.getElementById('mic-status').style.color='var(--danger)';
-        }
-      };
+async function stopLive(){
 
-      // Throttle ICE writes to avoid flooding Firebase (causes freeze)
-      let iceQueue=[], iceTimer=null;
-      viewerPC.onicecandidate=e=>{
-        if(!e.candidate)return;
-        iceQueue.push(e.candidate.toJSON());
-        if(!iceTimer){
-          iceTimer=setTimeout(()=>{
-            iceQueue.forEach(c=>push(ref(db,`lives/${live.id}/signals/${viewerId}/viewerCandidates`),c).catch(()=>{}));
-            iceQueue=[];iceTimer=null;
-          },300);
-        }
-      };
+  stopBots();
+  stopRealSim();
 
-      // Wait for host offer — only handle once
-      onValue(ref(db,`lives/${live.id}/signals/${viewerId}/offer`),async(snap)=>{
-        const offer=snap.val();
-        if(!offer||!viewerPC||offerHandled)return;
-        if(viewerPC.signalingState==='closed'||viewerPC.signalingState==='stable')return;
-        offerHandled=true;
-        try{
-          await viewerPC.setRemoteDescription(new RTCSessionDescription(offer));
-          const answer=await viewerPC.createAnswer();
-          await viewerPC.setLocalDescription(answer);
-          await set(ref(db,`lives/${live.id}/signals/${viewerId}/answer`),{
-            type:answer.type,sdp:answer.sdp
-          });
-        }catch(e){console.error('Viewer answer failed',e);offerHandled=false;}
-      });
+  cleanupViewer();
 
-      onChildAdded(ref(db,`lives/${live.id}/signals/${viewerId}/hostCandidates`),(snap)=>{
-        const c=snap.val();
-        if(c&&viewerPC&&viewerPC.signalingState!=='closed'){
-          viewerPC.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
-        }
-      });
-    }
+  Object.values(peerConnections)
+    .forEach(p=>p.close());
 
-    function cleanupViewerListeners(){
-      if(typeof unsubLiveEnd==='function'){try{unsubLiveEnd();}catch(e){} unsubLiveEnd=null;}
-      if(typeof unsubChat==='function'){try{unsubChat();}catch(e){} unsubChat=null;}
-    }
+  peerConnections={};
 
-    function forceLeaveLive(msg){
-      cleanupViewerListeners();
-      stopCam();stopBots();stopRealSim();
-      if(viewerPC){try{viewerPC.close();}catch(e){} viewerPC=null;}
-      Object.values(peerConnections).forEach(pc=>{try{pc.close();}catch(e){}});
-      peerConnections={};
-      const leftId=currentLiveId, leftViewer=viewerId;
-      isHost=false;botCount=0;realViewers=0;viewerId=null;currentLiveId=null;offerHandled=false;
-      document.getElementById('remote-video').srcObject=null;
-      document.getElementById('remote-video').style.display='none';
-      if(leftViewer&&leftId){
-        remove(ref(db,`lives/${leftId}/viewers/${leftViewer}`)).catch(()=>{});
+  stopCam();
+
+  const id=currentLiveId;
+
+  if(id&&isHost){
+
+    try{
+      await remove(
+        ref(db,"lives/"+id)
+      );
+    }catch(e){}
+  }
+
+  if(id&&viewerId&&!isHost){
+
+    remove(
+      ref(db,`lives/${id}/viewers/${viewerId}`)
+    ).catch(()=>{});
+  }
+
+  isHost=false;
+  currentLiveId=null;
+  viewerId=null;
+  botCount=0;
+
+  activeBotIds.clear();
+
+  show("menu");
+
+  toast("Live ended");
+}
+
+
+/* VIEWER COUNT */
+
+function updateCount(){
+
+  const n=
+    botCount+
+    realViewers;
+
+  document.getElementById("watchers-text")
+    .textContent=
+      format(n)+" watching";
+
+  if(isHost&&currentLiveId){
+
+    update(
+      ref(db,"lives/"+currentLiveId),
+      {
+        viewers:n
       }
-      show('menu');
-      toast(msg||'Live ended');
-    }
+    ).catch(()=>{});
+  }
+}
 
-    // Controls
-    document.getElementById('btn-mic').onclick=()=>{
-      if(!isHost||!stream)return;
-      isMuted=!isMuted;
-      stream.getAudioTracks().forEach(t=>t.enabled=!isMuted);
-      const btn=document.getElementById('btn-mic');
-      btn.textContent=isMuted?'🔇':'🎤';
-      btn.classList.toggle('muted',isMuted);
-      document.getElementById('mic-status').textContent=isMuted?'Mic: muted':'Mic: listening...';
-      document.getElementById('mic-status').style.color=isMuted?'var(--danger)':'var(--green)';
-      toast(isMuted?'Muted':'Mic on');
+
+/* BOT MENU */
+
+function buildBotGrid(){
+
+  const g=
+    document.getElementById("bot-grid");
+
+  g.innerHTML="";
+
+  BOT_AMOUNTS.forEach(n=>{
+
+    const b=
+      document.createElement("button");
+
+    b.className=
+      "bot-choice"+
+      (n===selectedBotAmount
+        ?" selected"
+        :"");
+
+    b.innerHTML=`
+      +${format(n)}
+      <small>
+        bots per B click
+      </small>
+    `;
+
+    b.onclick=()=>{
+
+      selectedBotAmount=n;
+
+      document
+        .querySelectorAll(".bot-choice")
+        .forEach(
+          x=>x.classList.remove("selected")
+        );
+
+      b.classList.add("selected");
+
+      document
+        .getElementById("bot-panel")
+        .classList.remove("show");
+
+      toast(
+        `B set to +${format(n)} bots`
+      );
     };
-    document.getElementById('btn-flip').onclick=async()=>{
-      if(!isHost)return;
-      facingMode=facingMode==='user'?'environment':'user';
-      await startCam();
-      toast(facingMode==='user'?'Front camera':'Back camera');
-    };
-    document.getElementById('btn-leave').onclick=()=>stopLive();
 
-    async function stopLive(){
-      cleanupViewerListeners();
-      stopCam();stopBots();stopRealSim();
-      Object.values(peerConnections).forEach(pc=>{try{pc.close();}catch(e){}});
-      peerConnections={};
-      if(viewerPC){try{viewerPC.close();}catch(e){} viewerPC=null;}
-      if(viewerId&&currentLiveId&&!isHost){
-        try{await remove(ref(db,`lives/${currentLiveId}/viewers/${viewerId}`));}catch(e){}
+    g.appendChild(b);
+  });
+}
+
+
+buildBotGrid();
+
+
+/* B BUTTON */
+
+document.getElementById("btn-b").onclick=()=>{
+
+  if(!isSpecialUser){
+    return;
+  }
+
+  document
+    .getElementById("bot-panel")
+    .classList.add("show");
+};
+
+
+document.getElementById("bot-close").onclick=
+  ()=>document
+    .getElementById("bot-panel")
+    .classList.remove("show");
+
+
+document.getElementById("bot-panel").onclick=
+  e=>{
+    if(e.target.id==="bot-panel"){
+      e.currentTarget.classList.remove("show");
+    }
+  };
+
+
+/* CREATE BOT */
+
+function newBot(){
+
+  const id=
+    "b"+
+    Date.now().toString(36)+
+    Math.random().toString(36).slice(2,7);
+
+  activeBotIds.add(id);
+
+  const name=makeName();
+
+  botNames.set(id,name);
+  botJoinedAt.set(id,Date.now());
+
+  botCount++;
+
+
+  /*
+   * During the beginning of a stream,
+   * roughly 70% of bot messages are greetings.
+   */
+
+  if(initialGreetingPhase){
+
+    initialGreetingCount++;
+
+    addMsg(
+      name,
+      Math.random()<.7
+        ?rand(GREETINGS)
+        :normalMsg()
+    );
+
+  }else if(Math.random()<.35){
+
+    addMsg(
+      name,
+      normalMsg()
+    );
+  }
+
+  return id;
+}
+
+
+/* BOT LEAVING */
+
+function removeBot(){
+
+  if(!activeBotIds.size){
+    return false;
+  }
+
+  const arr=[...activeBotIds];
+
+  const id=
+    arr[Math.floor(Math.random()*arr.length)];
+
+  activeBotIds.delete(id);
+
+  botNames.delete(id);
+  botJoinedAt.delete(id);
+  botLeaveAt.delete(id);
+
+  botCount=
+    Math.max(
+      0,
+      botCount-1
+    );
+
+  return true;
+}
+
+
+/* ADD BOT BATCH */
+
+function addBots(n){
+
+  /*
+   * IMPORTANT:
+   *
+   * 1M bots does NOT create 1M DOM messages.
+   *
+   * The game keeps a numeric audience count
+   * and only creates a small number of actual
+   * chat elements.
+   */
+
+  const target=
+    Math.min(n,1000000);
+
+  const chunk=
+    Math.min(target,500);
+
+  let made=0;
+
+  const loop=()=>{
+
+    const take=
+      Math.min(
+        chunk,
+        target-made
+      );
+
+    for(let i=0;i<take;i++){
+      newBot();
+    }
+
+    made+=take;
+
+    updateCount();
+
+    if(made<target){
+
+      requestAnimationFrame(loop);
+    }
+  };
+
+  loop();
+
+  initialGreetingPhase=false;
+
+  toast(
+    `+${format(target)} bots`
+  );
+}
+
+
+/* NATURAL BOT MOVEMENT */
+
+function scheduleBots(){
+
+  clearTimeout(botTimer);
+
+  if(!isHost){
+    return;
+  }
+
+  botTimer=setTimeout(()=>{
+
+    /* Some viewers leave */
+
+    if(
+      botCount>0 &&
+      Math.random()<
+        Math.min(
+          .72,
+          .08+botCount/600
+        )
+    ){
+
+      removeBot();
+    }
+
+
+    /* Some new viewers arrive */
+
+    const joinRate=
+      botCount<20
+        ?0.3
+        :botCount<100
+          ?.5
+          :.72;
+
+
+    if(Math.random()<joinRate){
+
+      const natural=
+        Math.max(
+          1,
+          Math.min(
+            6,
+            Math.ceil(botCount/300)
+          )
+        );
+
+      for(
+        let i=0;
+        i<natural;
+        i++
+      ){
+        newBot();
       }
-      if(isHost)await endLiveInDb();
-      isHost=false;botCount=0;realViewers=0;viewerId=null;currentLiveId=null;offerHandled=false;
-      document.getElementById('remote-video').srcObject=null;
-      document.getElementById('remote-video').style.display='none';
-      show('menu');toast('Live ended');
     }
 
-    // Viewers count
-    function updateCount(){
-      const total=botCount+realViewers;
-      updateCountDisplay(total);
-      if(isHost&&currentLiveId){
-        update(ref(db,'lives/'+currentLiveId),{viewers:total}).catch(()=>{});
+    updateCount();
+
+    scheduleBots();
+
+  },
+  Math.max(
+    250,
+    1600-
+      Math.min(
+        1200,
+        botCount*2
+      )+
+      Math.random()*900
+  ));
+}
+
+
+/* CHAT SPEED */
+
+function scheduleBotChat(){
+
+  clearTimeout(chatTimer);
+
+  if(!isHost){
+    return;
+  }
+
+  chatTimer=setTimeout(()=>{
+
+    const n=botCount;
+
+    if(n>0){
+
+      /*
+       * Chat gets faster with more viewers,
+       * but we never create thousands/millions
+       * of DOM nodes.
+       */
+
+      const perBurst=
+        n>=100000
+          ?8
+          :n>=10000
+            ?6
+            :n>=1000
+              ?4
+              :n>=100
+                ?3
+                :n>=20
+                  ?2
+                  :1;
+
+      const burst=
+        Math.min(perBurst,8);
+
+      for(
+        let i=0;
+        i<burst;
+        i++
+      ){
+
+        if(!activeBotIds.size){
+          break;
+        }
+
+        const ids=[...activeBotIds];
+
+        const id=
+          ids[
+            Math.floor(
+              Math.random()*ids.length
+            )
+          ];
+
+        addMsg(
+          botNames.get(id)||makeName(),
+          normalMsg()
+        );
       }
     }
-    function updateCountDisplay(n){
-      document.getElementById('watchers-text').textContent=format(n)+' watching';
-    }
 
-    // B button (only special)
-    document.getElementById('btn-b').onclick=async()=>{
-      if(!isSpecialUser)return;
-      if(isHost){
-        addBot();
-        toast('+1 bot');
-      } else if(currentLiveId){
-        // Admin adding bots in someone else's live
-        try{
-          const liveRef=ref(db,'lives/'+currentLiveId);
-          const snap=await new Promise(r=>onValue(liveRef,s=>r(s),{onlyOnce:true}));
-          const cur=(snap.val()?.viewers)||0;
-          await update(liveRef,{viewers:cur+1});
-          await push(ref(db,`lives/${currentLiveId}/chat`),{
-            name:nextName(), text:nextMsg(), host:false, gift:false, at:Date.now()
-          });
-          toast('+1 bot in this live');
-        }catch(e){toast('Bot add failed');}
+    scheduleBotChat();
+
+  },nToChatDelay(n));
+}
+
+
+function nToChatDelay(n){
+
+  if(n>=1000000){
+    return 80;
+  }
+
+  if(n>=100000){
+    return 100;
+  }
+
+  if(n>=10000){
+    return 130;
+  }
+
+  if(n>=1000){
+    return 180;
+  }
+
+  if(n>=100){
+    return 300;
+  }
+
+  if(n>=20){
+    return 600;
+  }
+
+  if(n>0){
+    return 1200;
+  }
+
+  return 5000;
+}
+
+
+/* START/STOP BOTS */
+
+function startBots(){
+
+  stopBots();
+
+  initialGreetingPhase=true;
+  initialGreetingCount=0;
+
+  scheduleBots();
+  scheduleBotChat();
+  scheduleBotLeaves();
+}
+
+
+function scheduleBotLeaves(){
+
+  clearTimeout(leaveTimer);
+
+  if(!isHost){
+    return;
+  }
+
+  leaveTimer=setTimeout(()=>{
+
+    if(botCount>0){
+
+      const maxLeaves=
+        botCount>=100000
+          ?Math.min(
+              1000,
+              Math.ceil(botCount*.002)
+            )
+          :botCount>=1000
+            ?Math.min(
+                50,
+                Math.ceil(botCount*.01)
+              )
+            :Math.max(
+                1,
+                Math.ceil(botCount*.03)
+              );
+
+      for(
+        let i=0;
+        i<maxLeaves;
+        i++
+      ){
+        removeBot();
       }
-    };
-    function addBot(){
-      botCount++;updateCount();
-      if(Math.random()<0.55)addMsg(nextName(),nextMsg());
+
+      updateCount();
     }
 
-    // Bots
-    function startBots(){
-      stopBots();
-      botTimer=setTimeout(scheduleJoin,6000+Math.random()*6000);
-      scheduleChat();
-    }
-    function stopBots(){clearTimeout(botTimer);botTimer=null;clearTimeout(chatTimer);chatTimer=null;}
-    function scheduleJoin(){
-      let delay;
-      if(botCount<3)delay=8000+Math.random()*7000;
-      else if(botCount<10)delay=5000+Math.random()*5000;
-      else if(botCount<25)delay=3000+Math.random()*3000;
-      else if(botCount<60)delay=1800+Math.random()*1800;
-      else if(botCount<150)delay=900+Math.random()*900;
-      else if(botCount<400)delay=450+Math.random()*400;
-      else delay=250+Math.random()*250;
-      const burst=botCount>100?(1+Math.floor(Math.random()*Math.min(3,Math.floor(botCount/120)))):1;
-      botTimer=setTimeout(()=>{for(let i=0;i<burst;i++)addBot();scheduleJoin();},delay);
-    }
-    function scheduleChat(){
-      let delay;
-      if(botCount<4)delay=7000+Math.random()*8000;
-      else if(botCount<12)delay=4000+Math.random()*4000;
-      else if(botCount<30)delay=2200+Math.random()*2000;
-      else if(botCount<80)delay=1200+Math.random()*1000;
-      else if(botCount<200)delay=600+Math.random()*500;
-      else if(botCount<500)delay=280+Math.random()*220;
-      else delay=140+Math.random()*140;
-      const multi=botCount>250?Math.min(3,1+Math.floor(botCount/300)):1;
-      chatTimer=setTimeout(()=>{
-        if(botCount>0)for(let i=0;i<multi;i++)addMsg(nextName(),nextMsg());
-        scheduleChat();
-      },delay);
-    }
-    function startRealSim(){
-      stopRealSim();
-      realTimer=setInterval(()=>{
-        if(Math.random()<0.35){
-          realViewers=Math.max(0,Math.min(8,realViewers+(Math.random()<0.55?1:-1)));
-          updateCount();
+    scheduleBotLeaves();
+
+  },
+  botCount>=10000
+    ?1800
+    :botCount>=1000
+      ?2500
+      :4500+Math.random()*3500
+  );
+}
+
+
+function stopBots(){
+
+  clearTimeout(botTimer);
+  clearTimeout(chatTimer);
+  clearTimeout(leaveTimer);
+
+  botTimer=null;
+  chatTimer=null;
+  leaveTimer=null;
+
+  activeBotIds.clear();
+  botNames.clear();
+
+  botCount=0;
+}
+
+
+/* SMALL REAL VIEWER SIMULATION */
+
+function startRealSim(){
+
+  stopRealSim();
+
+  realTimer=
+    setInterval(()=>{
+
+      if(Math.random()<.4){
+
+        realViewers=
+          Math.max(
+            0,
+            Math.min(
+              8,
+              realViewers+
+                (
+                  Math.random()<.55
+                    ?1
+                    :-1
+                )
+            )
+          );
+
+        updateCount();
+      }
+
+    },
+    9000+Math.random()*7000
+  );
+}
+
+
+function stopRealSim(){
+
+  clearInterval(realTimer);
+
+  realTimer=null;
+}
+
+
+/* HIGH VOLUME CHAT RENDERER */
+
+function scheduleRender(){
+
+  if(renderScheduled){
+    return;
+  }
+
+  renderScheduled=true;
+
+  requestAnimationFrame(()=>{
+
+    renderScheduled=false;
+
+    renderQueuedMessages();
+  });
+}
+
+
+function renderQueuedMessages(){
+
+  const list=
+    document.getElementById("chat-list");
+
+  if(!renderQueue.length){
+    return;
+  }
+
+  const frag=
+    document.createDocumentFragment();
+
+  /*
+   * Render at most 30 messages per frame.
+   */
+
+  const take=
+    Math.min(
+      renderQueue.length,
+      30
+    );
+
+  for(
+    let i=0;
+    i<take;
+    i++
+  ){
+
+    const m=
+      renderQueue.shift();
+
+    const d=
+      document.createElement("div");
+
+    d.className=
+      "msg"+
+      (m.host?" host":"")+
+      (m.gift?" gift-msg":"");
+
+    const c=
+      m.host||m.gift
+        ?""
+        :colorClass(m.name);
+
+    d.innerHTML=
+      `<span class="uname ${c}">
+        ${esc(m.name)}
+      </span>${esc(m.text)}`;
+
+    frag.appendChild(d);
+  }
+
+  list.appendChild(frag);
+
+  /*
+   * Never let the chat DOM grow forever.
+   */
+
+  while(list.children.length>70){
+    list.removeChild(
+      list.firstChild
+    );
+  }
+
+  if(renderQueue.length){
+    scheduleRender();
+  }
+}
+
+
+function displayMsg(
+  name,
+  text,
+  host=false,
+  gift=false
+){
+
+  renderQueue.push({
+    name,
+    text,
+    host,
+    gift
+  });
+
+  /*
+   * Prevent an enormous queue
+   * if chat suddenly becomes crazy.
+   */
+
+  if(renderQueue.length>100){
+
+    renderQueue.splice(
+      0,
+      renderQueue.length-100
+    );
+  }
+
+  scheduleRender();
+}
+
+
+function addMsg(
+  name,
+  text,
+  host=false,
+  gift=false
+){
+
+  displayMsg(
+    name,
+    text,
+    host,
+    gift
+  );
+}
+
+
+/* FIREBASE CHAT */
+
+function listenToChat(liveId){
+
+  if(unsubChat){
+    unsubChat();
+  }
+
+  const chatRef=
+    ref(
+      db,
+      `lives/${liveId}/chat`
+    );
+
+  unsubChat=
+    onChildAdded(
+      chatRef,
+      s=>{
+
+        const m=s.val();
+
+        if(!m){
+          return;
         }
-      },10000+Math.random()*8000);
-    }
-    function stopRealSim(){clearInterval(realTimer);realTimer=null;}
 
-    // Chat (synced via Firebase)
-    const seenChatIds=new Set();
-    function listenToChat(liveId){
-      if(typeof unsubChat==='function'){try{unsubChat();}catch(e){}}
-      seenChatIds.clear();
-      unsubChat=onChildAdded(ref(db,`lives/${liveId}/chat`),(snap)=>{
-        const msg=snap.val();
-        if(!msg||seenChatIds.has(snap.key))return;
-        seenChatIds.add(snap.key);
-        displayMsg(msg.name,msg.text,!!msg.host,!!msg.gift);
-        // Show gift animation for everyone when a gift appears in chat
-        if(msg.gift&&msg.giftEmoji){
-          playGiftAnim(msg.giftEmoji,msg.giftName||'',msg.giftCost||0);
+        displayMsg(
+          m.name,
+          m.text,
+          !!m.host,
+          !!m.gift
+        );
+
+        if(
+          m.gift &&
+          m.giftEmoji
+        ){
+
+          playGiftAnim(
+            m.giftEmoji,
+            m.giftName||"",
+            m.giftCost||0
+          );
         }
+      }
+    );
+}
+
+
+/* SEND CHAT */
+
+document.getElementById("btn-send")
+  .onclick=sendMsg;
+
+
+document.getElementById("chat-input")
+  .onkeydown=e=>{
+
+    if(e.key==="Enter"){
+      sendMsg();
+    }
+  };
+
+
+async function sendMsg(){
+
+  const i=
+    document.getElementById("chat-input");
+
+  const t=i.value.trim();
+
+  if(!t||!currentLiveId){
+    return;
+  }
+
+  try{
+
+    await push(
+      ref(
+        db,
+        `lives/${currentLiveId}/chat`
+      ),
+      {
+        name:user?.name||"You",
+        text:t,
+        host:isHost,
+        gift:false,
+        at:Date.now()
+      }
+    );
+
+  }catch(e){
+
+    toast("Chat failed");
+  }
+
+  i.value="";
+}
+
+
+/* GIFTS */
+
+const GIFTS=[
+
+  ["🌹","Rose",1],
+  ["❤️","Heart",5],
+  ["🍭","Lollipop",10],
+  ["🍦","Ice Cream",15],
+  ["🍩","Donut",20],
+  ["🎈","Balloon",25],
+  ["⭐","Star",50],
+  ["🌟","Glowing Star",75],
+  ["💎","Diamond",100],
+  ["👑","Crown",150],
+  ["🔥","Fire",200],
+  ["🚀","Rocket",300],
+  ["🎉","Party",400],
+  ["🦄","Unicorn",500],
+  ["🌈","Rainbow",600],
+  ["🐯","Tiger",1000],
+  ["🐉","Dragon",2500],
+  ["🦈","Shark",4000],
+  ["🐺","Wolf",5000],
+  ["🏎️","Race Car",8000],
+  ["✈️","Airplane",12000],
+  ["🚁","Helicopter",15000],
+  ["🛥️","Yacht",25000],
+  ["🏰","Castle",40000],
+  ["🌌","Galaxy",60000],
+  ["🪐","Planet",90000],
+  ["🌍","Earth",100000],
+  ["💯","100",100],
+  ["💰","Money Bag",5000],
+  ["🤑","Rich Face",3000],
+  ["🦖","T-Rex",12000],
+  ["🌋","Volcano",15000],
+  ["⚡","Lightning",450],
+  ["🌙","Moon",400],
+  ["💥","Boom",550],
+  ["🏆","Trophy",900],
+  ["🎤","Mic",320],
+  ["🎮","Gamepad",650],
+  ["👾","Alien",750],
+  ["🤖","Robot",1300],
+  ["🧙","Wizard",1600],
+  ["🧛","Vampire",1700],
+  ["🧜","Mermaid",1800],
+  ["🦸","Hero",2200],
+  ["🐳","Whale",7000],
+  ["🛸","UFO",30000],
+  ["🌌","Universe",99999]
+];
+
+
+const giftGrid=
+  document.getElementById("gift-grid");
+
+
+GIFTS.forEach(
+  ([e,n,c])=>{
+
+    const b=
+      document.createElement("button");
+
+    b.className="gift-item";
+
+    b.innerHTML=`
+      <div class="g-emoji">${e}</div>
+      <div class="g-name">${esc(n)}</div>
+      <div class="g-cost">🪙 ${format(c)}</div>
+    `;
+
+    b.onclick=
+      ()=>sendGift({
+        emoji:e,
+        name:n,
+        cost:c
       });
-    }
-    function displayMsg(name,text,host=false,isGift=false){
-      const list=document.getElementById('chat-list');
-      const div=document.createElement('div');
-      div.className='msg'+(host?' host':'')+(isGift?' gift-msg':'');
-      const cls=host||isGift?'':colorClass(name);
-      div.innerHTML=`<span class="uname ${cls}">${esc(name)}</span>${esc(text)}`;
-      list.appendChild(div);
-      while(list.children.length>80)list.removeChild(list.firstChild);
-      list.scrollTop=list.scrollHeight;
-    }
-    // Local-only messages (bots) still use this
-    function addMsg(name,text,host=false,isGift=false){
-      displayMsg(name,text,host,isGift);
-    }
-    document.getElementById('btn-send').onclick=sendMsg;
-    document.getElementById('chat-input').onkeydown=e=>{if(e.key==='Enter')sendMsg();};
-    async function sendMsg(){
-      const input=document.getElementById('chat-input');
-      const t=input.value.trim();
-      if(!t||!currentLiveId)return;
-      const name=user?user.name:'You';
-      try{
-        await push(ref(db,`lives/${currentLiveId}/chat`),{
-          name, text:t, host:isHost, gift:false, at:Date.now()
-        });
-      }catch(e){toast('Chat failed');}
-      input.value='';
+
+    giftGrid.appendChild(b);
+  }
+);
+
+
+document.getElementById("btn-gift")
+  .onclick=()=>{
+
+    if(isHost){
+      return toast(
+        "You can't gift in your own live"
+      );
     }
 
-    // Gifts
-    function buildGiftGrid(){
-      const grid=document.getElementById('gift-grid');
-      grid.innerHTML='';
-      GIFTS.forEach(g=>{
-        const item=document.createElement('div');
-        item.className='gift-item';
-        item.innerHTML=`<div class="g-emoji">${g.emoji}</div><div class="g-name">${esc(g.name)}</div><div class="g-cost">🪙 ${formatCoins(g.cost)}</div>`;
-        item.onclick=()=>sendGift(g);
-        grid.appendChild(item);
-      });
+    document
+      .getElementById("gift-panel")
+      .classList.add("show");
+  };
+
+
+document.getElementById("gift-close")
+  .onclick=()=>document
+    .getElementById("gift-panel")
+    .classList.remove("show");
+
+
+document.getElementById("gift-panel")
+  .onclick=e=>{
+
+    if(e.target.id==="gift-panel"){
+      e.currentTarget.classList.remove("show");
     }
-    buildGiftGrid();
+  };
 
-    document.getElementById('btn-gift').onclick=()=>{
-      if(isHost){toast("You can't gift in your own live");return;}
-      document.getElementById('gift-panel').classList.add('show');
-    };
-    document.getElementById('gift-close').onclick=()=>document.getElementById('gift-panel').classList.remove('show');
-    document.getElementById('gift-panel').onclick=e=>{if(e.target.id==='gift-panel')document.getElementById('gift-panel').classList.remove('show');};
 
-    async function sendGift(gift){
-      if(isHost){toast("You can't gift in your own live");return;}
-      if(!currentLiveId){toast('Not in a live');return;}
-      if(!isInfinite&&coins<gift.cost){toast('Not enough coins!');return;}
-      if(!isInfinite){coins-=gift.cost;saveCoins();updateCoinsUI();}
-      document.getElementById('gift-panel').classList.remove('show');
+async function sendGift(g){
 
-      // Animation on sender side
-      playGiftAnim(gift.emoji,gift.name,gift.cost);
+  if(!currentLiveId){
+    return;
+  }
 
-      const sender=user?user.name:'You';
-      const text=`sent ${gift.emoji} ${gift.name} (🪙${formatCoins(gift.cost)})`;
-      const toStreamer=Math.floor(gift.cost*0.7);
+  if(
+    !isInfinite &&
+    coins<g.cost
+  ){
 
-      try{
-        await push(ref(db,`lives/${currentLiveId}/chat`),{
-          name:sender, text, host:false, gift:true, at:Date.now(),
-          giftEmoji:gift.emoji, giftName:gift.name, giftCost:gift.cost,
-          coinsToHost:toStreamer
-        });
-        // Direct credit to live node so host gets it immediately
-        await push(ref(db,`lives/${currentLiveId}/gifts`),{
-          from:sender, emoji:gift.emoji, name:gift.name, cost:gift.cost,
-          toHost:toStreamer, at:Date.now()
-        });
-      }catch(e){console.error(e);toast('Gift failed');return;}
-      toast(`Gift sent! +${formatCoins(toStreamer)} to streamer`);
+    return toast(
+      "Not enough coins!"
+    );
+  }
+
+  if(!isInfinite){
+
+    coins-=g.cost;
+
+    saveCoins();
+    updateCoinsUI();
+  }
+
+  document
+    .getElementById("gift-panel")
+    .classList.remove("show");
+
+  playGiftAnim(
+    g.emoji,
+    g.name,
+    g.cost
+  );
+
+  try{
+
+    await push(
+      ref(
+        db,
+        `lives/${currentLiveId}/chat`
+      ),
+      {
+        name:user?.name||"You",
+        text:
+          `sent ${g.emoji} ${g.name} (🪙${format(g.cost)})`,
+        host:false,
+        gift:true,
+        giftEmoji:g.emoji,
+        giftName:g.name,
+        giftCost:g.cost,
+        at:Date.now()
+      }
+    );
+
+    await push(
+      ref(
+        db,
+        `lives/${currentLiveId}/gifts`
+      ),
+      {
+        from:user?.name||"You",
+        emoji:g.emoji,
+        name:g.name,
+        cost:g.cost,
+        toHost:Math.floor(g.cost*.7),
+        at:Date.now()
+      }
+    );
+
+  }catch(e){
+
+    toast("Gift failed");
+  }
+}
+
+
+/* GIFT ANIMATION */
+
+function playGiftAnim(e,n,c){
+
+  const a=
+    document.getElementById("gift-anim");
+
+  a.innerHTML=`
+    <div class="gift-fly">${e}</div>
+    <div class="gift-label">
+      ${e} ${esc(n)} · 🪙${format(c)}
+    </div>
+  `;
+
+  setTimeout(
+    ()=>a.innerHTML="",
+    1700
+  );
+}
+
+
+/* HOST GIFTS */
+
+function listenForGifts(id){
+
+  onChildAdded(
+    ref(db,`lives/${id}/gifts`),
+    s=>{
+
+      if(!isHost){
+        return;
+      }
+
+      const g=s.val();
+
+      if(!g){
+        return;
+      }
+
+      if(!isInfinite){
+
+        coins+=g.toHost||0;
+
+        saveCoins();
+        updateCoinsUI();
+      }
+
+      playGiftAnim(
+        g.emoji,
+        g.name,
+        g.cost
+      );
+
+      toast(
+        `+${format(g.toHost||0)} coins from gift!`
+      );
     }
+  );
+}
 
-    function playGiftAnim(emoji,name,cost){
-      const anim=document.getElementById('gift-anim');
-      anim.innerHTML=`<div class="gift-fly">${emoji}</div><div class="gift-label">${emoji} ${name} · 🪙${formatCoins(cost)}</div>`;
-      setTimeout(()=>{anim.innerHTML='';},1700);
-    }
-
-    // Host listens for incoming gifts → gets coins + animation
-    function listenForGifts(liveId){
-      onChildAdded(ref(db,`lives/${liveId}/gifts`),(snap)=>{
-        if(!isHost)return;
-        const g=snap.val();
-        if(!g)return;
-        playGiftAnim(g.emoji,g.name,g.cost);
-        if(!isInfinite){
-          coins+=(g.toHost||0);
-          saveCoins();
-          updateCoinsUI();
-        }
-        toast(`+${formatCoins(g.toHost||0)} coins from gift!`);
-      });
-    }
-  </script>
+</script>
 </body>
-</html>
+  </html>
