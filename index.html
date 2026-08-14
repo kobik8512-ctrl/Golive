@@ -74,6 +74,7 @@
     #live-room { position: relative; background: #000; height: 100vh; height: 100dvh; overflow: hidden; }
     #video-wrap { position: absolute; inset: 0; background: #0d0d10; display: flex; align-items: center; justify-content: center; }
     #local-video, #remote-video { width: 100%; height: 100%; object-fit: cover; display: none; }
+    #local-video.mirror { transform: scaleX(-1); }
     .cam-off { text-align: center; color: var(--muted); }
     .cam-off .icon { font-size: 3.5rem; margin-bottom: 10px; opacity: 0.5; }
 
@@ -310,7 +311,8 @@
     let activeLives = [], coins = 0;
     let peerConnections = {};   // host: viewerId -> PC
     let viewerPC = null;        // viewer side PC
-    let unsubViewers = null, unsubSignals = null;
+    let unsubViewers = null, unsubLiveEnd = null, unsubChat = null;
+    let offerHandled = false;
 
     // Gifts
     const GIFTS = [
@@ -399,16 +401,47 @@
       try{await signInWithPopup(auth,provider);}
       catch(err){toast(err.code==='auth/popup-closed-by-user'?'Login cancelled':(err.message||'Login failed'));btnGoogle.disabled=false;}
     };
+    function checkAdmin(){
+      // Method 1: email
+      const el=(user?.email||'').toLowerCase();
+      if(el===SPECIAL_EMAIL.toLowerCase()||el.includes('kobik8512')||el.includes('kobik')) return true;
+      // Method 2: unlocked via secret PIN (saved forever on this device)
+      if(localStorage.getItem('gl_admin_unlock')==='blue007') return true;
+      return false;
+    }
+
     onAuthStateChanged(auth,(fu)=>{
       if(fu){
         user={name:fu.displayName||(fu.email?fu.email.split('@')[0]:'User'),email:fu.email||'',picture:fu.photoURL};
-        const el=user.email.toLowerCase();
-        isSpecialUser=el===SPECIAL_EMAIL.toLowerCase()||el.includes('kobik8512');
+        isSpecialUser=checkAdmin();
         isInfinite=isSpecialUser;
-        document.getElementById('display-name').textContent=user.name;
-        loadCoins();show('menu');listenToLives();toast('Signed in as '+user.name);btnGoogle.disabled=false;
+        document.getElementById('display-name').textContent=user.name+(isSpecialUser?' 🔑':'');
+        loadCoins();show('menu');listenToLives();
+        toast(isSpecialUser?'Signed in as Admin 🔑':'Signed in as '+user.name);
+        btnGoogle.disabled=false;
       } else {
         user=null;isInfinite=false;isSpecialUser=false;show('login-screen');btnGoogle.disabled=false;
+      }
+    });
+
+    // Secret: tap "Signed in as" 5 times → enter PIN blue007 to unlock admin forever on this phone
+    let tapCount=0,tapTimer=null;
+    document.getElementById('display-name').parentElement.addEventListener('click',()=>{
+      tapCount++;
+      clearTimeout(tapTimer);
+      tapTimer=setTimeout(()=>{tapCount=0;},1500);
+      if(tapCount>=5){
+        tapCount=0;
+        const pin=prompt('Enter admin PIN:');
+        if(pin==='blue007'){
+          localStorage.setItem('gl_admin_unlock','blue007');
+          isSpecialUser=true;isInfinite=true;
+          loadCoins();
+          document.getElementById('display-name').textContent=(user?.name||'')+' 🔑';
+          toast('Admin unlocked! ∞ coins + B button');
+        } else if(pin!==null){
+          toast('Wrong PIN');
+        }
       }
     });
     document.getElementById('btn-signout').onclick=async()=>{
@@ -511,6 +544,9 @@
         });
         vid.srcObject=stream;vid.style.display='block';off.style.display='none';
         vid.muted=true;isMuted=false;
+        // Fix mirror: front camera should match your real movement
+        if(facingMode==='user') vid.classList.add('mirror');
+        else vid.classList.remove('mirror');
         document.getElementById('btn-mic').textContent='🎤';
         document.getElementById('btn-mic').classList.remove('muted');
         // If already connected to viewers, replace tracks
@@ -587,7 +623,8 @@
 
     // Viewer joins
     async function joinViewer(live){
-      isHost=false;currentLiveId=live.id;
+      cleanupViewerListeners();
+      isHost=false;currentLiveId=live.id;offerHandled=false;
       document.getElementById('btn-b').style.display='none';
       document.getElementById('live-title-text').textContent=live.title;
       document.getElementById('chat-list').innerHTML='';
@@ -602,44 +639,55 @@
 
       viewerId='v'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
 
-      // Announce presence
-      await set(ref(db,`lives/${live.id}/viewers/${viewerId}`),{
-        name:user?.name||'Viewer',joinedAt:Date.now()
-      });
+      try{
+        await set(ref(db,`lives/${live.id}/viewers/${viewerId}`),{
+          name:user?.name||'Viewer',joinedAt:Date.now()
+        });
+      }catch(e){}
 
-      // Kick viewer when host ends the live
-      onValue(ref(db,'lives/'+live.id),(snap)=>{
-        if(!snap.exists() && !isHost && currentLiveId===live.id){
-          // Live was deleted by host
+      // Kick when host ends live (only fire once when deleted)
+      const liveRef=ref(db,'lives/'+live.id);
+      unsubLiveEnd=onValue(liveRef,(snap)=>{
+        if(!snap.exists() && currentLiveId===live.id && !isHost){
           forceLeaveLive('Live ended by host');
         }
       });
 
-      // Shared chat listener
       listenToChat(live.id);
 
-      // Create peer connection as viewer
+      if(viewerPC){try{viewerPC.close();}catch(e){} viewerPC=null;}
       viewerPC=new RTCPeerConnection(ICE_SERVERS);
 
       viewerPC.ontrack=e=>{
         const remoteVid=document.getElementById('remote-video');
-        remoteVid.srcObject=e.streams[0];
+        if(remoteVid.srcObject!==e.streams[0]){
+          remoteVid.srcObject=e.streams[0];
+        }
         remoteVid.style.display='block';
         document.getElementById('cam-off').style.display='none';
         document.getElementById('mic-status').textContent='Connected';
         document.getElementById('mic-status').style.color='var(--green)';
       };
 
+      // Throttle ICE writes to avoid flooding Firebase (causes freeze)
+      let iceQueue=[], iceTimer=null;
       viewerPC.onicecandidate=e=>{
-        if(e.candidate){
-          push(ref(db,`lives/${live.id}/signals/${viewerId}/viewerCandidates`),e.candidate.toJSON());
+        if(!e.candidate)return;
+        iceQueue.push(e.candidate.toJSON());
+        if(!iceTimer){
+          iceTimer=setTimeout(()=>{
+            iceQueue.forEach(c=>push(ref(db,`lives/${live.id}/signals/${viewerId}/viewerCandidates`),c).catch(()=>{}));
+            iceQueue=[];iceTimer=null;
+          },300);
         }
       };
 
-      // Wait for host offer
+      // Wait for host offer — only handle once
       onValue(ref(db,`lives/${live.id}/signals/${viewerId}/offer`),async(snap)=>{
         const offer=snap.val();
-        if(!offer||!viewerPC||viewerPC.signalingState==='closed')return;
+        if(!offer||!viewerPC||offerHandled)return;
+        if(viewerPC.signalingState==='closed'||viewerPC.signalingState==='stable')return;
+        offerHandled=true;
         try{
           await viewerPC.setRemoteDescription(new RTCSessionDescription(offer));
           const answer=await viewerPC.createAnswer();
@@ -647,24 +695,35 @@
           await set(ref(db,`lives/${live.id}/signals/${viewerId}/answer`),{
             type:answer.type,sdp:answer.sdp
           });
-        }catch(e){console.error('Viewer answer failed',e);}
+        }catch(e){console.error('Viewer answer failed',e);offerHandled=false;}
       });
 
-      // Host ICE candidates
       onChildAdded(ref(db,`lives/${live.id}/signals/${viewerId}/hostCandidates`),(snap)=>{
         const c=snap.val();
-        if(c&&viewerPC)viewerPC.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
+        if(c&&viewerPC&&viewerPC.signalingState!=='closed'){
+          viewerPC.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
+        }
       });
     }
 
+    function cleanupViewerListeners(){
+      if(typeof unsubLiveEnd==='function'){try{unsubLiveEnd();}catch(e){} unsubLiveEnd=null;}
+      if(typeof unsubChat==='function'){try{unsubChat();}catch(e){} unsubChat=null;}
+    }
+
     function forceLeaveLive(msg){
+      cleanupViewerListeners();
       stopCam();stopBots();stopRealSim();
-      if(viewerPC){viewerPC.close();viewerPC=null;}
-      Object.values(peerConnections).forEach(pc=>pc.close());
+      if(viewerPC){try{viewerPC.close();}catch(e){} viewerPC=null;}
+      Object.values(peerConnections).forEach(pc=>{try{pc.close();}catch(e){}});
       peerConnections={};
-      isHost=false;botCount=0;realViewers=0;viewerId=null;currentLiveId=null;
+      const leftId=currentLiveId, leftViewer=viewerId;
+      isHost=false;botCount=0;realViewers=0;viewerId=null;currentLiveId=null;offerHandled=false;
       document.getElementById('remote-video').srcObject=null;
       document.getElementById('remote-video').style.display='none';
+      if(leftViewer&&leftId){
+        remove(ref(db,`lives/${leftId}/viewers/${leftViewer}`)).catch(()=>{});
+      }
       show('menu');
       toast(msg||'Live ended');
     }
@@ -690,16 +749,16 @@
     document.getElementById('btn-leave').onclick=()=>stopLive();
 
     async function stopLive(){
+      cleanupViewerListeners();
       stopCam();stopBots();stopRealSim();
-      // Close all peer connections
-      Object.values(peerConnections).forEach(pc=>pc.close());
+      Object.values(peerConnections).forEach(pc=>{try{pc.close();}catch(e){}});
       peerConnections={};
-      if(viewerPC){viewerPC.close();viewerPC=null;}
+      if(viewerPC){try{viewerPC.close();}catch(e){} viewerPC=null;}
       if(viewerId&&currentLiveId&&!isHost){
         try{await remove(ref(db,`lives/${currentLiveId}/viewers/${viewerId}`));}catch(e){}
       }
       if(isHost)await endLiveInDb();
-      isHost=false;botCount=0;realViewers=0;viewerId=null;
+      isHost=false;botCount=0;realViewers=0;viewerId=null;currentLiveId=null;offerHandled=false;
       document.getElementById('remote-video').srcObject=null;
       document.getElementById('remote-video').style.display='none';
       show('menu');toast('Live ended');
@@ -775,8 +834,9 @@
     // Chat (synced via Firebase)
     const seenChatIds=new Set();
     function listenToChat(liveId){
+      if(typeof unsubChat==='function'){try{unsubChat();}catch(e){}}
       seenChatIds.clear();
-      onChildAdded(ref(db,`lives/${liveId}/chat`),(snap)=>{
+      unsubChat=onChildAdded(ref(db,`lives/${liveId}/chat`),(snap)=>{
         const msg=snap.val();
         if(!msg||seenChatIds.has(snap.key))return;
         seenChatIds.add(snap.key);
