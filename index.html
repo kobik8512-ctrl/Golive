@@ -557,8 +557,8 @@
       }];
       renderLives();
 
-      const special = user.email && user.email.toLowerCase() === SPECIAL_EMAIL.toLowerCase();
-      document.getElementById('btn-b').style.display = special ? 'flex' : 'none';
+      // Always enable B button + bots when you are the host
+      document.getElementById('btn-b').style.display = 'flex';
 
       document.getElementById('live-title-text').textContent = liveTitle;
       document.getElementById('chat-list').innerHTML = '';
@@ -568,7 +568,7 @@
       show('live-room');
       await startCam();
 
-      if (special) startBots();
+      startBots();   // always start bots
       startRealSim();
     }
 
@@ -667,7 +667,7 @@
 
     // ================== B BUTTON ==================
     document.getElementById('btn-b').onclick = () => {
-      if (!isHost || !user || user.email.toLowerCase() !== SPECIAL_EMAIL.toLowerCase()) return;
+      if (!isHost) return;
       addBot();
       toast('+1 bot');
     };
