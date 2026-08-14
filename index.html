@@ -1,379 +1,3405 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GoLive</title>
+<script type="module">
 
-  <style>
-    * {
-      box-sizing: border-box;
-    }
+import {
+  initializeApp
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
 
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: #080809;
-      color: white;
-      font-family: Arial, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  signOut,
+  onAuthStateChanged,
+  browserLocalPersistence,
+  setPersistence
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
 
-    .app {
-      width: 100%;
-      max-width: 620px;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      padding: 30px;
-    }
+import {
+  getDatabase,
+  ref,
+  set,
+  update,
+  remove,
+  push,
+  onValue,
+  onChildAdded,
+  onChildRemoved
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js";
 
-    .error {
-      position: fixed;
-      top: 70px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #151519;
-      border: 1px solid #303038;
-      border-radius: 40px;
-      padding: 18px 28px;
-      max-width: 90%;
-      text-align: center;
-      color: #fff;
-      display: none;
-      z-index: 10;
-    }
 
-    .logo {
-      font-size: 68px;
-      font-weight: 800;
-      margin-bottom: 12px;
-    }
+/* =========================================================
+   FIREBASE CONFIG
+========================================================= */
 
-    .logo span {
-      color: #ff2454;
-    }
+const firebaseConfig = {
+  apiKey: "AIzaSyDaQ06E5ZvjM6XnqOpWgmUsbe5T_EnaPo",
+  authDomain: "golive-ff5ad.firebaseapp.com",
+  databaseURL: "https://golive-ff5ad-default-rtdb.firebaseio.com",
+  projectId: "golive-ff5ad",
+  storageBucket: "golive-ff5ad.firebasestorage.app",
+  messagingSenderId: "994701431927",
+  appId: "1:994701431927:web:4e7615434facc5b54ae272",
+  measurementId: "G-Q99XRZG8EG"
+};
 
-    .subtitle {
-      color: #92929a;
-      font-size: 27px;
-      margin-bottom: 75px;
-    }
+const app = initializeApp(firebaseConfig);
 
-    .google-btn {
-      width: 100%;
-      max-width: 620px;
-      height: 90px;
-      border: 0;
-      border-radius: 18px;
-      background: white;
-      color: #202124;
-      font-size: 25px;
-      font-weight: 700;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 25px;
-    }
+const auth = getAuth(app);
 
-    .google-btn:disabled {
-      opacity: .65;
-      cursor: wait;
-    }
+const provider = new GoogleAuthProvider();
 
-    .google {
-      font-size: 38px;
-      font-weight: 800;
-      color: #fbbc05;
-    }
+provider.setCustomParameters({
+  prompt: "select_account"
+});
 
-    .note {
-      margin-top: 45px;
-      color: #8e8e96;
-      font-size: 20px;
-    }
+const db = getDatabase(app);
 
-    .logged-in {
-      display: none;
-      text-align: center;
-    }
+const SPECIAL_EMAIL = "kobik8512@gmail.com";
 
-    .logged-in img {
-      width: 90px;
-      height: 90px;
-      border-radius: 50%;
-      margin-bottom: 15px;
-    }
 
-    .logout {
-      margin-top: 25px;
-      padding: 14px 25px;
-      border: 1px solid #444;
-      border-radius: 12px;
-      background: #17171b;
-      color: white;
-      cursor: pointer;
-    }
-  </style>
-</head>
+/* =========================================================
+   STATE
+========================================================= */
 
-<body>
+let user = null;
 
-  <div id="error" class="error"></div>
+let isHost = false;
+let isSpecialUser = false;
+let isInfinite = false;
 
-  <main class="app">
+let currentLiveId = null;
+let liveTitle = "";
 
-    <div id="loginScreen">
-      <div class="logo">
-        GO <span>LIVE</span>
-      </div>
+let viewerId = null;
 
-      <div class="subtitle">
-        Broadcast &amp; join lives
-      </div>
+let stream = null;
+let facingMode = "user";
+let isMuted = false;
+let cameraOn = false;
 
-      <button id="googleLogin" class="google-btn">
-        <span class="google">G</span>
-        <span>Continue with Google</span>
-      </button>
+let realViewers = 0;
+let botCount = 0;
+let botAddAmount = 1;
 
-      <div class="note">
-        Google login + live streaming
-      </div>
-    </div>
+let peerConnections = {};
+let viewerPC = null;
 
-    <div id="loggedIn" class="logged-in">
-      <img id="userPhoto" src="" alt="Profile">
+let unsubViewers = null;
+let unsubChat = null;
+let unsubGifts = null;
+let unsubLiveEnd = null;
+let unsubBotData = null;
 
-      <h2 id="userName"></h2>
-      <p id="userEmail"></p>
+let botExpiryTimer = null;
+let localBotChatTimer = null;
 
-      <button id="logout" class="logout">
-        Sign out
-      </button>
-    </div>
+let chatQueue = [];
+let chatFramePending = false;
 
-  </main>
+const MAX_CHAT_DOM = 50;
 
-  <!-- Firebase -->
-  <script type="module">
+let seenChat = new Set();
+
+let botBatches = {};
+
+let coins = 0;
+
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function toast(text, ms = 1800) {
+
+  const el = document.getElementById("toast");
+
+  el.textContent = text;
+
+  el.classList.add("show-toast");
+
+  clearTimeout(el.__toastTimer);
+
+  el.__toastTimer = setTimeout(() => {
+    el.classList.remove("show-toast");
+  }, ms);
+}
+
+
+function show(id) {
+
+  document.querySelectorAll(".screen")
+    .forEach(x => x.classList.remove("active"));
+
+  const el = document.getElementById(id);
+
+  if (el) {
+    el.classList.add("active");
+  }
+}
+
+
+function esc(s) {
+
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+
+function format(n) {
+
+  n = Math.max(0, Number(n) || 0);
+
+  if (n >= 1e9) return (n / 1e9).toFixed(1) + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
+  if (n >= 1000) return (n / 1000).toFixed(1) + "K";
+
+  return String(Math.floor(n));
+}
+
+
+function colorClass(name) {
+
+  let h = 0;
+
+  for (let i = 0; i < name.length; i++) {
+    h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  }
+
+  return "c" + (h % 8);
+}
+
+
+/* =========================================================
+   COINS
+========================================================= */
+
+function loadCoins() {
+
+  if (isInfinite) {
+
+    coins = Infinity;
+    updateCoins();
+    return;
+
+  }
+
+  const key = "gl_coins_v3_" + (user?.email || "guest");
+
+  const saved = localStorage.getItem(key);
+
+  coins = saved === null ? 0 : parseInt(saved, 10);
+
+  if (!Number.isFinite(coins) || coins < 0) {
+    coins = 0;
+  }
+
+  updateCoins();
+}
+
+
+function saveCoins() {
+
+  if (isInfinite) return;
+
+  localStorage.setItem(
+    "gl_coins_v3_" + (user?.email || "guest"),
+    String(coins)
+  );
+}
+
+
+function updateCoins() {
+
+  const el = document.getElementById("coins-count");
+
+  if (el) {
+    el.textContent = isInfinite ? "∞" : format(coins);
+  }
+}
+
+
+/* =========================================================
+   ADMIN
+========================================================= */
+
+function checkAdmin() {
+
+  const email = (user?.email || "").toLowerCase();
+
+  if (
+    email === SPECIAL_EMAIL.toLowerCase() ||
+    email.includes("kobik8512") ||
+    email.includes("kobik")
+  ) {
+    return true;
+  }
+
+  return localStorage.getItem("gl_admin_unlock") === "blue007";
+}
+
+
+/* =========================================================
+   GOOGLE LOGIN
+========================================================= */
+
+async function loginWithGoogle() {
+
+  const btn = document.getElementById("btn-google");
+
+  if (!btn) return;
+
+  btn.disabled = true;
+
+  const originalText = btn.innerHTML;
+
+  btn.textContent = "Signing in...";
+
+  try {
 
     /*
-     * YOUR REAL FIREBASE CONFIG
-     * Taken directly from Firebase Project Settings.
-     */
-    const firebaseConfig = {
-      apiKey: "AIzaSyDaQ06E5Zvj6M9XnqOpWgmUsbe5T_EnaPo",
-      authDomain: "golive-ff5ad.firebaseapp.com",
-      databaseURL: "https://golive-ff5ad-default-rtdb.firebaseio.com",
-      projectId: "golive-ff5ad",
-      storageBucket: "golive-ff5ad.firebasestorage.app",
-      messagingSenderId: "994701431927",
-      appId: "1:994701431927:web:4e7615434facc5b54ae272",
-      measurementId: "G-Q99XRZG8EG"
-    };
+      Popup is attempted first.
+
+      If the browser blocks the popup, we fall back
+      to redirect authentication.
+    */
+
+    await signInWithPopup(auth, provider);
+
+  } catch (error) {
+
+    console.error("Google sign-in error:", error);
+
+    const code = error?.code || "";
 
     /*
-     * IMPORTANT:
-     * Firebase is initialized ONCE.
-     * Do not create another firebaseConfig elsewhere.
-     */
+      These errors mean popup authentication isn't
+      usable in the current browser, so redirect is
+      the correct fallback.
+    */
 
-    import {
-      initializeApp
-    } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-
-    import {
-      getAuth,
-      GoogleAuthProvider,
-      signInWithPopup,
-      signOut,
-      onAuthStateChanged
-    } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-
-    // Initialize Firebase
-    const app = initializeApp(firebaseConfig);
-
-    // Initialize Authentication
-    const auth = getAuth(app);
-
-    // Google provider
-    const provider = new GoogleAuthProvider();
-
-    // Force account selection instead of silently reusing
-    // a potentially bad previous session.
-    provider.setCustomParameters({
-      prompt: "select_account"
-    });
-
-    const loginScreen = document.getElementById("loginScreen");
-    const loggedIn = document.getElementById("loggedIn");
-
-    const loginButton = document.getElementById("googleLogin");
-    const logoutButton = document.getElementById("logout");
-
-    const userPhoto = document.getElementById("userPhoto");
-    const userName = document.getElementById("userName");
-    const userEmail = document.getElementById("userEmail");
-
-    const errorBox = document.getElementById("error");
-
-    function showError(message) {
-      console.error(message);
-
-      errorBox.textContent = message;
-      errorBox.style.display = "block";
-
-      setTimeout(() => {
-        errorBox.style.display = "none";
-      }, 7000);
-    }
-
-    function hideError() {
-      errorBox.style.display = "none";
-    }
-
-    /*
-     * GOOGLE LOGIN
-     */
-    loginButton.addEventListener("click", async () => {
-
-      hideError();
-
-      loginButton.disabled = true;
-      loginButton.querySelector("span:last-child").textContent =
-        "Signing in...";
+    if (
+      code === "auth/popup-blocked" ||
+      code === "auth/popup-cancelled"
+    ) {
 
       try {
 
-        const result = await signInWithPopup(auth, provider);
+        await signInWithRedirect(auth, provider);
+        return;
 
-        const user = result.user;
+      } catch (redirectError) {
 
-        console.log("Google login successful:", user);
+        console.error(
+          "Google redirect error:",
+          redirectError
+        );
 
-        showUser(user);
+        showLoginError(redirectError);
 
-      } catch (error) {
+      }
 
-        console.error("Firebase login error:", error);
+    } else {
 
-        /*
-         * Show the REAL Firebase error instead of
-         * just saying "Login failed".
-         */
-        if (error.code === "auth/api-key-not-valid") {
+      showLoginError(error);
 
-          showError(
-            "Firebase API key rejected. Check that this deployed page is using the config in this script."
+    }
+
+  } finally {
+
+    btn.disabled = false;
+
+    btn.innerHTML = originalText;
+
+  }
+
+}
+
+
+function showLoginError(error) {
+
+  const code = error?.code || "unknown";
+
+  switch (code) {
+
+    case "auth/popup-closed-by-user":
+      toast("Google login cancelled");
+      break;
+
+    case "auth/popup-blocked":
+      toast("Popup blocked by browser");
+      break;
+
+    case "auth/unauthorized-domain":
+      toast("This website is not authorized in Firebase");
+      console.error(
+        "Add this website's hostname under Firebase Authentication > Settings > Authorized domains."
+      );
+      break;
+
+    case "auth/operation-not-allowed":
+      toast("Google sign-in is disabled in Firebase");
+      break;
+
+    case "auth/network-request-failed":
+      toast("Network error. Check your connection.");
+      break;
+
+    case "auth/account-exists-with-different-credential":
+      toast("This email uses another sign-in method");
+      break;
+
+    default:
+      toast("Login failed: " + code);
+      break;
+
+  }
+
+}
+
+
+/*
+  Handle users returning from Google redirect login.
+*/
+
+getRedirectResult(auth)
+  .then(result => {
+
+    if (result?.user) {
+      console.log(
+        "Google redirect login successful:",
+        result.user.email
+      );
+    }
+
+  })
+  .catch(error => {
+
+    console.error(
+      "Google redirect result error:",
+      error
+    );
+
+    /*
+      Ignore this if there was no redirect attempt.
+      Otherwise show the actual Firebase error.
+    */
+
+    if (error?.code) {
+      showLoginError(error);
+    }
+
+  });
+
+
+/*
+  Keep the Firebase session after page refresh.
+*/
+
+setPersistence(
+  auth,
+  browserLocalPersistence
+).catch(error => {
+
+  console.warn(
+    "Could not enable auth persistence:",
+    error
+  );
+
+});
+
+
+document.getElementById("btn-google")
+  .addEventListener("click", loginWithGoogle);
+
+
+/* =========================================================
+   AUTH STATE
+========================================================= */
+
+onAuthStateChanged(auth, firebaseUser => {
+
+  if (!firebaseUser) {
+
+    user = null;
+
+    isSpecialUser = false;
+    isInfinite = false;
+
+    show("login-screen");
+
+    return;
+
+  }
+
+
+  user = {
+
+    name:
+      firebaseUser.displayName ||
+      (
+        firebaseUser.email
+          ? firebaseUser.email.split("@")[0]
+          : "User"
+      ),
+
+    email: firebaseUser.email || "",
+
+    picture: firebaseUser.photoURL || null
+
+  };
+
+
+  isSpecialUser = checkAdmin();
+
+  isInfinite = isSpecialUser;
+
+
+  const displayName =
+    document.getElementById("display-name");
+
+  if (displayName) {
+
+    displayName.textContent =
+      user.name +
+      (isSpecialUser ? " 🔑" : "");
+
+  }
+
+
+  loadCoins();
+
+  show("menu");
+
+  listenToLives();
+
+});
+
+
+/* =========================================================
+   ADMIN UNLOCK
+========================================================= */
+
+let adminTaps = 0;
+let adminTapTimer = null;
+
+document.querySelector(".signed-in")
+  .addEventListener("click", () => {
+
+    adminTaps++;
+
+    clearTimeout(adminTapTimer);
+
+    adminTapTimer = setTimeout(() => {
+      adminTaps = 0;
+    }, 1500);
+
+    if (adminTaps < 5) return;
+
+    adminTaps = 0;
+
+    const pin = prompt("Enter admin PIN:");
+
+    if (pin === "blue007") {
+
+      localStorage.setItem(
+        "gl_admin_unlock",
+        "blue007"
+      );
+
+      isSpecialUser = true;
+      isInfinite = true;
+
+      loadCoins();
+
+      document.getElementById("display-name")
+        .textContent =
+        (user?.name || "") + " 🔑";
+
+      toast("Admin unlocked!");
+
+    }
+
+  });
+
+
+/* =========================================================
+   SIGN OUT
+========================================================= */
+
+document.getElementById("btn-signout")
+  .onclick = async () => {
+
+    try {
+
+      if (isHost && currentLiveId) {
+        await stopLive();
+      }
+
+      await signOut(auth);
+
+    } catch (error) {
+
+      console.error(error);
+
+      toast("Sign out failed");
+
+    }
+
+  };
+
+
+/* =========================================================
+   LIVE LIST
+========================================================= */
+
+let activeLives = [];
+
+function listenToLives() {
+
+  onValue(
+    ref(db, "lives"),
+    snap => {
+
+      const value = snap.val() || {};
+
+      activeLives =
+        Object.keys(value).map(id => ({
+          id,
+          ...value[id]
+        }));
+
+      activeLives.sort(
+        (a, b) =>
+          (b.startedAt || 0) -
+          (a.startedAt || 0)
+      );
+
+      renderLives();
+
+    },
+    error => {
+
+      console.error(
+        "Lives listener:",
+        error
+      );
+
+      toast("Database read failed");
+
+    }
+  );
+
+}
+
+
+function renderLives() {
+
+  const list =
+    document.getElementById("lives-list");
+
+  const empty =
+    document.getElementById("empty-state");
+
+  list.querySelectorAll(".live-card")
+    .forEach(x => x.remove());
+
+  if (!activeLives.length) {
+
+    empty.style.display = "block";
+
+    return;
+
+  }
+
+  empty.style.display = "none";
+
+
+  activeLives.forEach(live => {
+
+    const card =
+      document.createElement("div");
+
+    card.className = "live-card";
+
+    card.innerHTML = `
+
+      <div class="live-info">
+
+        <div class="live-name">
+          ${esc(live.title || "Live")}
+        </div>
+
+        <div class="live-meta">
+          <span class="dot"></span>
+          ${esc(live.host || "Host")}
+          ·
+          ${format(live.viewers || 0)}
+          watching
+        </div>
+
+      </div>
+
+      ${
+        (
+          user &&
+          live.hostEmail === user.email
+        ) || isSpecialUser
+          ?
+          `<button
+            class="btn-x-small"
+            data-remove="${esc(live.id)}">
+            ✕
+          </button>`
+          :
+          ""
+      }
+
+      <button
+        class="btn-join"
+        data-join="${esc(live.id)}">
+        Join
+      </button>
+
+    `;
+
+    list.appendChild(card);
+
+  });
+
+
+  list.querySelectorAll("[data-join]")
+    .forEach(btn => {
+
+      btn.onclick = () => {
+
+        const live =
+          activeLives.find(
+            x => x.id === btn.dataset.join
           );
 
-        } else if (error.code === "auth/unauthorized-domain") {
-
-          showError(
-            "This website domain is not authorized in Firebase Authentication."
-          );
-
-        } else if (error.code === "auth/popup-blocked") {
-
-          showError(
-            "Google login popup was blocked. Allow popups and try again."
-          );
-
-        } else if (error.code === "auth/popup-closed-by-user") {
-
-          showError(
-            "Google login was cancelled."
-          );
-
-        } else {
-
-          showError(
-            "Login failed: " +
-            (error.code || "unknown-error") +
-            " — " +
-            (error.message || "Unknown Firebase error")
-          );
+        if (live) {
+          joinViewer(live);
         }
 
-      } finally {
+      };
 
-        loginButton.disabled = false;
-
-        loginButton.querySelector("span:last-child").textContent =
-          "Continue with Google";
-      }
     });
 
 
-    /*
-     * DISPLAY USER
-     */
-    function showUser(user) {
+  list.querySelectorAll("[data-remove]")
+    .forEach(btn => {
 
-      loginScreen.style.display = "none";
-      loggedIn.style.display = "block";
+      btn.onclick = async () => {
 
-      userName.textContent =
-        user.displayName || "Google User";
+        try {
 
-      userEmail.textContent =
-        user.email || "";
+          await remove(
+            ref(
+              db,
+              "lives/" +
+              btn.dataset.remove
+            )
+          );
 
-      userPhoto.src =
-        user.photoURL ||
-        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Crect width='100%25' height='100%25' fill='%23333'/%3E%3C/svg%3E";
+        } catch (error) {
+
+          console.error(error);
+
+          toast("Could not remove live");
+
+        }
+
+      };
+
+    });
+
+}
+
+
+/* =========================================================
+   CLEAR STUCK LIVES
+========================================================= */
+
+document.getElementById("btn-clear")
+  .onclick = async () => {
+
+    if (!isSpecialUser) {
+
+      toast("Admin only");
+
+      return;
+
+    }
+
+    try {
+
+      await remove(
+        ref(db, "lives")
+      );
+
+      toast("Lives cleared");
+
+    } catch (error) {
+
+      console.error(error);
+
+      toast("Could not clear");
+
+    }
+
+  };
+
+
+/* =========================================================
+   GO LIVE
+========================================================= */
+
+document.getElementById("btn-go-live")
+  .onclick = () => {
+
+    document.getElementById("title-input")
+      .value = "";
+
+    document.getElementById("title-modal")
+      .classList.add("show");
+
+    setTimeout(() => {
+
+      document.getElementById("title-input")
+        .focus();
+
+    }, 80);
+
+  };
+
+
+document.getElementById("btn-cancel")
+  .onclick = () => {
+
+    document.getElementById("title-modal")
+      .classList.remove("show");
+
+  };
+
+
+document.getElementById("btn-start")
+  .onclick = startLive;
+
+
+document.getElementById("title-input")
+  .onkeydown = e => {
+
+    if (e.key === "Enter") {
+      startLive();
+    }
+
+  };
+
+
+/* =========================================================
+   START LIVE
+========================================================= */
+
+async function startLive() {
+
+  if (!user) return;
+
+  liveTitle =
+    document.getElementById("title-input")
+      .value.trim() ||
+    user.name + "'s Live";
+
+  document.getElementById("title-modal")
+    .classList.remove("show");
+
+  isHost = true;
+
+  botCount = 0;
+  realViewers = 0;
+  botBatches = {};
+
+  currentLiveId =
+    "l" +
+    Date.now() +
+    "_" +
+    Math.random()
+      .toString(36)
+      .slice(2, 8);
+
+  window.__liveStartedAt = Date.now();
+
+
+  document.getElementById("chat-list")
+    .innerHTML = "";
+
+
+  document.getElementById("btn-b")
+    .style.display =
+      isSpecialUser ? "flex" : "none";
+
+
+  document.getElementById("live-title-text")
+    .textContent = liveTitle;
+
+
+  document.getElementById("mic-status")
+    .textContent = "Camera loading...";
+
+
+  try {
+
+    await set(
+      ref(
+        db,
+        "lives/" +
+        currentLiveId
+      ),
+      {
+        title: liveTitle,
+        host: user.name,
+        hostEmail: user.email,
+        viewers: 0,
+        botCount: 0,
+        startedAt: Date.now()
+      }
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    toast("Could not publish live");
+
+    isHost = false;
+
+    currentLiveId = null;
+
+    return;
+
+  }
+
+
+  show("live-room");
+
+  await startCamera();
+
+  listenForViewers();
+
+  listenToChat(currentLiveId);
+
+  listenToGifts(currentLiveId);
+
+  listenToBotBatches(currentLiveId);
+
+  startBotExpiryWatcher();
+
+}
+
+
+/* =========================================================
+   CAMERA
+========================================================= */
+
+async function startCamera() {
+
+  try {
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error("Camera API unavailable");
     }
 
 
-    /*
-     * SIGN OUT
-     */
-    logoutButton.addEventListener("click", async () => {
+    if (stream) {
+
+      stream.getTracks()
+        .forEach(track => track.stop());
+
+      stream = null;
+
+    }
+
+
+    const newStream =
+      await navigator.mediaDevices.getUserMedia({
+
+        video: {
+          facingMode,
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30, max: 30 }
+        },
+
+        audio: true
+
+      });
+
+
+    stream = newStream;
+
+    cameraOn = true;
+
+
+    const video =
+      document.getElementById("local-video");
+
+
+    video.srcObject = stream;
+
+    video.style.display = "block";
+
+
+    document.getElementById("cam-off")
+      .style.display = "none";
+
+
+    video.classList.toggle(
+      "mirror",
+      facingMode === "user"
+    );
+
+
+    document.getElementById("mic-status")
+      .textContent =
+      isMuted ? "Mic: muted" : "Mic: on";
+
+
+    document.getElementById("btn-camera")
+      .textContent = "📷";
+
+
+    for (
+      const pc of Object.values(peerConnections)
+    ) {
+
+      const videoSender =
+        pc.getSenders().find(
+          sender =>
+            sender.track?.kind === "video"
+        );
+
+
+      const audioSender =
+        pc.getSenders().find(
+          sender =>
+            sender.track?.kind === "audio"
+        );
+
 
       try {
 
-        await signOut(auth);
+        if (videoSender) {
 
-        loggedIn.style.display = "none";
-        loginScreen.style.display = "block";
+          await videoSender.replaceTrack(
+            newStream.getVideoTracks()[0] ||
+            null
+          );
+
+        }
+
+
+        if (audioSender) {
+
+          await audioSender.replaceTrack(
+            newStream.getAudioTracks()[0] ||
+            null
+          );
+
+        }
 
       } catch (error) {
 
-        console.error("Logout error:", error);
-
-        showError(
-          "Logout failed: " +
-          (error.message || "Unknown error")
+        console.warn(
+          "Track replacement:",
+          error
         );
+
       }
+
+    }
+
+  } catch (error) {
+
+    console.error(
+      "Camera:",
+      error
+    );
+
+    cameraOn = false;
+
+    document.getElementById("local-video")
+      .style.display = "none";
+
+    document.getElementById("cam-off")
+      .style.display = "block";
+
+    document.getElementById("mic-status")
+      .textContent = "Camera off";
+
+
+    toast(
+      error.name === "NotAllowedError"
+        ? "Camera/mic permission denied"
+        : "Camera unavailable"
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   CAMERA BUTTON
+========================================================= */
+
+document.getElementById("btn-camera")
+  .onclick = async () => {
+
+    if (!isHost) return;
+
+
+    if (cameraOn) {
+
+      if (stream) {
+
+        stream.getTracks()
+          .forEach(track => track.stop());
+
+        stream = null;
+
+      }
+
+      cameraOn = false;
+
+
+      document.getElementById("local-video")
+        .style.display = "none";
+
+
+      document.getElementById("cam-off")
+        .style.display = "block";
+
+
+      for (
+        const pc of Object.values(peerConnections)
+      ) {
+
+        const sender =
+          pc.getSenders()
+            .find(
+              s => s.track?.kind === "video"
+            );
+
+
+        if (sender) {
+
+          try {
+            await sender.replaceTrack(null);
+          } catch {}
+
+        }
+
+      }
+
+
+      document.getElementById("mic-status")
+        .textContent =
+        isMuted ? "Mic: muted" : "Camera off";
+
+    } else {
+
+      await startCamera();
+
+    }
+
+  };
+
+
+/* =========================================================
+   WEBRTC HOST
+========================================================= */
+
+function listenForViewers() {
+
+  if (unsubViewers) {
+
+    try {
+      unsubViewers();
+    } catch {}
+
+  }
+
+
+  const viewersRef =
+    ref(
+      db,
+      `lives/${currentLiveId}/viewers`
+    );
+
+
+  unsubViewers =
+    onChildAdded(
+      viewersRef,
+      async snap => {
+
+        const id = snap.key;
+
+        if (peerConnections[id]) {
+          return;
+        }
+
+        realViewers++;
+
+        updateViewerCount();
+
+        await createHostPeer(id);
+
+      }
+    );
+
+
+  onChildRemoved(
+    viewersRef,
+    snap => {
+
+      const id = snap.key;
+
+      if (peerConnections[id]) {
+
+        try {
+          peerConnections[id].close();
+        } catch {}
+
+        delete peerConnections[id];
+
+      }
+
+
+      realViewers =
+        Math.max(
+          0,
+          realViewers - 1
+        );
+
+      updateViewerCount();
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   HOST PEER
+========================================================= */
+
+async function createHostPeer(id) {
+
+  const pc =
+    new RTCPeerConnection({
+      iceServers: [
+        {
+          urls: "stun:stun.l.google.com:19302"
+        },
+        {
+          urls: "stun:stun1.l.google.com:19302"
+        }
+      ]
     });
 
 
-    /*
-     * KEEP UI IN SYNC WITH FIREBASE
-     */
-    onAuthStateChanged(auth, (user) => {
+  peerConnections[id] = pc;
 
-      if (user) {
 
-        console.log("Existing Firebase session:", user);
+  const videoTrans =
+    pc.addTransceiver(
+      "video",
+      { direction: "sendonly" }
+    );
 
-        showUser(user);
+
+  const audioTrans =
+    pc.addTransceiver(
+      "audio",
+      { direction: "sendonly" }
+    );
+
+
+  if (stream) {
+
+    await videoTrans.sender.replaceTrack(
+      stream.getVideoTracks()[0] || null
+    );
+
+    await audioTrans.sender.replaceTrack(
+      stream.getAudioTracks()[0] || null
+    );
+
+  }
+
+
+  pc.onicecandidate = event => {
+
+    if (!event.candidate) return;
+
+
+    push(
+      ref(
+        db,
+        `lives/${currentLiveId}/signals/${id}/hostCandidates`
+      ),
+      event.candidate.toJSON()
+    ).catch(() => {});
+
+  };
+
+
+  onValue(
+    ref(
+      db,
+      `lives/${currentLiveId}/signals/${id}/answer`
+    ),
+    async snap => {
+
+      const answer = snap.val();
+
+      if (
+        !answer ||
+        pc.signalingState !==
+          "have-local-offer"
+      ) {
+        return;
+      }
+
+
+      try {
+
+        await pc.setRemoteDescription(
+          new RTCSessionDescription(answer)
+        );
+
+      } catch (error) {
+
+        console.warn(
+          "Host answer:",
+          error
+        );
+
+      }
+
+    }
+  );
+
+
+  onChildAdded(
+    ref(
+      db,
+      `lives/${currentLiveId}/signals/${id}/viewerCandidates`
+    ),
+    snap => {
+
+      const candidate = snap.val();
+
+      if (!candidate) return;
+
+
+      pc.addIceCandidate(
+        new RTCIceCandidate(candidate)
+      ).catch(() => {});
+
+    }
+  );
+
+
+  pc.onconnectionstatechange = () => {
+
+    if (
+      pc.connectionState === "failed" ||
+      pc.connectionState === "closed"
+    ) {
+
+      try {
+        pc.close();
+      } catch {}
+
+      delete peerConnections[id];
+
+    }
+
+  };
+
+
+  try {
+
+    const offer =
+      await pc.createOffer();
+
+    await pc.setLocalDescription(
+      offer
+    );
+
+
+    await set(
+      ref(
+        db,
+        `lives/${currentLiveId}/signals/${id}/offer`
+      ),
+      {
+        type: offer.type,
+        sdp: offer.sdp
+      }
+    );
+
+  } catch (error) {
+
+    console.error(
+      "WebRTC offer:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   VIEWER
+========================================================= */
+
+async function joinViewer(live) {
+
+  await leaveViewer(false);
+
+  isHost = false;
+
+  currentLiveId = live.id;
+
+
+  document.getElementById("live-title-text")
+    .textContent =
+    live.title || "LIVE";
+
+
+  document.getElementById("chat-list")
+    .innerHTML = "";
+
+
+  document.getElementById("local-video")
+    .style.display = "none";
+
+
+  document.getElementById("remote-video")
+    .style.display = "none";
+
+
+  document.getElementById("cam-off")
+    .style.display = "block";
+
+
+  document.getElementById("btn-b")
+    .style.display =
+      isSpecialUser ? "flex" : "none";
+
+
+  show("live-room");
+
+
+  viewerId =
+    "v" +
+    Date.now() +
+    "_" +
+    Math.random()
+      .toString(36)
+      .slice(2, 7);
+
+
+  try {
+
+    await set(
+      ref(
+        db,
+        `lives/${live.id}/viewers/${viewerId}`
+      ),
+      {
+        name: user?.name || "Viewer",
+        joinedAt: Date.now()
+      }
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    toast("Could not join live");
+
+    currentLiveId = null;
+    viewerId = null;
+
+    show("menu");
+
+    return;
+
+  }
+
+
+  unsubLiveEnd =
+    onValue(
+      ref(
+        db,
+        "lives/" + live.id
+      ),
+      snap => {
+
+        if (
+          !snap.exists() &&
+          currentLiveId === live.id
+        ) {
+
+          forceLeaveLive(
+            "Live ended"
+          );
+
+        }
+
+      }
+    );
+
+
+  listenToChat(live.id);
+
+  listenToBotBatches(live.id);
+
+
+  viewerPC =
+    new RTCPeerConnection({
+      iceServers: [
+        {
+          urls: "stun:stun.l.google.com:19302"
+        },
+        {
+          urls: "stun:stun1.l.google.com:19302"
+        }
+      ]
+    });
+
+
+  const pendingCandidates = [];
+
+
+  viewerPC.ontrack = event => {
+
+    const video =
+      document.getElementById(
+        "remote-video"
+      );
+
+
+    if (event.streams?.[0]) {
+
+      video.srcObject =
+        event.streams[0];
+
+      video.style.display =
+        "block";
+
+
+      document.getElementById("cam-off")
+        .style.display =
+        "none";
+
+
+      video.play().catch(() => {});
+
+    }
+
+  };
+
+
+  viewerPC.onicecandidate =
+    event => {
+
+      if (!event.candidate) return;
+
+
+      push(
+        ref(
+          db,
+          `lives/${live.id}/signals/${viewerId}/viewerCandidates`
+        ),
+        event.candidate.toJSON()
+      ).catch(() => {});
+
+    };
+
+
+  onValue(
+    ref(
+      db,
+      `lives/${live.id}/signals/${viewerId}/offer`
+    ),
+    async snap => {
+
+      const offer = snap.val();
+
+
+      if (
+        !offer ||
+        !viewerPC ||
+        viewerPC.signalingState !==
+          "stable"
+      ) {
+        return;
+      }
+
+
+      try {
+
+        await viewerPC.setRemoteDescription(
+          new RTCSessionDescription(offer)
+        );
+
+
+        while (
+          pendingCandidates.length
+        ) {
+
+          const candidate =
+            pendingCandidates.shift();
+
+          try {
+
+            await viewerPC
+              .addIceCandidate(
+                candidate
+              );
+
+          } catch {}
+
+        }
+
+
+        const answer =
+          await viewerPC.createAnswer();
+
+
+        await viewerPC.setLocalDescription(
+          answer
+        );
+
+
+        await set(
+          ref(
+            db,
+            `lives/${live.id}/signals/${viewerId}/answer`
+          ),
+          {
+            type: answer.type,
+            sdp: answer.sdp
+          }
+        );
+
+      } catch (error) {
+
+        console.error(
+          "Viewer WebRTC:",
+          error
+        );
+
+      }
+
+    }
+  );
+
+
+  onChildAdded(
+    ref(
+      db,
+      `lives/${live.id}/signals/${viewerId}/hostCandidates`
+    ),
+    async snap => {
+
+      const candidate =
+        snap.val();
+
+      if (!candidate || !viewerPC) {
+        return;
+      }
+
+
+      const iceCandidate =
+        new RTCIceCandidate(candidate);
+
+
+      if (
+        viewerPC.remoteDescription
+      ) {
+
+        try {
+
+          await viewerPC
+            .addIceCandidate(
+              iceCandidate
+            );
+
+        } catch {}
 
       } else {
 
-        loginScreen.style.display = "block";
-        loggedIn.style.display = "none";
+        pendingCandidates.push(
+          iceCandidate
+        );
+
       }
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   VIEWER CLEANUP
+========================================================= */
+
+async function leaveViewer(
+  showMenu = true
+) {
+
+  const id = currentLiveId;
+  const vid = viewerId;
+
+
+  if (unsubLiveEnd) {
+
+    try {
+      unsubLiveEnd();
+    } catch {}
+
+    unsubLiveEnd = null;
+
+  }
+
+
+  if (unsubChat) {
+
+    try {
+      unsubChat();
+    } catch {}
+
+    unsubChat = null;
+
+  }
+
+
+  if (unsubGifts) {
+
+    try {
+      unsubGifts();
+    } catch {}
+
+    unsubGifts = null;
+
+  }
+
+
+  if (unsubBotData) {
+
+    try {
+      unsubBotData();
+    } catch {}
+
+    unsubBotData = null;
+
+  }
+
+
+  clearTimeout(
+    localBotChatTimer
+  );
+
+  localBotChatTimer = null;
+
+
+  if (viewerPC) {
+
+    try {
+      viewerPC.close();
+    } catch {}
+
+    viewerPC = null;
+
+  }
+
+
+  if (vid && id) {
+
+    await remove(
+      ref(
+        db,
+        `lives/${id}/viewers/${vid}`
+      )
+    ).catch(() => {});
+
+  }
+
+
+  viewerId = null;
+
+
+  if (showMenu) {
+    show("menu");
+  }
+
+}
+
+
+function forceLeaveLive(message) {
+
+  leaveViewer(false)
+    .finally(() => {
+
+      currentLiveId = null;
+
+      show("menu");
+
+      toast(
+        message || "Live ended"
+      );
+
     });
 
-  </script>
+}
 
-</body>
-</html>
+
+/* =========================================================
+   VIEWER COUNT
+========================================================= */
+
+function calculateBotCount() {
+
+  let total = 0;
+
+  const now = Date.now();
+
+
+  Object.values(
+    botBatches || {}
+  ).forEach(batch => {
+
+    if (
+      batch &&
+      Number(batch.expiresAt || 0) >
+        now
+    ) {
+
+      total +=
+        Number(batch.amount || 0);
+
+    }
+
+  });
+
+
+  return total;
+
+}
+
+
+function updateViewerCount() {
+
+  botCount =
+    calculateBotCount();
+
+
+  const total =
+    realViewers + botCount;
+
+
+  document.getElementById(
+    "watchers-text"
+  ).textContent =
+    format(total) +
+    " watching";
+
+
+  if (
+    isHost &&
+    currentLiveId
+  ) {
+
+    update(
+      ref(
+        db,
+        "lives/" +
+        currentLiveId
+      ),
+      {
+        viewers: total,
+        botCount
+      }
+    ).catch(() => {});
+
+  }
+
+}
+
+
+/* =========================================================
+   BOT DATA
+========================================================= */
+
+function listenToBotBatches(id) {
+
+  if (unsubBotData) {
+
+    try {
+      unsubBotData();
+    } catch {}
+
+  }
+
+
+  unsubBotData =
+    onValue(
+      ref(
+        db,
+        `lives/${id}/botBatches`
+      ),
+      snap => {
+
+        botBatches =
+          snap.val() || {};
+
+        updateViewerCount();
+
+        startLocalBotChat();
+
+      }
+    );
+
+}
+
+
+async function addBots(amount) {
+
+  if (
+    !isHost ||
+    !isSpecialUser ||
+    !currentLiveId
+  ) {
+    return;
+  }
+
+
+  const id =
+    "b_" +
+    Date.now() +
+    "_" +
+    Math.random()
+      .toString(36)
+      .slice(2, 7);
+
+
+  const now = Date.now();
+
+
+  try {
+
+    await set(
+      ref(
+        db,
+        `lives/${currentLiveId}/botBatches/${id}`
+      ),
+      {
+        amount: Number(amount),
+        createdAt: now,
+        expiresAt:
+          now +
+          45000 +
+          Math.random() * 135000
+      }
+    );
+
+
+    toast(
+      "+" +
+      format(amount) +
+      " viewers"
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    toast(
+      "Could not add viewers"
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   BOT EXPIRY
+========================================================= */
+
+function startBotExpiryWatcher() {
+
+  clearInterval(
+    botExpiryTimer
+  );
+
+
+  botExpiryTimer =
+    setInterval(
+      async () => {
+
+        if (
+          !isHost ||
+          !currentLiveId
+        ) {
+          return;
+        }
+
+
+        const now =
+          Date.now();
+
+        const updates = {};
+
+
+        Object.entries(
+          botBatches || {}
+        ).forEach(
+          ([id, batch]) => {
+
+            if (
+              batch &&
+              Number(batch.expiresAt || 0) <=
+                now
+            ) {
+
+              updates[
+                `lives/${currentLiveId}/botBatches/${id}`
+              ] = null;
+
+            }
+
+          }
+        );
+
+
+        if (
+          Object.keys(updates).length
+        ) {
+
+          await update(
+            ref(db),
+            updates
+          ).catch(() => {});
+
+        }
+
+
+        updateViewerCount();
+
+      },
+      5000
+    );
+
+}
+
+
+/* =========================================================
+   BOT CHAT
+========================================================= */
+
+const adjs = [
+  "Cool","Epic","Pro","Shadow","Neon",
+  "Cyber","Swift","Fire","Ice","Nova",
+  "Turbo","Elite","Ace","Ninja","Pixel",
+  "Lucky","Wild","Silent","Blaze","Ghost",
+  "Royal","Crystal","Golden","Omega",
+  "Alpha","Hyper","Magic","Storm","Jade",
+  "Violet"
+];
+
+
+const nouns = [
+  "Gamer","Player","Stream","Live","Chat",
+  "Fan","Master","Legend","Hero","Star",
+  "Soul","Wave","Blade","Flash","Coder",
+  "Dev","Cat","Dog","Panda","Wolf",
+  "Dragon","Fox","Tiger","Shark","Raven",
+  "Owl","Bro","Kid","Pro","Chad"
+];
+
+
+const tags = [
+  "","123","99","X","XX","YT","TV",
+  "GG","OP","Live","Pro","77","01"
+];
+
+
+const normalMessages = [
+  "w","W","WW","lets go","LETS GO",
+  "hi","hello","hey","yo","sup",
+  "first","nice stream","fire","🔥",
+  "🔥🔥","💯","👏","❤️","😂","lmao",
+  "lol","haha","love this","keep going",
+  "what game?","pog","POG","based",
+  "mid","L","W","drop a like",
+  "chat is wild","nice cam","10/10",
+  "clip that","aura","rizz","no cap",
+  "fr","sheesh","yooo","goated",
+  "skill issue","huge W","hello host",
+  "mic check","respect","I'm early",
+  "bro","brooo","chat","yo chat",
+  "this is crazy","W stream","nah",
+  "wait","what","OMG","LOL",
+  "🔥🔥🔥","W W W"
+];
+
+
+const openingGreetings = [
+  "hi","hello","hiii","hey","yo",
+  "hi bro","hi kobi","hello kobi",
+  "hey bro","yo kobi","hi chat",
+  "hello chat","first","im early",
+  "hey everyone","sup kobi",
+  "hi everyone","hello bro",
+  "yooo","hiii kobi","hi hi",
+  "hello hello"
+];
+
+
+function rand(array) {
+
+  return array[
+    Math.floor(
+      Math.random() *
+      array.length
+    )
+  ];
+
+}
+
+
+function makeName() {
+
+  return (
+    rand(adjs) +
+    rand(nouns) +
+    rand(tags) +
+    (
+      Math.random() < .35
+        ? Math.floor(
+            Math.random() * 900 + 100
+          )
+        : ""
+    )
+  );
+
+}
+
+
+const names =
+  Array.from(
+    { length: 2500 },
+    makeName
+  );
+
+
+function nextName() {
+
+  return names[
+    Math.floor(
+      Math.random() *
+      names.length
+    )
+  ];
+
+}
+
+
+function nextBotMessage(
+  opening = false
+) {
+
+  if (
+    opening &&
+    Math.random() < .70
+  ) {
+    return rand(
+      openingGreetings
+    );
+  }
+
+
+  if (
+    Math.random() < .72
+  ) {
+    return rand(
+      normalMessages
+    );
+  }
+
+
+  return (
+    rand(normalMessages) +
+    " " +
+    rand(normalMessages)
+  );
+
+}
+
+
+function getChatSpeed() {
+
+  const count =
+    calculateBotCount();
+
+
+  if (count < 10)
+    return {
+      interval: 1600,
+      burst: 1
+    };
+
+
+  if (count < 100)
+    return {
+      interval: 650,
+      burst: 1
+    };
+
+
+  if (count < 1000)
+    return {
+      interval: 180,
+      burst: 2
+    };
+
+
+  if (count < 3000)
+    return {
+      interval: 80,
+      burst: 3
+    };
+
+
+  if (count < 7000)
+    return {
+      interval: 40,
+      burst: 5
+    };
+
+
+  if (count < 20000)
+    return {
+      interval: 25,
+      burst: 8
+    };
+
+
+  if (count < 100000)
+    return {
+      interval: 18,
+      burst: 12
+    };
+
+
+  return {
+    interval: 16,
+    burst: 18
+  };
+
+}
+
+
+function startLocalBotChat() {
+
+  clearTimeout(
+    localBotChatTimer
+  );
+
+
+  if (
+    calculateBotCount() > 0
+  ) {
+
+    localBotChatTick();
+
+  }
+
+}
+
+
+function localBotChatTick() {
+
+  const count =
+    calculateBotCount();
+
+
+  if (count <= 0) {
+
+    localBotChatTimer =
+      setTimeout(
+        localBotChatTick,
+        1000
+      );
+
+    return;
+
+  }
+
+
+  const speed =
+    getChatSpeed();
+
+
+  const opening =
+    Date.now() -
+    (
+      window.__liveStartedAt ||
+      Date.now()
+    ) <
+    45000;
+
+
+  for (
+    let i = 0;
+    i < speed.burst;
+    i++
+  ) {
+
+    enqueueChat({
+
+      name: nextName(),
+
+      text:
+        nextBotMessage(
+          opening
+        ),
+
+      host: false,
+
+      gift: false
+
+    });
+
+  }
+
+
+  localBotChatTimer =
+    setTimeout(
+      localBotChatTick,
+      speed.interval
+    );
+
+}
+
+
+/* =========================================================
+   CHAT
+========================================================= */
+
+function enqueueChat(message) {
+
+  chatQueue.push(message);
+
+
+  if (
+    chatQueue.length > 300
+  ) {
+
+    chatQueue.splice(
+      0,
+      chatQueue.length - 300
+    );
+
+  }
+
+
+  if (!chatFramePending) {
+
+    chatFramePending = true;
+
+    requestAnimationFrame(
+      renderChat
+    );
+
+  }
+
+}
+
+
+function renderChat() {
+
+  chatFramePending = false;
+
+
+  const list =
+    document.getElementById(
+      "chat-list"
+    );
+
+
+  const batch =
+    chatQueue.splice(
+      0,
+      80
+    );
+
+
+  const fragment =
+    document.createDocumentFragment();
+
+
+  batch.forEach(message => {
+
+    const div =
+      document.createElement(
+        "div"
+      );
+
+
+    div.className =
+      "msg" +
+      (
+        message.host
+          ? " host"
+          : ""
+      ) +
+      (
+        message.gift
+          ? " gift-msg"
+          : ""
+      );
+
+
+    const cls =
+      message.host ||
+      message.gift
+        ? ""
+        : colorClass(
+            message.name
+          );
+
+
+    div.innerHTML =
+      `<span class="uname ${cls}">
+        ${esc(message.name)}
+      </span>${esc(message.text)}`;
+
+
+    fragment.appendChild(div);
+
+  });
+
+
+  list.appendChild(
+    fragment
+  );
+
+
+  while (
+    list.children.length >
+    MAX_CHAT_DOM
+  ) {
+
+    list.removeChild(
+      list.firstChild
+    );
+
+  }
+
+
+  list.scrollTop =
+    list.scrollHeight;
+
+
+  if (chatQueue.length) {
+
+    chatFramePending = true;
+
+    requestAnimationFrame(
+      renderChat
+    );
+
+  }
+
+}
+
+
+function listenToChat(id) {
+
+  if (unsubChat) {
+
+    try {
+      unsubChat();
+    } catch {}
+
+  }
+
+
+  seenChat.clear();
+
+
+  unsubChat =
+    onChildAdded(
+      ref(
+        db,
+        `lives/${id}/chat`
+      ),
+      snap => {
+
+        if (
+          seenChat.has(
+            snap.key
+          )
+        ) {
+          return;
+        }
+
+
+        seenChat.add(
+          snap.key
+        );
+
+
+        const message =
+          snap.val();
+
+
+        if (
+          !message ||
+          message.bot
+        ) {
+          return;
+        }
+
+
+        enqueueChat({
+
+          name:
+            message.name ||
+            "User",
+
+          text:
+            message.text ||
+            "",
+
+          host:
+            !!message.host,
+
+          gift:
+            !!message.gift
+
+        });
+
+      }
+    );
+
+}
+
+
+/* =========================================================
+   SEND CHAT
+========================================================= */
+
+document.getElementById("btn-send")
+  .onclick = sendMessage;
+
+
+document.getElementById("chat-input")
+  .onkeydown = event => {
+
+    if (event.key === "Enter") {
+      sendMessage();
+    }
+
+  };
+
+
+async function sendMessage() {
+
+  const input =
+    document.getElementById(
+      "chat-input"
+    );
+
+
+  const text =
+    input.value.trim();
+
+
+  if (
+    !text ||
+    !currentLiveId ||
+    !user
+  ) {
+    return;
+  }
+
+
+  input.value = "";
+
+
+  try {
+
+    await push(
+      ref(
+        db,
+        `lives/${currentLiveId}/chat`
+      ),
+      {
+        name: user.name,
+        text,
+        host: isHost,
+        gift: false,
+        at: Date.now()
+      }
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    toast("Chat failed");
+
+  }
+
+}
+
+
+/* =========================================================
+   GIFTS
+========================================================= */
+
+const GIFTS = [
+  ["🌹","Rose",1],
+  ["❤️","Heart",5],
+  ["🍭","Lollipop",10],
+  ["🍦","Ice Cream",15],
+  ["🍩","Donut",20],
+  ["🎈","Balloon",25],
+  ["🎀","Ribbon",30],
+  ["🌸","Cherry Blossom",35],
+  ["⭐","Star",50],
+  ["🌟","Glowing Star",75],
+  ["💎","Diamond",100],
+  ["👑","Crown",150],
+  ["🔥","Fire",200],
+  ["🚀","Rocket",300],
+  ["🎉","Party",400],
+  ["🦄","Unicorn",500],
+  ["🌈","Rainbow",600],
+  ["🐻","Bear",800],
+  ["🐯","Tiger",1000],
+  ["🦁","Lion",1500],
+  ["🐉","Dragon",2500],
+  ["🦅","Eagle",3000],
+  ["🦈","Shark",4000],
+  ["🐺","Wolf",5000],
+  ["🏎️","Race Car",8000],
+  ["✈️","Airplane",12000],
+  ["🚁","Helicopter",15000],
+  ["🛥️","Yacht",25000],
+  ["🏰","Castle",40000],
+  ["🌌","Galaxy",60000],
+  ["☄️","Comet",75000],
+  ["🪐","Planet",90000],
+  ["🌍","Earth",100000],
+  ["✨","Sparkles",85],
+  ["🎇","Firework",220],
+  ["🏆","Trophy",900],
+  ["🥇","Gold Medal",1200],
+  ["🎯","Bullseye",95],
+  ["🎸","Guitar",700],
+  ["🎮","Gamepad",650],
+  ["🤖","Robot",1300],
+  ["👻","Ghost",175],
+  ["🎃","Pumpkin",140],
+  ["🎅","Santa",850],
+  ["🧙","Wizard",1600],
+  ["🧚","Fairy",1400],
+  ["🧛","Vampire",1700],
+  ["🦸","Hero",2200],
+  ["🧞","Genie",5000],
+  ["🐬","Dolphin",1600],
+  ["🐳","Whale",7000],
+  ["🦖","T-Rex",12000],
+  ["🌋","Volcano",15000],
+  ["🌊","Wave",700],
+  ["⚡","Lightning",450],
+  ["💥","Boom",550],
+  ["💯","100",100],
+  ["💸","Money Fly",2000],
+  ["💰","Money Bag",5000],
+  ["🤑","Rich Face",3000],
+  ["🔮","Crystal Ball",2200],
+  ["🪄","Magic Wand",1800],
+  ["🏟️","Stadium",50000],
+  ["🛸","UFO",30000],
+  ["🪩","Disco Ball",1200],
+  ["🎭","Masks",800],
+  ["🎨","Art",600],
+  ["🖼️","Painting",1500],
+  ["🧬","DNA",1100],
+  ["🧪","Potion",700],
+  ["🔭","Telescope",1300],
+  ["🛰️","Satellite",20000],
+  ["👨‍🚀","Astronaut",18000]
+];
+
+
+GIFTS.forEach(gift => {
+
+  const element =
+    document.createElement("div");
+
+
+  element.className =
+    "gift-item";
+
+
+  element.innerHTML = `
+    <div class="g-emoji">
+      ${gift[0]}
+    </div>
+
+    <div class="g-name">
+      ${esc(gift[1])}
+    </div>
+
+    <div class="g-cost">
+      🪙 ${format(gift[2])}
+    </div>
+  `;
+
+
+  element.onclick = () =>
+    sendGift(gift);
+
+
+  document.getElementById(
+    "gift-grid"
+  ).appendChild(element);
+
+});
+
+
+document.getElementById("btn-gift")
+  .onclick = () => {
+
+    if (isHost) {
+
+      toast(
+        "You can't gift in your own live"
+      );
+
+      return;
+
+    }
+
+
+    document.getElementById(
+      "gift-panel"
+    ).classList.add("show");
+
+  };
+
+
+document.getElementById("gift-close")
+  .onclick = () => {
+
+    document.getElementById(
+      "gift-panel"
+    ).classList.remove("show");
+
+  };
+
+
+function playGiftAnim(
+  emoji,
+  name,
+  cost
+) {
+
+  const element =
+    document.getElementById(
+      "gift-anim"
+    );
+
+
+  element.innerHTML = `
+    <div class="gift-fly">
+      ${emoji}
+    </div>
+
+    <div class="gift-label">
+      ${emoji}
+      ${esc(name)}
+      · 🪙${format(cost)}
+    </div>
+  `;
+
+
+  setTimeout(() => {
+
+    element.innerHTML = "";
+
+  }, 1200);
+
+}
+
+
+async function sendGift(gift) {
+
+  if (
+    !currentLiveId ||
+    isHost
+  ) {
+    return;
+  }
+
+
+  const cost =
+    gift[2];
+
+
+  if (
+    !isInfinite &&
+    coins < cost
+  ) {
+
+    toast(
+      "Not enough coins!"
+    );
+
+    return;
+
+  }
+
+
+  if (!isInfinite) {
+
+    coins -= cost;
+
+    saveCoins();
+
+    updateCoins();
+
+  }
+
+
+  document.getElementById(
+    "gift-panel"
+  ).classList.remove("show");
+
+
+  playGiftAnim(
+    gift[0],
+    gift[1],
+    cost
+  );
+
+
+  try {
+
+    await push(
+      ref(
+        db,
+        `lives/${currentLiveId}/chat`
+      ),
+      {
+        name: user.name,
+        text:
+          `sent ${gift[0]} ${gift[1]} (🪙${format(cost)})`,
+        host: false,
+        gift: true,
+        at: Date.now()
+      }
+    );
+
+
+    await push(
+      ref(
+        db,
+        `lives/${currentLiveId}/gifts`
+      ),
+      {
+        from: user.name,
+        emoji: gift[0],
+        name: gift[1],
+        cost,
+        toHost:
+          Math.floor(cost * .7),
+        at: Date.now()
+      }
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    toast("Gift failed");
+
+  }
+
+}
+
+
+/* =========================================================
+   RECEIVE GIFTS
+========================================================= */
+
+function listenToGifts(id) {
+
+  if (unsubGifts) {
+
+    try {
+      unsubGifts();
+    } catch {}
+
+  }
+
+
+  unsubGifts =
+    onChildAdded(
+      ref(
+        db,
+        `lives/${id}/gifts`
+      ),
+      snap => {
+
+        if (!isHost) return;
+
+
+        const gift =
+          snap.val();
+
+
+        if (!gift) return;
+
+
+        playGiftAnim(
+          gift.emoji,
+          gift.name,
+          gift.cost
+        );
+
+
+        if (!isInfinite) {
+
+          coins += Number(
+            gift.toHost || 0
+          );
+
+          saveCoins();
+
+          updateCoins();
+
+        }
+
+      }
+    );
+
+}
+
+
+/* =========================================================
+   MIC
+========================================================= */
+
+document.getElementById("btn-mic")
+  .onclick = () => {
+
+    if (
+      !isHost ||
+      !stream
+    ) {
+      return;
+    }
+
+
+    isMuted = !isMuted;
+
+
+    stream
+      .getAudioTracks()
+      .forEach(track => {
+
+        track.enabled =
+          !isMuted;
+
+      });
+
+
+    document.getElementById(
+      "btn-mic"
+    ).textContent =
+      isMuted
+        ? "🔇"
+        : "🎤";
+
+
+    document.getElementById(
+      "mic-status"
+    ).textContent =
+      isMuted
+        ? "Mic: muted"
+        : "Mic: on";
+
+  };
+
+
+/* =========================================================
+   FLIP CAMERA
+========================================================= */
+
+document.getElementById("btn-flip")
+  .onclick = async () => {
+
+    if (!isHost) return;
+
+
+    facingMode =
+      facingMode === "user"
+        ? "environment"
+        : "user";
+
+
+    await startCamera();
+
+  };
+
+
+/* =========================================================
+   B BUTTON
+========================================================= */
+
+const bButton =
+  document.getElementById(
+    "btn-b"
+  );
+
+
+const botMenu =
+  document.getElementById(
+    "bot-menu"
+  );
+
+
+let holdTimer = null;
+let wasHeld = false;
+
+
+bButton.addEventListener(
+  "pointerdown",
+  event => {
+
+    if (
+      !isHost ||
+      !isSpecialUser
+    ) {
+      return;
+    }
+
+
+    event.preventDefault();
+
+    wasHeld = false;
+
+    clearTimeout(
+      holdTimer
+    );
+
+
+    holdTimer =
+      setTimeout(() => {
+
+        wasHeld = true;
+
+        botMenu.classList.add(
+          "show"
+        );
+
+      }, 450);
+
+  }
+);
+
+
+bButton.addEventListener(
+  "pointerup",
+  async event => {
+
+    if (
+      !isHost ||
+      !isSpecialUser
+    ) {
+      return;
+    }
+
+
+    event.preventDefault();
+
+    clearTimeout(
+      holdTimer
+    );
+
+
+    if (!wasHeld) {
+
+      await addBots(
+        botAddAmount
+      );
+
+    }
+
+  }
+);
+
+
+bButton.addEventListener(
+  "pointercancel",
+  () => {
+
+    clearTimeout(
+      holdTimer
+    );
+
+  }
+);
+
+
+document.addEventListener(
+  "pointerdown",
+  event => {
+
+    if (
+      !event.target.closest(
+        ".b-wrap"
+      )
+    ) {
+
+      botMenu.classList.remove(
+        "show"
+      );
+
+    }
+
+  }
+);
+
+
+document.querySelectorAll(
+  ".bot-options button"
+).forEach(button => {
+
+  button.onclick = () => {
+
+    botAddAmount =
+      Number(
+        button.dataset.bots
+      );
+
+
+    document.querySelectorAll(
+      ".bot-options button"
+    ).forEach(other => {
+
+      other.classList.toggle(
+        "selected",
+        other === button
+      );
+
+    });
+
+
+    document.getElementById(
+      "bot-selected"
+    ).textContent =
+      "Selected: " +
+      format(botAddAmount);
+
+
+    botMenu.classList.remove(
+      "show"
+    );
+
+
+    toast(
+      format(botAddAmount) +
+      " viewers per B click"
+    );
+
+  };
+
+});
+
+
+document.querySelector(
+  '.bot-options button[data-bots="1"]'
+).classList.add(
+  "selected"
+);
+
+
+/* =========================================================
+   STOP LIVE
+========================================================= */
+
+async function stopLive() {
+
+  const id =
+    currentLiveId;
+
+
+  clearTimeout(
+    localBotChatTimer
+  );
+
+  clearInterval(
+    botExpiryTimer
+  );
+
+
+  localBotChatTimer = null;
+  botExpiryTimer = null;
+
+
+  if (unsubBotData) {
+
+    try {
+      unsubBotData();
+    } catch {}
+
+    unsubBotData = null;
+
+  }
+
+
+  if (unsubViewers) {
+
+    try {
+      unsubViewers();
+    } catch {}
+
+    unsubViewers = null;
+
+  }
+
+
+  if (unsubChat) {
+
+    try {
+      unsubChat();
+    } catch {}
+
+    unsubChat = null;
+
+  }
+
+
+  if (unsubGifts) {
+
+    try {
+      unsubGifts();
+    } catch {}
+
+    unsubGifts = null;
+
+  }
+
+
+  if (unsubLiveEnd) {
+
+    try {
+      unsubLiveEnd();
+    } catch {}
+
+    unsubLiveEnd = null;
+
+  }
+
+
+  if (stream) {
+
+    stream
+      .getTracks()
+      .forEach(track =>
+        track.stop()
+      );
+
+    stream = null;
+
+  }
+
+
+  Object.values(
+    peerConnections
+  ).forEach(pc => {
+
+    try {
+      pc.close();
+    } catch {}
+
+  });
+
+
+  peerConnections = {};
+
+
+  if (viewerPC) {
+
+    try {
+      viewerPC.close();
+    } catch {}
+
+    viewerPC = null;
+
+  }
+
+
+  if (
+    viewerId &&
+    id
+  ) {
+
+    await remove(
+      ref(
+        db,
+        `lives/${id}/viewers/${viewerId}`
+      )
+    ).catch(() => {});
+
+  }
+
+
+  if (
+    isHost &&
+    id
+  ) {
+
+    await remove(
+      ref(
+        db,
+        "lives/" + id
+      )
+    ).catch(() => {});
+
+  }
+
+
+  isHost = false;
+  cameraOn = false;
+
+  currentLiveId = null;
+  viewerId = null;
+
+  botCount = 0;
+  realViewers = 0;
+  botBatches = {};
+
+
+  document.getElementById(
+    "local-video"
+  ).srcObject = null;
+
+
+  document.getElementById(
+    "remote-video"
+  ).srcObject = null;
+
+
+  document.getElementById(
+    "local-video"
+  ).style.display = "none";
+
+
+  document.getElementById(
+    "remote-video"
+  ).style.display = "none";
+
+
+  document.getElementById(
+    "cam-off"
+  ).style.display = "block";
+
+
+  document.getElementById(
+    "chat-list"
+  ).innerHTML = "";
+
+
+  chatQueue = [];
+
+
+  show("menu");
+
+  toast("Live ended");
+
+}
+
+
+/* =========================================================
+   LEAVE
+========================================================= */
+
+document.getElementById("btn-leave")
+  .onclick = async () => {
+
+    if (isHost) {
+
+      await stopLive();
+
+    } else {
+
+      await leaveViewer();
+
+      currentLiveId = null;
+
+      show("menu");
+
+      toast("Left live");
+
+    }
+
+  };
+
+
+/* =========================================================
+   CLEANUP
+========================================================= */
+
+window.addEventListener(
+  "beforeunload",
+  () => {
+
+    if (
+      viewerId &&
+      currentLiveId
+    ) {
+
+      remove(
+        ref(
+          db,
+          `lives/${currentLiveId}/viewers/${viewerId}`
+        )
+      ).catch(() => {});
+
+    }
+
+  }
+);
+
+  </script>
