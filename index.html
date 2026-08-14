@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Go Live Simulator</title>
+  <style>
+    :root {
+      --bg: #0f0f13;
+      --card: #1a1a22;
+      --accent: #ff2d55;
+      --accent2: #00d4ff;
+      --text: #f0f0f5;
+      --muted: #8a8a9a;
+      --green: #00e676;
+      --danger: #ff3b30;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    button { cursor: pointer; border: none; font-family: inherit; }
+    input, textarea { font-family: inherit; }
+
+    /* ===== SCREENS ===== */
+    .screen { display: none; min-height: 100vh; flex-direction: column; }
+    .screen.active { display: flex; }
+
+    /* ===== MENU ===== */
+    #menu {
+      padding: 20px 16px 100px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 28px;
+    }
+    .logo {
+      font-size: 1.6rem;
+      font-weight: 800;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .user-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--card);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+    }
+    .user-badge .dot {
+      width: 8px; height: 8px;
+      background: var(--green);
+      border-radius: 50%;
+    }
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 14px;
+      color: var(--muted);
+    }
+    .lives-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 30px;
+    }
+    .live-card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border: 1px solid #2a2a35;
+    }
+    .live-thumb {
+      width: 64px; height: 64px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #2a2a40, #1a1a28);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      flex-shrink: 0;
+    }
+    .live-info { flex: 1; min-width: 0; }
+    .live-title {
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .live-meta {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .btn-join {
+      background: var(--accent);
+      color: white;
+      padding: 10px 18px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    .btn-join:active { transform: scale(0.96); }
+    .empty-lives {
+      text-align: center;
+      color: var(--muted);
+      padding: 40px 20px;
+      background: var(--card);
+      border-radius: 16px;
+      border: 1px dashed #333;
+    }
+
+    /* Go Live FAB */
+    .go-live-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      padding: 16px 20px 28px;
+      background: linear-gradient(transparent, var(--bg) 30%);
+      display: flex;
+      justify-content: center;
+    }
+    .btn-go-live {
+      background: linear-gradient(135deg, var(--accent), #ff5c7a);
+      color: white;
+      font-size: 1.15rem;
+      font-weight: 700;
+      padding: 16px 48px;
+      border-radius: 50px;
+      box-shadow: 0 8px 32px rgba(255, 45, 85, 0.4);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-go-live:active { transform: scale(0.97); }
+
+    /* Login overlay */
+    #login-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+    }
+    #login-overlay.hidden { display: none; }
+    .login-card {
+      background: var(--card);
+      border-radius: 24px;
+      padding: 32px 28px;
+      width: 100%;
+      max-width: 360px;
+      text-align: center;
+    }
+    .login-card h2 {
+      margin-bottom: 8px;
+      font-size: 1.4rem;
+    }
+    .login-card p {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 24px;
+    }
+    .btn-google {
+      width: 100%;
+      background: white;
+      color: #333;
+      padding: 14px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .btn-google img { width: 22px; height: 22px; }
+
+    /* ===== LIVE ROOM ===== */
+    #live-room {
+      position: relative;
+      background: #000;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #video-container {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #111;
+    }
+    #local-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .video-placeholder {
+      text-align: center;
+      color: var(--muted);
+    }
+    .video-placeholder .cam-icon { font-size: 4rem; margin-bottom: 12px; }
+
+    /* Top bar */
+    .live-top {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      padding: 14px 14px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      z-index: 20;
+      pointer-events: none;
+    }
+    .live-top > * { pointer-events: auto; }
+    .live-badge {
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(8px);
+      border-radius: 10px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    .live-dot {
+      width: 8px; height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 1.2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .viewer-count {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .top-controls {
+      display: flex;
+      gap: 8px;
+    }
+    .ctrl-btn {
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(8px);
+      color: white;
+      font-size: 1.15rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .ctrl-btn.muted { background: var(--danger); }
+    .ctrl-btn.b-btn {
+      background: linear-gradient(135deg, #7b2ff7, #00d4ff);
+      font-weight: 800;
+      font-size: 1rem;
+    }
+    .ctrl-btn:active { transform: scale(0.92); }
+
+    /* Chat */
+    .chat-area {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 42%;
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(transparent, rgba(0,0,0,0.75) 25%);
+      z-index: 15;
+      pointer-events: none;
+    }
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: auto;
+      scrollbar-width: none;
+    }
+    .chat-messages::-webkit-scrollbar { display: none; }
+    .chat-msg {
+      background: rgba(0,0,0,0.45);
+      backdrop-filter: blur(4px);
+      border-radius: 12px;
+      padding: 7px 12px;
+      font-size: 0.88rem;
+      max-width: 85%;
+      align-self: flex-start;
+      line-height: 1.35;
+      animation: fadeIn 0.25s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .chat-msg .name {
+      font-weight: 700;
+      color: var(--accent2);
+      margin-right: 6px;
+    }
+    .chat-msg.host .name { color: var(--accent); }
+    .chat-input-row {
+      display: flex;
+      gap: 8px;
+      padding: 8px 12px 18px;
+      pointer-events: auto;
+    }
+    #chat-input {
+      flex: 1;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 24px;
+      padding: 12px 18px;
+      color: white;
+      font-size: 0.95rem;
+      outline: none;
+    }
+    #chat-input::placeholder { color: rgba(255,255,255,0.45); }
+    .btn-send {
+      width: 46px; height: 46px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: white;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Title prompt modal */
+    #title-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      padding: 20px;
+    }
+    #title-modal.show { display: flex; }
+    .title-card {
+      background: var(--card);
+      border-radius: 20px;
+      padding: 28px 24px;
+      width: 100%;
+      max-width: 340px;
+    }
+    .title-card h3 {
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    #live-title-input {
+      width: 100%;
+      background: #12121a;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 14px 16px;
+      color: white;
+      font-size: 1rem;
+      margin-bottom: 18px;
+      outline: none;
+    }
+    .title-actions {
+      display: flex;
+      gap: 10px;
+    }
+    .btn-cancel, .btn-start {
+      flex: 1;
+      padding: 13px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    .btn-cancel { background: #2a2a35; color: var(--text); }
+    .btn-start { background: var(--accent); color: white; }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: rgba(0,0,0,0.8);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      opacity: 0;
+      transition: all 0.3s;
+      z-index: 200;
+      pointer-events: none;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <!-- LOGIN -->
+  <div id="login-overlay">
+    <div class="login-card">
+      <h2>Go Live Simulator</h2>
+      <p>Register to start streaming &amp; join lives</p>
+      <button class="btn-google" id="btn-google">
+        <svg width="22" height="22" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
+        Continue with Google
+      </button>
+    </div>
+  </div>
+
+  <!-- MENU -->
+  <div id="menu" class="screen">
+    <div class="header">
+      <div class="logo">GoLive</div>
+      <div class="user-badge" id="user-badge">
+        <span class="dot"></span>
+        <span id="user-email-display">—</span>
+      </div>
+    </div>
+
+    <div class="section-title">Live now</div>
+    <div class="lives-list" id="lives-list">
+      <div class="empty-lives" id="empty-lives">No one is live right now.<br>Be the first!</div>
+    </div>
+
+    <div class="go-live-bar">
+      <button class="btn-go-live" id="btn-go-live">
+        <span>🔴</span> Go Live
+      </button>
+    </div>
+  </div>
+
+  <!-- LIVE ROOM -->
+  <div id="live-room" class="screen">
+    <div id="video-container">
+      <video id="local-video" autoplay playsinline muted></video>
+      <div class="video-placeholder" id="video-placeholder">
+        <div class="cam-icon">📷</div>
+        <div>Camera off or permission denied</div>
+      </div>
+    </div>
+
+    <div class="live-top">
+      <div class="live-badge">
+        <div class="live-dot"></div>
+        <span>LIVE</span>
+        <div class="viewer-count">
+          <span>👁</span>
+          <span id="viewer-count">0</span>
+        </div>
+      </div>
+      <div class="top-controls">
+        <button class="ctrl-btn b-btn" id="btn-b" title="Add bot (host only)" style="display:none;">B</button>
+        <button class="ctrl-btn" id="btn-flip" title="Flip camera">🔄</button>
+        <button class="ctrl-btn" id="btn-mic" title="Mute">🎤</button>
+        <button class="ctrl-btn" id="btn-leave" title="Leave">✕</button>
+      </div>
+    </div>
+
+    <div class="chat-area">
+      <div class="chat-messages" id="chat-messages"></div>
+      <div class="chat-input-row">
+        <input type="text" id="chat-input" placeholder="Say something..." maxlength="120" />
+        <button class="btn-send" id="btn-send">➤</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Title modal -->
+  <div id="title-modal">
+    <div class="title-card">
+      <h3>Name your live</h3>
+      <input type="text" id="live-title-input" placeholder="e.g. my live" maxlength="40" />
+      <div class="title-actions">
+        <button class="btn-cancel" id="btn-cancel-title">Cancel</button>
+        <button class="btn-start" id="btn-start-live">Start Live</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ========== CONFIG ==========
+    const SPECIAL_EMAIL = 'kobik8512@gmail.com';
+
+    // ========== STATE ==========
+    let currentUser = null;          // { email }
+    let isHost = false;
+    let liveTitle = '';
+    let stream = null;
+    let facingMode = 'user';
+    let isMuted = false;
+    let videoEnabled = true;
+
+    let botCount = 0;
+    let realViewers = 0;             // simulated "real" people
+    let totalViewers = 0;
+    let botJoinTimer = null;
+    let chatSpamTimer = null;
+    let realViewerTimer = null;
+
+    // Active lives (in this simulator only the current user's live is real)
+    let activeLives = [];
+
+    // ========== UNIQUE NAMES & MESSAGES ==========
+    const adjectives = [
+      'Cool','Epic','Pro','Shadow','Dark','Neon','Cyber','Pixel','Swift','Silent',
+      'Lucky','Wild','Fire','Ice','Storm','Ghost','Blaze','Nova','Turbo','Ultra',
+      'Hyper','Magic','Royal','Crystal','Golden','Silver','Crimson','Azure','Jade','Violet',
+      'Omega','Alpha','Delta','Zero','Prime','Elite','Ace','King','Queen','Lord',
+      'Ninja','Samurai','Warrior','Hunter','Fox','Wolf','Dragon','Phoenix','Tiger','Eagle'
+    ];
+    const nouns = [
+      'Gamer','Player','Stream','Live','Chat','Viewer','Fan','Boy','Girl','Kid',
+      'Master','Legend','Hero','Star','Soul','Mind','Force','Wave','Pulse','Spark',
+      'Blade','Arrow','Bolt','Flash','Dash','Rush','Strike','Shot','Kick','Punch',
+      'Coder','Dev','Hacker','Nerd','Geek','Pro','Noob','Chad','Bro','Dude',
+      'Cat','Dog','Panda','Bear','Lion','Shark','Snake','Raven','Owl','Hawk'
+    ];
+    const suffixes = ['', '123', '99', '77', 'X', 'XX', '69', '420', '777', 'YT', 'TV', 'Live', 'Pro', 'GG', 'OP'];
+
+    const msgTemplates = [
+      'w', 'W', 'WW', 'WWW', 'wwww', 'W W W',
+      'let\'s go', 'LETS GO', 'lets goo', 'LET\'S GOOO',
+      'hi', 'hello', 'hey', 'yo', 'sup', 'hiii',
+      'first', 'FIRST', 'I\'m early', 'early gang',
+      'nice stream', 'great stream', 'good content', 'fire stream',
+      '🔥', '🔥🔥', '🔥🔥🔥', '💯', '👏', '❤️', '😂', '🤣', '👀', '🐐',
+      'LMAO', 'lol', 'haha', 'hahaha', 'lmaooo',
+      'this is so good', 'love this', 'keep going', 'don\'t stop',
+      'what game is this?', 'what are you playing?', 'which game?',
+      'can you hear me?', 'audio good?', 'mic check',
+      'new here', 'just joined', 'hi from [place]',
+      'follow me back', 'sub?', 'anyone else here?',
+      'this chat is wild', 'chat going crazy', 'spam',
+      'bot?', 'are these bots?', 'so many people',
+      'pog', 'POG', 'poggers', 'based', 'based and true',
+      'cringe', 'mid', 'ratio', 'L', 'W stream',
+      'drop a like', 'like if you agree', 'type 1 if yes',
+      'how long have you been live?', 'started when?',
+      'where are you from?', 'what time is it there?',
+      'this is fire', 'absolute cinema', 'peak content',
+      'I can\'t believe this', 'no way', 'wait what',
+      'send gift', 'gifted sub', 'thanks for stream',
+      'see you next time', 'gotta go', 'bye chat',
+      'anyone else hyped?', 'hype train', 'choo choo',
+      'mod?', 'can I be mod?', 'ban this guy',
+      'nice cam', 'good lighting', 'setup looks clean',
+      'what mic is that?', 'headphones?', 'PC or console?',
+      'rate the stream 1-10', '10/10', 'solid 8',
+      'this is better than [platform]', 'better than twitch',
+      'who else is watching?', 'raise hand if here',
+      'chat move', 'chat wake up', 'hello???',
+      'I was here from the start', 'day 1 viewer',
+      'algorithm brought me here', 'fyp', 'recommended',
+      'this needs more viewers', 'share the stream',
+      'clip that', 'someone clip', 'instant classic',
+      'main character energy', 'aura', 'rizz',
+      'no cap', 'fr fr', 'on god', 'deadass',
+      'skill issue', 'git gud', 'touch grass',
+      'I\'m crying', 'tears', 'emotional damage',
+      'plot twist', 'didn\'t see that coming',
+      'ok that was good', 'respect', 'huge W',
+      'who is this guy?', 'new favorite streamer',
+      'bookmarking this', 'saving for later',
+      'my friends need to see this',
+      'typing in chat so you notice me',
+      'can you say my name?', 'say hi to me',
+      'I\'m from the future', '2026 is wild',
+      'this simulator is crazy', 'wait is this real?',
+      'bots going crazy rn', 'view count going brrr',
+      'more bots please', 'keep the B button coming',
+      'chat is exploding', 'help chat is too fast',
+      'I can barely read', 'slow down chat',
+      'this is peak internet', 'internet moment',
+      'someone screenshot this', 'history is being made'
+    ];
+
+    // Extra random fillers to reach huge unique pool
+    const fillers = [
+      'omg', 'bruh', 'dude', 'bro', 'sis', 'fam', 'chat', 'guys',
+      'real talk', 'no lie', 'for real', 'seriously', 'literally',
+      'actually', 'basically', 'kinda', 'sorta', 'maybe',
+      'idk', 'idc', 'imo', 'imho', 'tbh', 'ngl', 'fr',
+      'lowkey', 'highkey', 'mid', 'goated', 'cooked', 'raw',
+      'sheesh', 'yooo', 'ayy', 'ayyy', 'skrrt', 'bussin'
+    ];
+
+    function generateBotName() {
+      const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+      const noun = nouns[Math.floor(Math.random() * nouns.length)];
+      const suf = suffixes[Math.floor(Math.random() * suffixes.length)];
+      const num = Math.random() < 0.4 ? Math.floor(Math.random() * 9000 + 100) : '';
+      return `${adj}${noun}${suf}${num}`;
+    }
+
+    function generateMessage() {
+      // Mix templates + fillers for huge variety
+      if (Math.random() < 0.55) {
+        return msgTemplates[Math.floor(Math.random() * msgTemplates.length)];
+      }
+      const parts = [];
+      const len = 1 + Math.floor(Math.random() * 4);
+      for (let i = 0; i < len; i++) {
+        if (Math.random() < 0.6) {
+          parts.push(msgTemplates[Math.floor(Math.random() * msgTemplates.length)]);
+        } else {
+          parts.push(fillers[Math.floor(Math.random() * fillers.length)]);
+        }
+      }
+      // slight uniqueness
+      if (Math.random() < 0.3) parts.push(String(Math.floor(Math.random() * 999)));
+      return parts.join(' ').slice(0, 100);
+    }
+
+    // Pre-generate large pools (unique enough)
+    const BOT_NAMES = new Set();
+    while (BOT_NAMES.size < 5000) {
+      BOT_NAMES.add(generateBotName());
+    }
+    const BOT_NAME_LIST = [...BOT_NAMES];
+
+    const CHAT_POOL = new Set();
+    while (CHAT_POOL.size < 8000) {
+      CHAT_POOL.add(generateMessage());
+    }
+    const CHAT_LIST = [...CHAT_POOL];
+
+    let nameIndex = 0;
+    let msgIndex = 0;
+    function nextBotName() {
+      const n = BOT_NAME_LIST[nameIndex % BOT_NAME_LIST.length];
+      nameIndex++;
+      // slight mutation for extra uniqueness after wrap
+      if (nameIndex > BOT_NAME_LIST.length) {
+        return n + Math.floor(Math.random() * 99);
+      }
+      return n;
+    }
+    function nextMessage() {
+      const m = CHAT_LIST[msgIndex % CHAT_LIST.length];
+      msgIndex++;
+      if (msgIndex > CHAT_LIST.length && Math.random() < 0.4) {
+        return m + ' ' + Math.floor(Math.random() * 999);
+      }
+      return m;
+    }
+
+    // ========== UI HELPERS ==========
+    function showToast(text, ms = 1800) {
+      const t = document.getElementById('toast');
+      t.textContent = text;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), ms);
+    }
+
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    // ========== AUTH ==========
+    document.getElementById('btn-google').addEventListener('click', () => {
+      // Simulated Google login – always lands on the special email
+      // (in a real app this would be OAuth)
+      currentUser = { email: SPECIAL_EMAIL };
+      localStorage.setItem('golive_user', JSON.stringify(currentUser));
+      document.getElementById('login-overlay').classList.add('hidden');
+      document.getElementById('user-email-display').textContent = currentUser.email.split('@')[0];
+      showScreen('menu');
+      renderLives();
+      showToast('Signed in as ' + currentUser.email);
+    });
+
+    // Restore session
+    (function () {
+      try {
+        const saved = localStorage.getItem('golive_user');
+        if (saved) {
+          currentUser = JSON.parse(saved);
+          document.getElementById('login-overlay').classList.add('hidden');
+          document.getElementById('user-email-display').textContent = currentUser.email.split('@')[0];
+          showScreen('menu');
+          renderLives();
+        }
+      } catch (e) {}
+    })();
+
+    // ========== LIVES LIST ==========
+    function renderLives() {
+      const list = document.getElementById('lives-list');
+      const empty = document.getElementById('empty-lives');
+      if (activeLives.length === 0) {
+        empty.style.display = 'block';
+        // clear any old cards
+        list.querySelectorAll('.live-card').forEach(c => c.remove());
+        return;
+      }
+      empty.style.display = 'none';
+      list.querySelectorAll('.live-card').forEach(c => c.remove());
+      activeLives.forEach(live => {
+        const card = document.createElement('div');
+        card.className = 'live-card';
+        card.innerHTML = `
+          <div class="live-thumb">🔴</div>
+          <div class="live-info">
+            <div class="live-title">${escapeHtml(live.title)}</div>
+            <div class="live-meta">👁 ${live.viewers} watching · ${live.host}</div>
+          </div>
+          <button class="btn-join" data-id="${live.id}">Join</button>
+        `;
+        list.appendChild(card);
+      });
+      list.querySelectorAll('.btn-join').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.id;
+          const live = activeLives.find(l => l.id === id);
+          if (live) joinAsViewer(live);
+        });
+      });
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ========== GO LIVE ==========
+    document.getElementById('btn-go-live').addEventListener('click', () => {
+      if (!currentUser) return;
+      document.getElementById('live-title-input').value = '';
+      document.getElementById('title-modal').classList.add('show');
+      setTimeout(() => document.getElementById('live-title-input').focus(), 100);
+    });
+
+    document.getElementById('btn-cancel-title').addEventListener('click', () => {
+      document.getElementById('title-modal').classList.remove('show');
+    });
+
+    document.getElementById('btn-start-live').addEventListener('click', startLive);
+    document.getElementById('live-title-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') startLive();
+    });
+
+    async function startLive() {
+      const title = document.getElementById('live-title-input').value.trim() || 'my live';
+      liveTitle = title;
+      document.getElementById('title-modal').classList.remove('show');
+
+      isHost = true;
+      botCount = 0;
+      realViewers = 0;
+      totalViewers = 0;
+      nameIndex = 0;
+      msgIndex = 0;
+      updateViewerCount();
+
+      // Add to lives list
+      const liveId = 'live_' + Date.now();
+      activeLives = [{
+        id: liveId,
+        title: liveTitle,
+        host: currentUser.email.split('@')[0],
+        viewers: 0,
+        isMine: true
+      }];
+      renderLives();
+
+      // Show B button only for special user
+      const isSpecial = currentUser.email.toLowerCase() === SPECIAL_EMAIL.toLowerCase();
+      document.getElementById('btn-b').style.display = isSpecial ? 'flex' : 'none';
+
+      showScreen('live-room');
+      document.getElementById('chat-messages').innerHTML = '';
+
+      // Camera
+      await startCamera();
+
+      // Auto bots only for special user
+      if (isSpecial) {
+        startBotSystem();
+      }
+
+      // Simulate a few real viewers slowly
+      startRealViewerSim();
+    }
+
+    // ========== CAMERA ==========
+    async function startCamera() {
+      stopCamera();
+      const placeholder = document.getElementById('video-placeholder');
+      const video = document.getElementById('local-video');
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: true
+        });
+        video.srcObject = stream;
+        video.style.display = 'block';
+        placeholder.style.display = 'none';
+        // keep muted on the element so no feedback loop; real mute is track based
+        video.muted = true;
+        isMuted = false;
+        document.getElementById('btn-mic').classList.remove('muted');
+        document.getElementById('btn-mic').textContent = '🎤';
+      } catch (err) {
+        console.warn('Camera error', err);
+        video.style.display = 'none';
+        placeholder.style.display = 'block';
+        showToast('Camera permission denied – using placeholder');
+      }
+    }
+
+    function stopCamera() {
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+        stream = null;
+      }
+      const video = document.getElementById('local-video');
+      video.srcObject = null;
+    }
+
+    document.getElementById('btn-mic').addEventListener('click', () => {
+      if (!isHost || !stream) return;
+      isMuted = !isMuted;
+      stream.getAudioTracks().forEach(t => t.enabled = !isMuted);
+      const btn = document.getElementById('btn-mic');
+      btn.classList.toggle('muted', isMuted);
+      btn.textContent = isMuted ? '🔇' : '🎤';
+      showToast(isMuted ? 'Microphone muted' : 'Microphone on');
+    });
+
+    document.getElementById('btn-flip').addEventListener('click', async () => {
+      if (!isHost) return;
+      facingMode = facingMode === 'user' ? 'environment' : 'user';
+      await startCamera();
+      showToast(facingMode === 'user' ? 'Front camera' : 'Back camera');
+    });
+
+    // ========== LEAVE ==========
+    document.getElementById('btn-leave').addEventListener('click', () => {
+      stopLive();
+    });
+
+    function stopLive() {
+      stopCamera();
+      stopBotSystem();
+      stopRealViewerSim();
+      isHost = false;
+      botCount = 0;
+      realViewers = 0;
+      totalViewers = 0;
+      activeLives = [];
+      renderLives();
+      showScreen('menu');
+      showToast('Live ended');
+    }
+
+    // ========== JOIN AS VIEWER (other lives) ==========
+    function joinAsViewer(live) {
+      // In this simulator the only real live is the host's.
+      // If somehow joining own live, just go back.
+      isHost = false;
+      liveTitle = live.title;
+      document.getElementById('btn-b').style.display = 'none';
+      showScreen('live-room');
+      document.getElementById('chat-messages').innerHTML = '';
+      document.getElementById('video-placeholder').style.display = 'block';
+      document.getElementById('local-video').style.display = 'none';
+      totalViewers = live.viewers || 1;
+      updateViewerCount();
+      // Simple static viewer experience – no bots for non-host
+      showToast('Joined: ' + live.title);
+    }
+
+    // ========== VIEWER COUNT ==========
+    function updateViewerCount() {
+      totalViewers = botCount + realViewers;
+      document.getElementById('viewer-count').textContent = formatCount(totalViewers);
+      // Update the live card if exists
+      if (activeLives.length && activeLives[0].isMine) {
+        activeLives[0].viewers = totalViewers;
+      }
+    }
+
+    function formatCount(n) {
+      if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+      if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+      return String(n);
+    }
+
+    // ========== B BUTTON ==========
+    document.getElementById('btn-b').addEventListener('click', () => {
+      if (!isHost) return;
+      if (currentUser.email.toLowerCase() !== SPECIAL_EMAIL.toLowerCase()) return;
+      addOneBot();
+      showToast('+1 bot');
+    });
+
+    function addOneBot() {
+      botCount++;
+      updateViewerCount();
+      // Sometimes the new bot says something immediately
+      if (Math.random() < 0.7) {
+        addChatMessage(nextBotName(), nextMessage(), false);
+      }
+    }
+
+    // ========== BOT SYSTEM ==========
+    function startBotSystem() {
+      stopBotSystem();
+      // First bot after a short delay
+      botJoinTimer = setTimeout(() => {
+        scheduleNextBotJoin();
+      }, 2500 + Math.random() * 2000);
+
+      // Chat spam loop
+      scheduleChatSpam();
+    }
+
+    function stopBotSystem() {
+      if (botJoinTimer) { clearTimeout(botJoinTimer); botJoinTimer = null; }
+      if (chatSpamTimer) { clearTimeout(chatSpamTimer); chatSpamTimer = null; }
+    }
+
+    function scheduleNextBotJoin() {
+      // Join rate ramps up with current bot count
+      // Low: slow (1 every few seconds)
+      // High: many per second
+      let delay;
+      if (botCount < 5) {
+        delay = 3000 + Math.random() * 4000;          // ~3-7s
+      } else if (botCount < 15) {
+        delay = 1200 + Math.random() * 1800;          // ~1.2-3s
+      } else if (botCount < 40) {
+        delay = 400 + Math.random() * 600;            // ~0.4-1s
+      } else if (botCount < 100) {
+        delay = 120 + Math.random() * 200;            // fast
+      } else if (botCount < 300) {
+        delay = 40 + Math.random() * 80;              // very fast
+      } else if (botCount < 800) {
+        delay = 15 + Math.random() * 30;              // extreme
+      } else {
+        delay = 5 + Math.random() * 15;               // insane
+      }
+
+      // Occasionally add more than one at higher counts
+      const burst = botCount > 80 ? (1 + Math.floor(Math.random() * Math.min(6, Math.floor(botCount / 80)))) : 1;
+
+      botJoinTimer = setTimeout(() => {
+        for (let i = 0; i < burst; i++) addOneBot();
+        scheduleNextBotJoin();
+      }, delay);
+    }
+
+    function scheduleChatSpam() {
+      // Chat speed based on bot count
+      let delay;
+      if (botCount < 3) {
+        delay = 4000 + Math.random() * 5000;
+      } else if (botCount < 10) {
+        delay = 1800 + Math.random() * 2500;
+      } else if (botCount < 30) {
+        delay = 700 + Math.random() * 900;
+      } else if (botCount < 80) {
+        delay = 250 + Math.random() * 350;
+      } else if (botCount < 200) {
+        delay = 80 + Math.random() * 120;
+      } else if (botCount < 500) {
+        delay = 25 + Math.random() * 40;
+      } else if (botCount < 1200) {
+        delay = 8 + Math.random() * 15;
+      } else {
+        delay = 3 + Math.random() * 8;   // sooooo fast
+      }
+
+      // At high counts send multiple messages per tick
+      const multi = botCount > 150 ? Math.min(8, 1 + Math.floor(botCount / 200)) : 1;
+
+      chatSpamTimer = setTimeout(() => {
+        if (botCount > 0) {
+          for (let i = 0; i < multi; i++) {
+            addChatMessage(nextBotName(), nextMessage(), false);
+          }
+        }
+        scheduleChatSpam();
+      }, delay);
+    }
+
+    // ========== REAL VIEWER SIM (small) ==========
+    function startRealViewerSim() {
+      stopRealViewerSim();
+      realViewerTimer = setInterval(() => {
+        // Slowly fluctuate a few real viewers
+        if (Math.random() < 0.4) {
+          realViewers = Math.max(0, realViewers + (Math.random() < 0.6 ? 1 : -1));
+          if (realViewers > 12) realViewers = 12; // keep it modest
+          updateViewerCount();
+        }
+      }, 8000 + Math.random() * 7000);
+    }
+    function stopRealViewerSim() {
+      if (realViewerTimer) { clearInterval(realViewerTimer); realViewerTimer = null; }
+    }
+
+    // ========== CHAT ==========
+    function addChatMessage(name, text, isHostMsg) {
+      const box = document.getElementById('chat-messages');
+      const div = document.createElement('div');
+      div.className = 'chat-msg' + (isHostMsg ? ' host' : '');
+      div.innerHTML = `<span class="name">${escapeHtml(name)}</span>${escapeHtml(text)}`;
+      box.appendChild(div);
+
+      // Keep only last ~120 messages for performance
+      while (box.children.length > 120) {
+        box.removeChild(box.firstChild);
+      }
+      box.scrollTop = box.scrollHeight;
+    }
+
+    document.getElementById('btn-send').addEventListener('click', sendHostMessage);
+    document.getElementById('chat-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') sendHostMessage();
+    });
+
+    function sendHostMessage() {
+      const input = document.getElementById('chat-input');
+      const text = input.value.trim();
+      if (!text) return;
+      const name = isHost ? (currentUser.email.split('@')[0] || 'Host') : 'You';
+      addChatMessage(name, text, isHost);
+      input.value = '';
+    }
+  </script>
+</body>
+</html>
