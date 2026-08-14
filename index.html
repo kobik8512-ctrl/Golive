@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>Go Live</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>GO LIVE</title>
 
 <style>
 :root{
@@ -14,16 +14,11 @@
  --text:#f5f5f7;
  --muted:#8b8b96;
  --green:#30d158;
- --danger:#ff453a;
- --border:#292930;
  --gold:#ffd60a;
+ --border:#292930;
 }
 
-*{
- box-sizing:border-box;
- margin:0;
- padding:0;
-}
+*{box-sizing:border-box;margin:0;padding:0}
 
 html,body{
  width:100%;
@@ -31,19 +26,11 @@ html,body{
  background:var(--bg);
  color:var(--text);
  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
- -webkit-tap-highlight-color:transparent;
  overflow-x:hidden;
 }
 
-button,input{
- font:inherit;
-}
-
-button{
- border:0;
- cursor:pointer;
- color:inherit;
-}
+button,input{font:inherit}
+button{border:0;color:inherit;cursor:pointer}
 
 .screen{
  display:none;
@@ -51,10 +38,7 @@ button{
  flex-direction:column;
 }
 
-.screen.active{
- display:flex;
-}
-
+.screen.active{display:flex}
 
 /* LOGIN */
 
@@ -89,11 +73,11 @@ button{
 
 .btn-google{
  width:100%;
- background:white;
+ background:#fff;
  color:#1f1f1f;
  padding:14px 20px;
  border-radius:14px;
- font-weight:600;
+ font-weight:700;
  display:flex;
  justify-content:center;
  align-items:center;
@@ -110,7 +94,6 @@ button{
  font-size:.8rem;
  color:var(--muted);
 }
-
 
 /* MENU */
 
@@ -139,9 +122,7 @@ button{
  margin-bottom:28px;
 }
 
-.signed-in strong{
- color:var(--green);
-}
+.signed-in strong{color:var(--green)}
 
 .lives-list{
  display:flex;
@@ -178,7 +159,7 @@ button{
  margin-top:3px;
 }
 
-.live-meta .dot{
+.dot{
  display:inline-block;
  width:7px;
  height:7px;
@@ -231,7 +212,6 @@ button{
  font-weight:700;
  padding:16px;
  border-radius:999px;
- box-shadow:0 8px 28px rgba(255,45,85,.3);
 }
 
 .btn-secondary{
@@ -241,7 +221,6 @@ button{
  border-radius:999px;
  border:1px solid var(--border);
 }
-
 
 /* LIVE */
 
@@ -263,8 +242,7 @@ button{
  justify-content:center;
 }
 
-#local-video,
-#remote-video{
+video{
  width:100%;
  height:100%;
  object-fit:cover;
@@ -285,7 +263,6 @@ button{
  margin-bottom:10px;
 }
 
-
 /* HEADER */
 
 .live-header{
@@ -301,9 +278,7 @@ button{
  pointer-events:none;
 }
 
-.live-header>*{
- pointer-events:auto;
-}
+.live-header>*{pointer-events:auto}
 
 .live-pill{
  max-width:65%;
@@ -352,14 +327,12 @@ button{
  display:flex;
  align-items:center;
  justify-content:center;
- font-size:1rem;
 }
 
 .b-btn{
  background:linear-gradient(135deg,#7c3aed,#06b6d4);
  font-weight:900;
 }
-
 
 /* BOT MENU */
 
@@ -376,14 +349,12 @@ button{
  background:rgba(20,20,24,.98);
  border:1px solid #38383f;
  border-radius:16px;
- box-shadow:0 12px 40px rgba(0,0,0,.6);
+ box-shadow:0 12px 40px #0009;
  display:none;
  z-index:500;
 }
 
-.bot-menu.show{
- display:block;
-}
+.bot-menu.show{display:block}
 
 .bot-menu-title{
  font-size:.75rem;
@@ -419,7 +390,6 @@ button{
  font-size:.72rem;
 }
 
-
 /* CHAT */
 
 .chat-wrap{
@@ -430,7 +400,7 @@ button{
  height:42%;
  display:flex;
  flex-direction:column;
- background:linear-gradient(to top,rgba(0,0,0,.93) 45%,transparent);
+ background:linear-gradient(to top,#000e 45%,transparent);
  z-index:50;
  pointer-events:none;
 }
@@ -444,14 +414,12 @@ button{
  justify-content:flex-end;
  gap:3px;
  pointer-events:auto;
- contain:layout paint;
 }
 
 .msg{
  font-size:.84rem;
  line-height:1.25;
  word-break:break-word;
- flex:none;
 }
 
 .msg .uname{
@@ -488,11 +456,11 @@ button{
 #chat-input{
  flex:1;
  min-width:0;
- background:rgba(255,255,255,.1);
- border:1px solid rgba(255,255,255,.12);
+ background:#ffffff1a;
+ border:1px solid #ffffff1f;
  border-radius:999px;
  padding:11px 15px;
- color:white;
+ color:#fff;
  outline:none;
 }
 
@@ -503,15 +471,12 @@ button{
  border-radius:999px;
 }
 
-.btn-send{
- background:var(--accent);
-}
+.btn-send{background:var(--accent)}
 
 .btn-gift{
  background:linear-gradient(135deg,#ffd60a,#ff9f0a);
  color:#111;
 }
-
 
 /* STATUS */
 
@@ -530,33 +495,26 @@ button{
  bottom:43%;
  right:12px;
  z-index:40;
- background:rgba(0,0,0,.65);
+ background:#000a;
  backdrop-filter:blur(8px);
  border-radius:999px;
  padding:6px 12px;
  font-size:.82rem;
  font-weight:700;
- border:1px solid rgba(255,215,0,.3);
+ border:1px solid #ffd7004d;
 }
 
-.coin-icon{
- color:var(--gold);
-}
+/* MODALS */
 
-
-/* GIFT */
-
-#gift-panel,
-#title-modal{
+.modal-bg{
  position:fixed;
  inset:0;
- background:rgba(0,0,0,.72);
+ background:#000b;
  display:none;
  z-index:900;
 }
 
-#gift-panel.show,
-#title-modal.show{
+.modal-bg.show{
  display:flex;
 }
 
@@ -568,7 +526,7 @@ button{
  border-radius:20px 20px 0 0;
 }
 
-.gift-sheet-header{
+.gift-head{
  padding:14px 16px;
  border-bottom:1px solid var(--border);
  display:flex;
@@ -591,9 +549,7 @@ button{
  text-align:center;
 }
 
-.g-emoji{
- font-size:1.7rem;
-}
+.g-emoji{font-size:1.7rem}
 
 .g-name{
  font-size:.66rem;
@@ -616,24 +572,19 @@ button{
  justify-content:center;
 }
 
-.gift-fly{
- font-size:4.5rem;
-}
+.gift-fly{font-size:4.5rem}
 
 .gift-label{
  position:absolute;
  bottom:38%;
- background:rgba(0,0,0,.8);
+ background:#000c;
  color:var(--gold);
  padding:8px 18px;
  border-radius:999px;
  font-weight:800;
 }
 
-
-/* TITLE */
-
-#title-modal{
+.title-modal{
  align-items:center;
  justify-content:center;
  padding:20px;
@@ -658,7 +609,7 @@ button{
  border:1px solid var(--border);
  border-radius:12px;
  padding:14px;
- color:white;
+ color:#fff;
  outline:none;
  margin-bottom:16px;
 }
@@ -675,23 +626,16 @@ button{
  font-weight:700;
 }
 
-.btn-cancel{
- background:var(--card2);
-}
+.btn-cancel{background:var(--card2)}
 
-.btn-confirm{
- background:var(--accent);
-}
-
-
-/* TOAST */
+.btn-confirm{background:var(--accent)}
 
 #toast{
  position:fixed;
  top:60px;
  left:50%;
  transform:translateX(-50%) translateY(-12px);
- background:rgba(20,20,24,.94);
+ background:#141418f2;
  padding:10px 18px;
  border-radius:999px;
  font-size:.86rem;
@@ -700,6 +644,8 @@ button{
  z-index:2000;
  border:1px solid var(--border);
  pointer-events:none;
+ max-width:90%;
+ text-align:center;
 }
 
 .show-toast{
@@ -715,7 +661,6 @@ button{
 </head>
 
 <body>
-
 
 <!-- LOGIN -->
 
@@ -738,10 +683,11 @@ button{
    </svg>
 
    Continue with Google
+
   </button>
 
   <div class="login-note">
-   Real Google login + live streaming
+   Google login + live streaming
   </div>
 
  </div>
@@ -802,18 +748,9 @@ button{
 
  <div id="video-wrap">
 
-  <video
-   id="local-video"
-   autoplay
-   playsinline
-   muted>
-  </video>
+  <video id="local-video" autoplay playsinline muted></video>
 
-  <video
-   id="remote-video"
-   autoplay
-   playsinline>
-  </video>
+  <video id="remote-video" autoplay playsinline></video>
 
   <div class="cam-off" id="cam-off">
    <div class="icon">📷</div>
@@ -844,10 +781,7 @@ button{
 
    <div class="b-wrap">
 
-    <button
-     class="icon-btn b-btn"
-     id="btn-b"
-     style="display:none">
+    <button class="icon-btn b-btn" id="btn-b" style="display:none">
      B
     </button>
 
@@ -877,21 +811,10 @@ button{
 
    </div>
 
-   <button class="icon-btn" id="btn-mic">
-    🎤
-   </button>
-
-   <button class="icon-btn" id="btn-camera">
-    📷
-   </button>
-
-   <button class="icon-btn" id="btn-flip">
-    🔄
-   </button>
-
-   <button class="icon-btn" id="btn-leave">
-    ✕
-   </button>
+   <button class="icon-btn" id="btn-mic">🎤</button>
+   <button class="icon-btn" id="btn-camera">📷</button>
+   <button class="icon-btn" id="btn-flip">🔄</button>
+   <button class="icon-btn" id="btn-leave">✕</button>
 
   </div>
 
@@ -903,8 +826,7 @@ button{
  </div>
 
  <div class="coins-badge">
-  <span class="coin-icon">🪙</span>
-  <span id="coins-count">0</span>
+  🪙 <span id="coins-count">0</span>
  </div>
 
 
@@ -919,7 +841,8 @@ button{
     type="text"
     maxlength="140"
     autocomplete="off"
-    placeholder="Say something...">
+    placeholder="Say something..."
+   >
 
    <button class="btn-gift" id="btn-gift">
     🎁
@@ -938,17 +861,15 @@ button{
 
 <!-- GIFTS -->
 
-<div id="gift-panel">
+<div id="gift-panel" class="modal-bg">
 
  <div class="gift-sheet">
 
-  <div class="gift-sheet-header">
+  <div class="gift-head">
 
    <h3>Send a Gift</h3>
 
-   <button id="gift-close">
-    ✕
-   </button>
+   <button id="gift-close">✕</button>
 
   </div>
 
@@ -963,7 +884,7 @@ button{
 
 <!-- TITLE -->
 
-<div id="title-modal">
+<div id="title-modal" class="modal-bg title-modal">
 
  <div class="modal-card">
 
@@ -973,7 +894,8 @@ button{
    id="title-input"
    type="text"
    maxlength="40"
-   placeholder="e.g. my live">
+   placeholder="e.g. my live"
+  >
 
   <div class="modal-actions">
 
@@ -1009,8 +931,12 @@ import {
  getAuth,
  GoogleAuthProvider,
  signInWithPopup,
+ signInWithRedirect,
+ getRedirectResult,
  signOut,
- onAuthStateChanged
+ onAuthStateChanged,
+ browserLocalPersistence,
+ setPersistence
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
 
 import {
@@ -1028,7 +954,7 @@ import {
 
 
 const firebaseConfig={
- apiKey:"AIzaSyDaQ06E5ZvjM6X9XnqOpWgmUsbe5T_EnaPo",
+ apiKey:"AIzaSyDaQ06E5ZvjM6XnqOpWgmUsbe5T_EnaPo",
  authDomain:"golive-ff5ad.firebaseapp.com",
  projectId:"golive-ff5ad",
  storageBucket:"golive-ff5ad.firebasestorage.app",
@@ -1075,7 +1001,6 @@ let cameraOn=false;
 
 let realViewers=0;
 let botCount=0;
-
 let botAddAmount=1;
 
 let peerConnections={};
@@ -1088,8 +1013,6 @@ let unsubLiveEnd=null;
 let unsubBotData=null;
 
 let botExpiryTimer=null;
-let botBatchTimers=new Map();
-
 let localBotChatTimer=null;
 
 let chatQueue=[];
@@ -1099,14 +1022,9 @@ const MAX_CHAT_DOM=50;
 
 let seenChat=new Set();
 
-
-/* =========================================================
-   BOT DATA
-   IMPORTANT:
-   ONE RECORD PER BATCH, NOT ONE RECORD PER BOT.
-========================================================= */
-
 let botBatches={};
+
+let coins=0;
 
 
 /* =========================================================
@@ -1145,28 +1063,10 @@ const normalMessages=[
 ];
 
 const openingGreetings=[
- "hi",
- "hello",
- "hiii",
- "hey",
- "yo",
- "hi bro",
- "hi kobi",
- "hello kobi",
- "hey bro",
- "yo kobi",
- "hi chat",
- "hello chat",
- "first",
- "im early",
- "hey everyone",
- "sup kobi",
- "hi everyone",
- "hello bro",
- "yooo",
- "hiii kobi",
- "hi hi",
- "hello hello"
+ "hi","hello","hiii","hey","yo","hi bro","hi kobi",
+ "hello kobi","hey bro","yo kobi","hi chat","hello chat",
+ "first","im early","hey everyone","sup kobi","hi everyone",
+ "hello bro","yooo","hiii kobi","hi hi","hello hello"
 ];
 
 function rand(a){
@@ -1178,31 +1078,21 @@ function makeName(){
  (Math.random()<.35?Math.floor(Math.random()*900+100):"");
 }
 
-const names=Array.from(
- {length:2500},
- makeName
-);
+const names=Array.from({length:2500},makeName);
 
 function nextName(){
- return names[
-  Math.floor(Math.random()*names.length)
- ];
+ return names[Math.floor(Math.random()*names.length)];
 }
 
 function nextBotMessage(opening=false){
 
- if(opening && Math.random()<.70){
+ if(opening&&Math.random()<.70)
   return rand(openingGreetings);
- }
 
- if(Math.random()<.72){
+ if(Math.random()<.72)
   return rand(normalMessages);
- }
 
- return [
-  rand(normalMessages),
-  rand(normalMessages)
- ].join(" ");
+ return rand(normalMessages)+" "+rand(normalMessages);
 }
 
 
@@ -1210,14 +1100,16 @@ function nextBotMessage(opening=false){
    HELPERS
 ========================================================= */
 
-function toast(text,ms=1500){
+function toast(text,ms=1800){
 
  const el=document.getElementById("toast");
 
  el.textContent=text;
  el.classList.add("show-toast");
 
- setTimeout(()=>{
+ clearTimeout(el.__toastTimer);
+
+ el.__toastTimer=setTimeout(()=>{
   el.classList.remove("show-toast");
  },ms);
 }
@@ -1238,7 +1130,9 @@ function esc(s){
  return String(s)
  .replace(/&/g,"&amp;")
  .replace(/</g,"&lt;")
- .replace(/>/g,"&gt;");
+ .replace(/>/g,"&gt;")
+ .replace(/"/g,"&quot;")
+ .replace(/'/g,"&#039;");
 }
 
 
@@ -1246,14 +1140,9 @@ function format(n){
 
  n=Math.max(0,Number(n)||0);
 
- if(n>=1e9)
-  return (n/1e9).toFixed(1)+"B";
-
- if(n>=1e6)
-  return (n/1e6).toFixed(1)+"M";
-
- if(n>=1000)
-  return (n/1000).toFixed(1)+"K";
+ if(n>=1e9)return (n/1e9).toFixed(1)+"B";
+ if(n>=1e6)return (n/1e6).toFixed(1)+"M";
+ if(n>=1000)return (n/1000).toFixed(1)+"K";
 
  return String(Math.floor(n));
 }
@@ -1263,9 +1152,8 @@ function colorClass(name){
 
  let h=0;
 
- for(let i=0;i<name.length;i++){
+ for(let i=0;i<name.length;i++)
   h=(h*31+name.charCodeAt(i))>>>0;
- }
 
  return "c"+(h%8);
 }
@@ -1275,28 +1163,21 @@ function colorClass(name){
    COINS
 ========================================================= */
 
-let coins=0;
-
 function loadCoins(){
 
  if(isInfinite){
 
   coins=Infinity;
   updateCoins();
-
   return;
+
  }
 
- const key=
- "gl_coins_v3_"+(user?.email||"guest");
+ const key="gl_coins_v3_"+(user?.email||"guest");
 
- const saved=
- localStorage.getItem(key);
+ const saved=localStorage.getItem(key);
 
- coins=
- saved===null
- ?0
- :parseInt(saved,10);
+ coins=saved===null?0:parseInt(saved,10);
 
  if(!Number.isFinite(coins)||coins<0)
   coins=0;
@@ -1319,16 +1200,69 @@ function saveCoins(){
 function updateCoins(){
 
  document.getElementById("coins-count")
- .textContent=
- isInfinite
- ?"∞"
- :format(coins);
+ .textContent=isInfinite?"∞":format(coins);
 }
 
 
 /* =========================================================
    AUTH
 ========================================================= */
+
+function checkAdmin(){
+
+ const email=(user?.email||"").toLowerCase();
+
+ if(
+  email===SPECIAL_EMAIL.toLowerCase()||
+  email.includes("kobik8512")||
+  email.includes("kobik")
+ )
+  return true;
+
+ return localStorage.getItem("gl_admin_unlock")==="blue007";
+}
+
+
+async function handleLoginError(e){
+
+ console.error("Firebase login error:",e);
+
+ const code=e?.code||"unknown";
+
+ if(code==="auth/popup-closed-by-user"){
+  toast("Login cancelled");
+  return;
+ }
+
+ if(code==="auth/popup-blocked"){
+  toast("Popup blocked — opening Google login...");
+  try{
+   await signInWithRedirect(auth,provider);
+  }catch(err){
+   console.error(err);
+   toast("Google redirect failed: "+(err.code||"unknown"));
+  }
+  return;
+ }
+
+ if(code==="auth/unauthorized-domain"){
+  toast("Firebase: domain not authorized");
+  return;
+ }
+
+ if(code==="auth/operation-not-allowed"){
+  toast("Firebase: Google sign-in is disabled");
+  return;
+ }
+
+ if(code==="auth/network-request-failed"){
+  toast("Network error — check internet");
+  return;
+ }
+
+ toast("Login failed: "+code);
+}
+
 
 document.getElementById("btn-google").onclick=
 async()=>{
@@ -1339,42 +1273,75 @@ async()=>{
 
  try{
 
-  await signInWithPopup(
-   auth,
-   provider
+  /*
+   Mobile browsers are much more reliable with
+   redirect authentication than popup authentication.
+  */
+
+  const mobile=/Android|iPhone|iPad|iPod/i.test(
+   navigator.userAgent
   );
+
+  if(mobile){
+
+   await signInWithRedirect(auth,provider);
+
+  }else{
+
+   try{
+
+    await signInWithPopup(auth,provider);
+
+   }catch(e){
+
+    if(e?.code==="auth/popup-blocked"){
+
+     await signInWithRedirect(auth,provider);
+
+    }else{
+
+     throw e;
+
+    }
+
+   }
+
+  }
 
  }catch(e){
 
-  toast(
-   e.code==="auth/popup-closed-by-user"
-   ?"Login cancelled"
-   :"Login failed"
-  );
+  await handleLoginError(e);
+
+  btn.disabled=false;
 
  }
 
- btn.disabled=false;
 };
 
 
-function checkAdmin(){
+getRedirectResult(auth)
+.then(result=>{
 
- const email=
- (user?.email||"").toLowerCase();
+ if(result?.user)
+  console.log("Google redirect login complete");
 
- if(
-  email===SPECIAL_EMAIL.toLowerCase()||
-  email.includes("kobik8512")||
-  email.includes("kobik")
- ){
-  return true;
- }
+})
+.catch(async e=>{
 
- return localStorage.getItem(
-  "gl_admin_unlock"
- )==="blue007";
-}
+ console.error("Redirect result error:",e);
+
+ if(e?.code)
+  toast("Login failed: "+e.code);
+
+});
+
+
+setPersistence(
+ auth,
+ browserLocalPersistence
+).catch(e=>{
+ console.warn("Auth persistence failed:",e);
+});
 
 
 onAuthStateChanged(auth,fu=>{
@@ -1386,8 +1353,8 @@ onAuthStateChanged(auth,fu=>{
   isInfinite=false;
 
   show("login-screen");
-
   return;
+
  }
 
  user={
@@ -1402,8 +1369,7 @@ onAuthStateChanged(auth,fu=>{
  isInfinite=isSpecialUser;
 
  document.getElementById("display-name")
- .textContent=
- user.name+(isSpecialUser?" 🔑":"");
+ .textContent=user.name+(isSpecialUser?" 🔑":"");
 
  loadCoins();
 
@@ -1476,6 +1442,7 @@ document.getElementById("btn-signout")
 
  }catch(e){
 
+  console.error(e);
   toast("Sign out failed");
 
  }
@@ -1505,11 +1472,16 @@ function listenToLives(){
 
    activeLives.sort(
     (a,b)=>
-     (b.startedAt||0)-
-     (a.startedAt||0)
+     (b.startedAt||0)-(a.startedAt||0)
    );
 
    renderLives();
+
+  },
+  error=>{
+
+   console.error("Lives listener:",error);
+   toast("Database read failed");
 
   }
  );
@@ -1519,11 +1491,8 @@ function listenToLives(){
 
 function renderLives(){
 
- const list=
- document.getElementById("lives-list");
-
- const empty=
- document.getElementById("empty-state");
+ const list=document.getElementById("lives-list");
+ const empty=document.getElementById("empty-state");
 
  list.querySelectorAll(".live-card")
  .forEach(x=>x.remove());
@@ -1539,8 +1508,7 @@ function renderLives(){
 
  activeLives.forEach(live=>{
 
-  const card=
-  document.createElement("div");
+  const card=document.createElement("div");
 
   card.className="live-card";
 
@@ -1567,17 +1535,13 @@ function renderLives(){
      user&&live.hostEmail===user.email
     )||isSpecialUser
     ?
-    `<button
-      class="btn-x-small"
-      data-remove="${live.id}">
-      ✕
-     </button>`
+    `<button class="btn-x-small"
+      data-remove="${esc(live.id)}">✕</button>`
     :""
    }
 
-   <button
-    class="btn-join"
-    data-join="${live.id}">
+   <button class="btn-join"
+    data-join="${esc(live.id)}">
     Join
    </button>
   `;
@@ -1586,33 +1550,37 @@ function renderLives(){
 
  });
 
-
  list.querySelectorAll("[data-join]")
  .forEach(btn=>{
 
   btn.onclick=()=>{
 
-   const live=
-   activeLives.find(
+   const live=activeLives.find(
     x=>x.id===btn.dataset.join
    );
 
-   if(live)
-    joinViewer(live);
+   if(live)joinViewer(live);
 
   };
 
  });
-
 
  list.querySelectorAll("[data-remove]")
  .forEach(btn=>{
 
   btn.onclick=async()=>{
 
-   await remove(
-    ref(db,"lives/"+btn.dataset.remove)
-   );
+   try{
+
+    await remove(
+     ref(db,"lives/"+btn.dataset.remove)
+    );
+
+   }catch(e){
+
+    toast("Could not remove live");
+
+   }
 
   };
 
@@ -1657,15 +1625,13 @@ document.getElementById("btn-clear")
 document.getElementById("btn-go-live")
 .onclick=()=>{
 
- document.getElementById("title-input")
- .value="";
+ document.getElementById("title-input").value="";
 
  document.getElementById("title-modal")
  .classList.add("show");
 
  setTimeout(()=>{
-  document.getElementById("title-input")
-  .focus();
+  document.getElementById("title-input").focus();
  },80);
 
 };
@@ -1717,14 +1683,13 @@ async function startLive(){
  "l"+Date.now()+"_"+
  Math.random().toString(36).slice(2,8);
 
+ window.__liveStartedAt=Date.now();
+
  document.getElementById("chat-list")
  .innerHTML="";
 
  document.getElementById("btn-b")
- .style.display=
- isSpecialUser
- ?"flex"
- :"none";
+ .style.display=isSpecialUser?"flex":"none";
 
  document.getElementById("live-title-text")
  .textContent=liveTitle;
@@ -1748,27 +1713,25 @@ async function startLive(){
 
  }catch(e){
 
+  console.error(e);
+
   toast("Could not publish live");
+
   isHost=false;
   currentLiveId=null;
 
   return;
+
  }
 
  show("live-room");
 
- /*
-  Start camera BEFORE viewer signalling.
-  This reduces the chance that a viewer connects
-  during the camera initialization.
- */
  await startCamera();
 
  listenForViewers();
  listenToChat(currentLiveId);
- listenForGifts(currentLiveId);
+ listenToGifts(currentLiveId);
  listenToBotBatches(currentLiveId);
-
  startBotExpiryWatcher();
 
 }
@@ -1782,12 +1745,19 @@ async function startCamera(){
 
  try{
 
+  if(!navigator.mediaDevices?.getUserMedia){
+
+   throw new Error("Camera API unavailable");
+
+  }
+
   if(stream){
 
    stream.getTracks()
    .forEach(t=>t.stop());
 
    stream=null;
+
   }
 
   const newStream=
@@ -1821,22 +1791,11 @@ async function startCamera(){
    facingMode==="user"
   );
 
+  document.getElementById("mic-status")
+  .textContent=isMuted?"Mic: muted":"Mic: on";
+
   document.getElementById("btn-camera")
   .textContent="📷";
-
-  document.getElementById("mic-status")
-  .textContent=
-   isMuted
-   ?"Mic: muted"
-   :"Mic: on";
-
-  /*
-   CRITICAL:
-   The peer connections already contain
-   persistent transceivers.
-   We only replace their tracks.
-   No giant renegotiation.
-  */
 
   for(const pc of Object.values(peerConnections)){
 
@@ -1850,27 +1809,29 @@ async function startCamera(){
     s=>s.track?.kind==="audio"
    );
 
-   if(videoSender){
+   try{
 
-    await videoSender
-    .replaceTrack(
-     newStream.getVideoTracks()[0]||null
-    );
+    if(videoSender)
+     await videoSender.replaceTrack(
+      newStream.getVideoTracks()[0]||null
+     );
 
-   }
+    if(audioSender)
+     await audioSender.replaceTrack(
+      newStream.getAudioTracks()[0]||null
+     );
 
-   if(audioSender){
+   }catch(e){
 
-    await audioSender
-    .replaceTrack(
-     newStream.getAudioTracks()[0]||null
-    );
+    console.warn("Track replacement:",e);
 
    }
 
   }
 
  }catch(e){
+
+  console.error("Camera:",e);
 
   cameraOn=false;
 
@@ -1883,7 +1844,11 @@ async function startCamera(){
   document.getElementById("mic-status")
   .textContent="Camera off";
 
-  toast("Camera permission denied");
+  toast(
+   e.name==="NotAllowedError"
+   ?"Camera/mic permission denied"
+   :"Camera unavailable"
+  );
 
  }
 
@@ -1905,6 +1870,7 @@ document.getElementById("btn-camera")
    .forEach(t=>t.stop());
 
    stream=null;
+
   }
 
   cameraOn=false;
@@ -1915,29 +1881,24 @@ document.getElementById("btn-camera")
   document.getElementById("cam-off")
   .style.display="block";
 
-  /*
-   Stop sending without destroying WebRTC.
-  */
-
   for(const pc of Object.values(peerConnections)){
 
    const sender=
    pc.getSenders()
    .find(s=>s.track?.kind==="video");
 
-   if(sender)
-    await sender.replaceTrack(null);
+   if(sender){
+
+    try{
+     await sender.replaceTrack(null);
+    }catch(e){}
+
+   }
 
   }
 
-  document.getElementById("btn-camera")
-  .textContent="📷";
-
   document.getElementById("mic-status")
-  .textContent=
-   isMuted
-   ?"Mic: muted"
-   :"Camera off";
+  .textContent=isMuted?"Mic: muted":"Camera off";
 
  }else{
 
@@ -1954,14 +1915,14 @@ document.getElementById("btn-camera")
 
 function listenForViewers(){
 
- if(unsubViewers)
-  unsubViewers();
+ if(unsubViewers){
+
+  try{unsubViewers()}catch(e){}
+
+ }
 
  const viewersRef=
- ref(
-  db,
-  "lives/"+currentLiveId+"/viewers"
- );
+ ref(db,`lives/${currentLiveId}/viewers`);
 
  unsubViewers=
  onChildAdded(
@@ -1969,15 +1930,11 @@ function listenForViewers(){
   async snap=>{
 
    const id=snap.key;
-   const data=snap.val();
-
-   if(!data)return;
 
    if(peerConnections[id])
     return;
 
    realViewers++;
-
    updateViewerCount();
 
    await createHostPeer(id);
@@ -2001,8 +1958,7 @@ function listenForViewers(){
 
    }
 
-   realViewers=
-    Math.max(0,realViewers-1);
+   realViewers=Math.max(0,realViewers-1);
 
    updateViewerCount();
 
@@ -2015,16 +1971,9 @@ function listenForViewers(){
 async function createHostPeer(id){
 
  const pc=
- new RTCPeerConnection(
-  ICE_SERVERS
- );
+ new RTCPeerConnection(ICE_SERVERS);
 
  peerConnections[id]=pc;
-
- /*
-  Persistent transceivers fix the camera-on-after-connect
-  problem.
- */
 
  const videoTrans=
  pc.addTransceiver(
@@ -2040,13 +1989,11 @@ async function createHostPeer(id){
 
  if(stream){
 
-  await videoTrans.sender
-  .replaceTrack(
+  await videoTrans.sender.replaceTrack(
    stream.getVideoTracks()[0]||null
   );
 
-  await audioTrans.sender
-  .replaceTrack(
+  await audioTrans.sender.replaceTrack(
    stream.getAudioTracks()[0]||null
   );
 
@@ -2062,26 +2009,21 @@ async function createHostPeer(id){
     `lives/${currentLiveId}/signals/${id}/hostCandidates`
    ),
    e.candidate.toJSON()
-  );
+  ).catch(()=>{});
 
  };
 
-
- const answerRef=
- ref(
-  db,
-  `lives/${currentLiveId}/signals/${id}/answer`
- );
-
  onValue(
-  answerRef,
+  ref(
+   db,
+   `lives/${currentLiveId}/signals/${id}/answer`
+  ),
   async snap=>{
 
    const answer=snap.val();
 
-   if(!answer)return;
-
    if(
+    !answer||
     pc.signalingState!=="have-local-offer"
    )
     return;
@@ -2092,11 +2034,14 @@ async function createHostPeer(id){
      new RTCSessionDescription(answer)
     );
 
-   }catch(e){}
+   }catch(e){
+
+    console.warn("Host answer:",e);
+
+   }
 
   }
  );
-
 
  onChildAdded(
   ref(
@@ -2116,18 +2061,13 @@ async function createHostPeer(id){
   }
  );
 
-
  pc.onconnectionstatechange=()=>{
 
   if(
-   ["failed","closed"].includes(
-    pc.connectionState
-   )
+   ["failed","closed"].includes(pc.connectionState)
   ){
 
-   try{
-    pc.close();
-   }catch(e){}
+   try{pc.close()}catch(e){}
 
    delete peerConnections[id];
 
@@ -2135,11 +2075,9 @@ async function createHostPeer(id){
 
  };
 
-
  try{
 
-  const offer=
-  await pc.createOffer();
+  const offer=await pc.createOffer();
 
   await pc.setLocalDescription(offer);
 
@@ -2156,7 +2094,7 @@ async function createHostPeer(id){
 
  }catch(e){
 
-  console.error("WebRTC offer error",e);
+  console.error("WebRTC offer:",e);
 
  }
 
@@ -2169,7 +2107,7 @@ async function createHostPeer(id){
 
 async function joinViewer(live){
 
- cleanupViewer();
+ await leaveViewer(false);
 
  isHost=false;
 
@@ -2191,10 +2129,7 @@ async function joinViewer(live){
  .style.display="block";
 
  document.getElementById("btn-b")
- .style.display=
- isSpecialUser
- ?"flex"
- :"none";
+ .style.display=isSpecialUser?"flex":"none";
 
  show("live-room");
 
@@ -2202,18 +2137,28 @@ async function joinViewer(live){
  "v"+Date.now()+"_"+
  Math.random().toString(36).slice(2,7);
 
+ try{
 
- await set(
-  ref(
-   db,
-   `lives/${live.id}/viewers/${viewerId}`
-  ),
-  {
-   name:user?.name||"Viewer",
-   joinedAt:Date.now()
-  }
- );
+  await set(
+   ref(
+    db,
+    `lives/${live.id}/viewers/${viewerId}`
+   ),
+   {
+    name:user?.name||"Viewer",
+    joinedAt:Date.now()
+   }
+  );
 
+ }catch(e){
+
+  toast("Could not join live");
+  currentLiveId=null;
+  viewerId=null;
+  show("menu");
+  return;
+
+ }
 
  unsubLiveEnd=
  onValue(
@@ -2232,25 +2177,22 @@ async function joinViewer(live){
   }
  );
 
-
  listenToChat(live.id);
  listenToBotBatches(live.id);
 
  viewerPC=
- new RTCPeerConnection(
-  ICE_SERVERS
- );
+ new RTCPeerConnection(ICE_SERVERS);
 
+ const pendingCandidates=[];
 
  viewerPC.ontrack=e=>{
 
   const video=
-  document.getElementById("remote-video");
+   document.getElementById("remote-video");
 
-  if(e.streams&&e.streams[0]){
+  if(e.streams?.[0]){
 
    video.srcObject=e.streams[0];
-
    video.style.display="block";
 
    document.getElementById("cam-off")
@@ -2262,7 +2204,6 @@ async function joinViewer(live){
 
  };
 
-
  viewerPC.onicecandidate=e=>{
 
   if(!e.candidate)return;
@@ -2273,10 +2214,9 @@ async function joinViewer(live){
     `lives/${live.id}/signals/${viewerId}/viewerCandidates`
    ),
    e.candidate.toJSON()
-  );
+  ).catch(()=>{});
 
  };
-
 
  onValue(
   ref(
@@ -2300,6 +2240,16 @@ async function joinViewer(live){
      new RTCSessionDescription(offer)
     );
 
+    while(pendingCandidates.length){
+
+     const c=pendingCandidates.shift();
+
+     try{
+      await viewerPC.addIceCandidate(c);
+     }catch(e){}
+
+    }
+
     const answer=
     await viewerPC.createAnswer();
 
@@ -2318,28 +2268,40 @@ async function joinViewer(live){
 
    }catch(e){
 
-    console.error("Viewer WebRTC error",e);
+    console.error("Viewer WebRTC:",e);
 
    }
 
   }
  );
 
-
  onChildAdded(
   ref(
    db,
    `lives/${live.id}/signals/${viewerId}/hostCandidates`
   ),
-  snap=>{
+  async snap=>{
 
    const c=snap.val();
 
    if(!c||!viewerPC)return;
 
-   viewerPC.addIceCandidate(
-    new RTCIceCandidate(c)
-   ).catch(()=>{});
+   const candidate=
+    new RTCIceCandidate(c);
+
+   if(
+    viewerPC.remoteDescription
+   ){
+
+    try{
+     await viewerPC.addIceCandidate(candidate);
+    }catch(e){}
+
+   }else{
+
+    pendingCandidates.push(candidate);
+
+   }
 
   }
  );
@@ -2351,29 +2313,33 @@ async function joinViewer(live){
    VIEWER CLEANUP
 ========================================================= */
 
-function cleanupViewer(){
+async function leaveViewer(showMenu=true){
+
+ const id=currentLiveId;
+ const vid=viewerId;
 
  if(unsubLiveEnd){
-  try{unsubLiveEnd();}catch(e){}
+  try{unsubLiveEnd()}catch(e){}
   unsubLiveEnd=null;
  }
 
  if(unsubChat){
-  try{unsubChat();}catch(e){}
+  try{unsubChat()}catch(e){}
   unsubChat=null;
  }
 
  if(unsubGifts){
-  try{unsubGifts();}catch(e){}
+  try{unsubGifts()}catch(e){}
   unsubGifts=null;
  }
 
  if(unsubBotData){
-  try{unsubBotData();}catch(e){}
+  try{unsubBotData()}catch(e){}
   unsubBotData=null;
  }
 
  clearTimeout(localBotChatTimer);
+ localBotChatTimer=null;
 
  if(viewerPC){
 
@@ -2382,38 +2348,38 @@ function cleanupViewer(){
   }catch(e){}
 
   viewerPC=null;
+
  }
 
- if(viewerId&&currentLiveId){
+ if(vid&&id){
 
-  remove(
-   ref(
-    db,
-    `lives/${currentLiveId}/viewers/${viewerId}`
-   )
+  await remove(
+   ref(db,`lives/${id}/viewers/${vid}`)
   ).catch(()=>{});
 
  }
 
+ viewerId=null;
+
+ if(showMenu)
+  show("menu");
+
 }
 
 
-/* =========================================================
-   FORCE LEAVE
-========================================================= */
-
 function forceLeaveLive(message){
 
- const id=currentLiveId;
+ const oldId=currentLiveId;
 
- cleanupViewer();
+ leaveViewer(false).finally(()=>{
 
- currentLiveId=null;
- viewerId=null;
+  currentLiveId=null;
 
- show("menu");
+  show("menu");
 
- toast(message||"Live ended");
+  toast(message||"Live ended");
+
+ });
 
 }
 
@@ -2425,14 +2391,13 @@ function forceLeaveLive(message){
 function calculateBotCount(){
 
  let total=0;
-
  const now=Date.now();
 
  Object.values(botBatches||{})
  .forEach(batch=>{
 
   if(
-   batch &&
+   batch&&
    Number(batch.expiresAt||0)>now
   ){
 
@@ -2450,24 +2415,18 @@ function updateViewerCount(){
 
  botCount=calculateBotCount();
 
- const total=
- realViewers+
- botCount;
+ const total=realViewers+botCount;
 
  document.getElementById("watchers-text")
- .textContent=
- format(total)+" watching";
+ .textContent=format(total)+" watching";
 
- if(
-  isHost&&
-  currentLiveId
- ){
+ if(isHost&&currentLiveId){
 
   update(
    ref(db,"lives/"+currentLiveId),
    {
     viewers:total,
-    botCount:botCount
+    botCount
    }
   ).catch(()=>{});
 
@@ -2484,9 +2443,7 @@ function listenToBotBatches(id){
 
  if(unsubBotData){
 
-  try{
-   unsubBotData();
-  }catch(e){}
+  try{unsubBotData()}catch(e){}
 
  }
 
@@ -2495,8 +2452,7 @@ function listenToBotBatches(id){
   ref(db,`lives/${id}/botBatches`),
   snap=>{
 
-   botBatches=
-    snap.val()||{};
+   botBatches=snap.val()||{};
 
    updateViewerCount();
 
@@ -2508,11 +2464,6 @@ function listenToBotBatches(id){
 }
 
 
-/* =========================================================
-   ADD BOTS
-   ONLY ONE DATABASE RECORD FOR THE WHOLE BATCH.
-========================================================= */
-
 async function addBots(amount){
 
  if(
@@ -2523,25 +2474,10 @@ async function addBots(amount){
   return;
 
  const id=
- "b_"+Date.now()+"_"+
- Math.random().toString(36).slice(2,7);
+  "b_"+Date.now()+"_"+
+  Math.random().toString(36).slice(2,7);
 
  const now=Date.now();
-
- /*
-  Random lifetime:
-  1M bots still = ONE Firebase record.
- */
-
- const lifetime=
-  45000+
-  Math.random()*135000;
-
- const batch={
-  amount:Number(amount),
-  createdAt:now,
-  expiresAt:now+lifetime
- };
 
  try{
 
@@ -2550,12 +2486,17 @@ async function addBots(amount){
     db,
     `lives/${currentLiveId}/botBatches/${id}`
    ),
-   batch
+   {
+    amount:Number(amount),
+    createdAt:now,
+    expiresAt:
+     now+
+     45000+
+     Math.random()*135000
+   }
   );
 
-  toast(
-   "+"+format(amount)+" viewers"
-  );
+  toast("+"+format(amount)+" viewers");
 
  }catch(e){
 
@@ -2568,10 +2509,6 @@ async function addBots(amount){
 }
 
 
-/* =========================================================
-   BOT EXPIRY
-========================================================= */
-
 function startBotExpiryWatcher(){
 
  clearInterval(botExpiryTimer);
@@ -2579,22 +2516,18 @@ function startBotExpiryWatcher(){
  botExpiryTimer=
  setInterval(async()=>{
 
-  if(
-   !isHost||
-   !currentLiveId
-  )
+  if(!isHost||!currentLiveId)
    return;
 
   const now=Date.now();
-
   const updates={};
 
   Object.entries(botBatches||{})
-  .forEach(([id,batch])=>{
+  .forEach(([id,b])=>{
 
    if(
-    batch &&
-    Number(batch.expiresAt||0)<=now
+    b&&
+    Number(b.expiresAt||0)<=now
    ){
 
     updates[
@@ -2607,10 +2540,8 @@ function startBotExpiryWatcher(){
 
   if(Object.keys(updates).length){
 
-   await update(
-    ref(db),
-    updates
-   ).catch(()=>{});
+   await update(ref(db),updates)
+   .catch(()=>{});
 
   }
 
@@ -2622,81 +2553,22 @@ function startBotExpiryWatcher(){
 
 
 /* =========================================================
-   BOT CHAT ENGINE
-=========================================================
-
-   IMPORTANT:
-
-   Bot chat is NOT pushed to Firebase.
-
-   That means 100K bots do not create 100K database writes.
-
-   Every viewer creates its own lightweight visual chat stream.
+   BOT CHAT
 ========================================================= */
 
 function getChatSpeed(){
 
- const count=calculateBotCount();
+ const c=calculateBotCount();
 
- if(count<10)
-  return {
-   interval:1600,
-   burst:1
-  };
+ if(c<10)return{interval:1600,burst:1};
+ if(c<100)return{interval:650,burst:1};
+ if(c<1000)return{interval:180,burst:2};
+ if(c<3000)return{interval:80,burst:3};
+ if(c<7000)return{interval:40,burst:5};
+ if(c<20000)return{interval:25,burst:8};
+ if(c<100000)return{interval:18,burst:12};
 
- if(count<100)
-  return {
-   interval:650,
-   burst:1
-  };
-
- if(count<1000)
-  return {
-   interval:180,
-   burst:2
-  };
-
- if(count<3000)
-  return {
-   interval:80,
-   burst:3
-  };
-
- if(count<7000)
-  return {
-   interval:40,
-   burst:5
-  };
-
- /*
-  7K+:
-  CHAT EXPLOSION MODE
- */
-
- if(count<20000)
-  return {
-   interval:25,
-   burst:8
-  };
-
- if(count<100000)
-  return {
-   interval:18,
-   burst:12
-  };
-
- /*
-  At huge numbers don't literally create
-  millions of DOM nodes per second.
-  We simulate the visual speed with large
-  batches while keeping the page alive.
- */
-
- return {
-  interval:16,
-  burst:18
- };
-
+ return{interval:16,burst:18};
 }
 
 
@@ -2704,51 +2576,39 @@ function startLocalBotChat(){
 
  clearTimeout(localBotChatTimer);
 
- if(calculateBotCount()<=0)
-  return;
-
- localBotChatTick();
+ if(calculateBotCount()>0)
+  localBotChatTick();
 
 }
 
 
 function localBotChatTick(){
 
- const count=
- calculateBotCount();
+ const c=calculateBotCount();
 
- if(count<=0){
+ if(c<=0){
 
   localBotChatTimer=
-   setTimeout(
-    localBotChatTick,
-    1000
-   );
+   setTimeout(localBotChatTick,1000);
 
   return;
+
  }
 
- const speed=
- getChatSpeed();
-
- /*
-  First 45 seconds of a live:
-  approximately 70% greeting messages.
- */
+ const s=getChatSpeed();
 
  const opening=
- Date.now()-
- (window.__liveStartedAt||Date.now())
- <45000;
+  Date.now()-
+  (window.__liveStartedAt||Date.now())<
+  45000;
 
- for(let i=0;i<speed.burst;i++){
+ for(let i=0;i<s.burst;i++){
 
   enqueueChat({
    name:nextName(),
    text:nextBotMessage(opening),
    host:false,
-   gift:false,
-   bot:true
+   gift:false
   });
 
  }
@@ -2756,7 +2616,7 @@ function localBotChatTick(){
  localBotChatTimer=
   setTimeout(
    localBotChatTick,
-   speed.interval
+   s.interval
   );
 
 }
@@ -2783,9 +2643,7 @@ function enqueueChat(msg){
 
   chatFramePending=true;
 
-  requestAnimationFrame(
-   renderChat
-  );
+  requestAnimationFrame(renderChat);
 
  }
 
@@ -2797,23 +2655,18 @@ function renderChat(){
  chatFramePending=false;
 
  const list=
- document.getElementById("chat-list");
-
- /*
-  Never allow an enormous queue to be
-  inserted in one JavaScript task.
- */
+  document.getElementById("chat-list");
 
  const batch=
- chatQueue.splice(0,80);
+  chatQueue.splice(0,80);
 
  const fragment=
- document.createDocumentFragment();
+  document.createDocumentFragment();
 
  batch.forEach(msg=>{
 
   const div=
-  document.createElement("div");
+   document.createElement("div");
 
   div.className=
    "msg"+
@@ -2836,14 +2689,8 @@ function renderChat(){
 
  list.appendChild(fragment);
 
- /*
-  Keep the chat visually explosive but tiny
-  in DOM size.
- */
-
  while(
-  list.children.length>
-  MAX_CHAT_DOM
+  list.children.length>MAX_CHAT_DOM
  ){
 
   list.removeChild(
@@ -2852,20 +2699,13 @@ function renderChat(){
 
  }
 
- /*
-  No expensive smooth scrolling.
- */
-
- list.scrollTop=
- list.scrollHeight;
+ list.scrollTop=list.scrollHeight;
 
  if(chatQueue.length){
 
   chatFramePending=true;
 
-  requestAnimationFrame(
-   renderChat
-  );
+  requestAnimationFrame(renderChat);
 
  }
 
@@ -2880,18 +2720,11 @@ function listenToChat(id){
 
  if(unsubChat){
 
-  try{
-   unsubChat();
-  }catch(e){}
+  try{unsubChat()}catch(e){}
 
  }
 
  seenChat.clear();
-
- /*
-  Only listen to the newest chat data.
-  Bot chat is NOT stored here.
- */
 
  unsubChat=
  onChildAdded(
@@ -2905,14 +2738,7 @@ function listenToChat(id){
 
    const msg=snap.val();
 
-   if(!msg)return;
-
-   /*
-    Ignore old bot records created by an older
-    version of the game.
-   */
-
-   if(msg.bot)
+   if(!msg||msg.bot)
     return;
 
    enqueueChat({
@@ -2947,16 +2773,11 @@ document.getElementById("chat-input")
 async function sendMessage(){
 
  const input=
- document.getElementById("chat-input");
+  document.getElementById("chat-input");
 
- const text=
- input.value.trim();
+ const text=input.value.trim();
 
- if(
-  !text||
-  !currentLiveId||
-  !user
- )
+ if(!text||!currentLiveId||!user)
   return;
 
  input.value="";
@@ -3067,18 +2888,14 @@ const GIFTS=[
 ];
 
 
-const giftGrid=
-document.getElementById("gift-grid");
-
-
 GIFTS.forEach(g=>{
 
- const div=
- document.createElement("div");
+ const d=
+  document.createElement("div");
 
- div.className="gift-item";
+ d.className="gift-item";
 
- div.innerHTML=`
+ d.innerHTML=`
   <div class="g-emoji">${g[0]}</div>
   <div class="g-name">${esc(g[1])}</div>
   <div class="g-cost">
@@ -3086,11 +2903,10 @@ GIFTS.forEach(g=>{
   </div>
  `;
 
- div.onclick=()=>{
-  sendGift(g);
- };
+ d.onclick=()=>sendGift(g);
 
- giftGrid.appendChild(div);
+ document.getElementById("gift-grid")
+ .appendChild(d);
 
 });
 
@@ -3122,10 +2938,10 @@ document.getElementById("gift-close")
 
 function playGiftAnim(emoji,name,cost){
 
- const anim=
- document.getElementById("gift-anim");
+ const a=
+  document.getElementById("gift-anim");
 
- anim.innerHTML=`
+ a.innerHTML=`
   <div class="gift-fly">${emoji}</div>
   <div class="gift-label">
    ${emoji} ${esc(name)}
@@ -3134,7 +2950,7 @@ function playGiftAnim(emoji,name,cost){
  `;
 
  setTimeout(()=>{
-  anim.innerHTML="";
+  a.innerHTML="";
  },1200);
 
 }
@@ -3142,18 +2958,12 @@ function playGiftAnim(emoji,name,cost){
 
 async function sendGift(g){
 
- if(
-  !currentLiveId||
-  isHost
- )
+ if(!currentLiveId||isHost)
   return;
 
  const cost=g[2];
 
- if(
-  !isInfinite&&
-  coins<cost
- ){
+ if(!isInfinite&&coins<cost){
 
   toast("Not enough coins!");
   return;
@@ -3163,6 +2973,7 @@ async function sendGift(g){
  if(!isInfinite){
 
   coins-=cost;
+
   saveCoins();
   updateCoins();
 
@@ -3226,9 +3037,7 @@ function listenToGifts(id){
 
  if(unsubGifts){
 
-  try{
-   unsubGifts();
-  }catch(e){}
+  try{unsubGifts()}catch(e){}
 
  }
 
@@ -3251,8 +3060,7 @@ function listenToGifts(id){
 
    if(!isInfinite){
 
-    coins+=
-     Number(g.toHost||0);
+    coins+=Number(g.toHost||0);
 
     saveCoins();
     updateCoins();
@@ -3285,15 +3093,11 @@ document.getElementById("btn-mic")
 
  document.getElementById("btn-mic")
  .textContent=
-  isMuted
-  ?"🔇"
-  :"🎤";
+  isMuted?"🔇":"🎤";
 
  document.getElementById("mic-status")
  .textContent=
-  isMuted
-  ?"Mic: muted"
-  :"Mic: on";
+  isMuted?"Mic: muted":"Mic: on";
 
 };
 
@@ -3305,8 +3109,7 @@ document.getElementById("btn-mic")
 document.getElementById("btn-flip")
 .onclick=async()=>{
 
- if(!isHost)
-  return;
+ if(!isHost)return;
 
  facingMode=
   facingMode==="user"
@@ -3323,10 +3126,10 @@ document.getElementById("btn-flip")
 ========================================================= */
 
 const bButton=
-document.getElementById("btn-b");
+ document.getElementById("btn-b");
 
 const botMenu=
-document.getElementById("bot-menu");
+ document.getElementById("bot-menu");
 
 let holdTimer=null;
 let wasHeld=false;
@@ -3369,11 +3172,8 @@ bButton.addEventListener(
 
   clearTimeout(holdTimer);
 
-  if(!wasHeld){
-
+  if(!wasHeld)
    await addBots(botAddAmount);
-
-  }
 
  }
 );
@@ -3389,23 +3189,16 @@ bButton.addEventListener(
 );
 
 
-/* CLOSE MENU */
-
 document.addEventListener(
  "pointerdown",
  e=>{
 
-  if(!e.target.closest(".b-wrap")){
-
+  if(!e.target.closest(".b-wrap"))
    botMenu.classList.remove("show");
-
-  }
 
  }
 );
 
-
-/* BOT OPTIONS */
 
 document.querySelectorAll(
  ".bot-options button"
@@ -3463,55 +3256,29 @@ async function stopLive(){
  botExpiryTimer=null;
 
  if(unsubBotData){
-
-  try{
-   unsubBotData();
-  }catch(e){}
-
+  try{unsubBotData()}catch(e){}
   unsubBotData=null;
-
  }
 
  if(unsubViewers){
-
-  try{
-   unsubViewers();
-  }catch(e){}
-
+  try{unsubViewers()}catch(e){}
   unsubViewers=null;
-
  }
 
  if(unsubChat){
-
-  try{
-   unsubChat();
-  }catch(e){}
-
+  try{unsubChat()}catch(e){}
   unsubChat=null;
-
  }
 
  if(unsubGifts){
-
-  try{
-   unsubGifts();
-  }catch(e){}
-
+  try{unsubGifts()}catch(e){}
   unsubGifts=null;
-
  }
 
  if(unsubLiveEnd){
-
-  try{
-   unsubLiveEnd();
-  }catch(e){}
-
+  try{unsubLiveEnd()}catch(e){}
   unsubLiveEnd=null;
-
  }
-
 
  if(stream){
 
@@ -3522,34 +3289,24 @@ async function stopLive(){
 
  }
 
-
  Object.values(peerConnections)
  .forEach(pc=>{
 
-  try{
-   pc.close();
-  }catch(e){}
+  try{pc.close()}catch(e){}
 
  });
 
  peerConnections={};
 
-
  if(viewerPC){
 
-  try{
-   viewerPC.close();
-  }catch(e){}
+  try{viewerPC.close()}catch(e){}
 
   viewerPC=null;
 
  }
 
-
- if(
-  viewerId&&
-  id
- ){
+ if(viewerId&&id){
 
   await remove(
    ref(
@@ -3560,7 +3317,6 @@ async function stopLive(){
 
  }
 
-
  if(isHost&&id){
 
   await remove(
@@ -3568,7 +3324,6 @@ async function stopLive(){
   ).catch(()=>{});
 
  }
-
 
  isHost=false;
  cameraOn=false;
@@ -3612,70 +3367,48 @@ async function stopLive(){
 ========================================================= */
 
 document.getElementById("btn-leave")
-.onclick=stopLive;
+.onclick=async()=>{
 
+ if(isHost){
 
-/* =========================================================
-   INITIAL LIVE TIME
-========================================================= */
+  await stopLive();
 
-const originalStartLive=startLive;
+ }else{
 
+  await leaveViewer();
 
-/*
- We need the opening-chat timer to know when
- the live started. This is only local and does
- not affect Firebase.
- */
+  currentLiveId=null;
 
-const startLiveWithTime=async()=>{
+  show("menu");
 
- window.__liveStartedAt=Date.now();
+  toast("Left live");
 
- return originalStartLive();
+ }
 
 };
 
 
-/*
- Replace the button handler with the timed version.
- */
-
-document.getElementById("btn-start")
-.onclick=startLiveWithTime;
-
-
 /* =========================================================
-   SAFETY CLEANUP ON PAGE CLOSE
+   PAGE CLEANUP
 ========================================================= */
 
 window.addEventListener(
  "beforeunload",
  ()=>{
 
-  if(
-   currentLiveId&&
-   viewerId
-  ){
-
-   /*
-    Best effort only. Firebase handles
-    disconnected sessions as configured
-    by the database.
-   */
+  if(viewerId&&currentLiveId){
 
    remove(
     ref(
      db,
      `lives/${currentLiveId}/viewers/${viewerId}`
     )
-   );
+   ).catch(()=>{});
 
   }
 
- }
-);
+ });
 
 </script>
 </body>
-  </html>
+ </html>
