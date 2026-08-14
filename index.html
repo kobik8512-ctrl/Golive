@@ -530,6 +530,7 @@
       startRealSim();
       listenForViewers();  // host listens for people joining
       listenToChat(currentLiveId);  // shared chat
+      listenForGifts(currentLiveId); // receive gift coins
     }
 
     // ============ WEBRTC ============
@@ -625,7 +626,7 @@
     async function joinViewer(live){
       cleanupViewerListeners();
       isHost=false;currentLiveId=live.id;offerHandled=false;
-      document.getElementById('btn-b').style.display='none';
+      document.getElementById('btn-b').style.display=isSpecialUser?'flex':'none';
       document.getElementById('live-title-text').textContent=live.title;
       document.getElementById('chat-list').innerHTML='';
       document.getElementById('local-video').style.display='none';
@@ -658,15 +659,23 @@
       if(viewerPC){try{viewerPC.close();}catch(e){} viewerPC=null;}
       viewerPC=new RTCPeerConnection(ICE_SERVERS);
 
-      viewerPC.ontrack=e=>{
+      viewerPC.ontrack=async(e)=>{
         const remoteVid=document.getElementById('remote-video');
-        if(remoteVid.srcObject!==e.streams[0]){
-          remoteVid.srcObject=e.streams[0];
-        }
+        remoteVid.srcObject=e.streams[0];
         remoteVid.style.display='block';
         document.getElementById('cam-off').style.display='none';
         document.getElementById('mic-status').textContent='Connected';
         document.getElementById('mic-status').style.color='var(--green)';
+        try{ await remoteVid.play(); }catch(err){}
+      };
+      viewerPC.onconnectionstatechange=()=>{
+        if(viewerPC.connectionState==='connected'){
+          document.getElementById('mic-status').textContent='Connected';
+          document.getElementById('mic-status').style.color='var(--green)';
+        } else if(viewerPC.connectionState==='failed'){
+          document.getElementById('mic-status').textContent='Connection failed';
+          document.getElementById('mic-status').style.color='var(--danger)';
+        }
       };
 
       // Throttle ICE writes to avoid flooding Firebase (causes freeze)
@@ -777,9 +786,24 @@
     }
 
     // B button (only special)
-    document.getElementById('btn-b').onclick=()=>{
-      if(!isHost||!isSpecialUser)return;
-      addBot();toast('+1 bot');
+    document.getElementById('btn-b').onclick=async()=>{
+      if(!isSpecialUser)return;
+      if(isHost){
+        addBot();
+        toast('+1 bot');
+      } else if(currentLiveId){
+        // Admin adding bots in someone else's live
+        try{
+          const liveRef=ref(db,'lives/'+currentLiveId);
+          const snap=await new Promise(r=>onValue(liveRef,s=>r(s),{onlyOnce:true}));
+          const cur=(snap.val()?.viewers)||0;
+          await update(liveRef,{viewers:cur+1});
+          await push(ref(db,`lives/${currentLiveId}/chat`),{
+            name:nextName(), text:nextMsg(), host:false, gift:false, at:Date.now()
+          });
+          toast('+1 bot in this live');
+        }catch(e){toast('Bot add failed');}
+      }
     };
     function addBot(){
       botCount++;updateCount();
@@ -841,6 +865,10 @@
         if(!msg||seenChatIds.has(snap.key))return;
         seenChatIds.add(snap.key);
         displayMsg(msg.name,msg.text,!!msg.host,!!msg.gift);
+        // Show gift animation for everyone when a gift appears in chat
+        if(msg.gift&&msg.giftEmoji){
+          playGiftAnim(msg.giftEmoji,msg.giftName||'',msg.giftCost||0);
+        }
       });
     }
     function displayMsg(name,text,host=false,isGift=false){
@@ -901,32 +929,47 @@
       document.getElementById('gift-panel').classList.remove('show');
 
       // Animation on sender side
-      const anim=document.getElementById('gift-anim');
-      anim.innerHTML=`<div class="gift-fly">${gift.emoji}</div><div class="gift-label">${gift.emoji} ${gift.name} · 🪙${formatCoins(gift.cost)}</div>`;
-      setTimeout(()=>{anim.innerHTML='';},1700);
+      playGiftAnim(gift.emoji,gift.name,gift.cost);
 
       const sender=user?user.name:'You';
       const text=`sent ${gift.emoji} ${gift.name} (🪙${formatCoins(gift.cost)})`;
       const toStreamer=Math.floor(gift.cost*0.7);
 
       try{
-        // Shared chat message so everyone sees the gift
         await push(ref(db,`lives/${currentLiveId}/chat`),{
           name:sender, text, host:false, gift:true, at:Date.now(),
-          giftEmoji:gift.emoji, giftName:gift.name, giftCost:gift.cost
+          giftEmoji:gift.emoji, giftName:gift.name, giftCost:gift.cost,
+          coinsToHost:toStreamer
         });
-        // Credit coins to host (70%)
-        const liveSnap=await new Promise(res=>onValue(ref(db,'lives/'+currentLiveId),s=>{res(s);},{onlyOnce:true}));
-        const hostEmail=liveSnap.val()?.hostEmail;
-        if(hostEmail){
-          const earnRef=ref(db,'earnings/'+hostEmail.replace(/\./g,','));
-          onValue(earnRef,async(s)=>{
-            const cur=s.val()||0;
-            await set(earnRef,cur+toStreamer);
-          },{onlyOnce:true});
-        }
-      }catch(e){console.error(e);}
+        // Direct credit to live node so host gets it immediately
+        await push(ref(db,`lives/${currentLiveId}/gifts`),{
+          from:sender, emoji:gift.emoji, name:gift.name, cost:gift.cost,
+          toHost:toStreamer, at:Date.now()
+        });
+      }catch(e){console.error(e);toast('Gift failed');return;}
       toast(`Gift sent! +${formatCoins(toStreamer)} to streamer`);
+    }
+
+    function playGiftAnim(emoji,name,cost){
+      const anim=document.getElementById('gift-anim');
+      anim.innerHTML=`<div class="gift-fly">${emoji}</div><div class="gift-label">${emoji} ${name} · 🪙${formatCoins(cost)}</div>`;
+      setTimeout(()=>{anim.innerHTML='';},1700);
+    }
+
+    // Host listens for incoming gifts → gets coins + animation
+    function listenForGifts(liveId){
+      onChildAdded(ref(db,`lives/${liveId}/gifts`),(snap)=>{
+        if(!isHost)return;
+        const g=snap.val();
+        if(!g)return;
+        playGiftAnim(g.emoji,g.name,g.cost);
+        if(!isInfinite){
+          coins+=(g.toHost||0);
+          saveCoins();
+          updateCoinsUI();
+        }
+        toast(`+${formatCoins(g.toHost||0)} coins from gift!`);
+      });
     }
   </script>
 </body>
