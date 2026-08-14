@@ -1,3414 +1,379 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>GO LIVE</title>
-
-<style>
-:root{
- --bg:#09090b;
- --card:#151519;
- --card2:#1d1d23;
- --accent:#ff2d55;
- --text:#f5f5f7;
- --muted:#8b8b96;
- --green:#30d158;
- --gold:#ffd60a;
- --border:#292930;
-}
-
-*{box-sizing:border-box;margin:0;padding:0}
-
-html,body{
- width:100%;
- min-height:100%;
- background:var(--bg);
- color:var(--text);
- font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
- overflow-x:hidden;
-}
-
-button,input{font:inherit}
-button{border:0;color:inherit;cursor:pointer}
-
-.screen{
- display:none;
- min-height:100vh;
- flex-direction:column;
-}
-
-.screen.active{display:flex}
-
-/* LOGIN */
-
-#login-screen{
- align-items:center;
- justify-content:center;
- padding:24px;
- background:radial-gradient(ellipse at top,#1a0a12 0%,var(--bg) 60%);
-}
-
-.login-box{
- width:100%;
- max-width:360px;
- text-align:center;
-}
-
-.login-logo{
- font-size:2.4rem;
- font-weight:800;
- margin-bottom:8px;
-}
-
-.login-logo span,
-.menu-title span{
- color:var(--accent);
-}
-
-.login-sub{
- color:var(--muted);
- margin-bottom:40px;
-}
-
-.btn-google{
- width:100%;
- background:#fff;
- color:#1f1f1f;
- padding:14px 20px;
- border-radius:14px;
- font-weight:700;
- display:flex;
- justify-content:center;
- align-items:center;
- gap:12px;
-}
-
-.btn-google svg{
- width:20px;
- height:20px;
-}
-
-.login-note{
- margin-top:24px;
- font-size:.8rem;
- color:var(--muted);
-}
-
-/* MENU */
-
-#menu{
- padding:20px 16px 160px;
-}
-
-.broadcast-label,
-.section-label{
- font-size:.7rem;
- font-weight:700;
- letter-spacing:1.5px;
- color:var(--muted);
- text-transform:uppercase;
- margin-bottom:8px;
-}
-
-.menu-title{
- font-size:2.1rem;
- font-weight:800;
- margin-bottom:10px;
-}
-
-.signed-in{
- color:var(--muted);
- margin-bottom:28px;
-}
-
-.signed-in strong{color:var(--green)}
-
-.lives-list{
- display:flex;
- flex-direction:column;
- gap:10px;
-}
-
-.live-card{
- background:var(--card);
- border:1px solid var(--border);
- border-radius:16px;
- padding:14px;
- display:flex;
- align-items:center;
- gap:12px;
-}
-
-.live-info{
- flex:1;
- min-width:0;
-}
-
-.live-name{
- font-weight:700;
- font-size:1.05rem;
- white-space:nowrap;
- overflow:hidden;
- text-overflow:ellipsis;
-}
-
-.live-meta{
- color:var(--muted);
- font-size:.82rem;
- margin-top:3px;
-}
-
-.dot{
- display:inline-block;
- width:7px;
- height:7px;
- background:var(--accent);
- border-radius:50%;
- margin-right:6px;
-}
-
-.btn-join{
- background:var(--accent);
- font-weight:700;
- padding:10px 18px;
- border-radius:999px;
-}
-
-.btn-x-small{
- width:32px;
- height:32px;
- border-radius:50%;
- background:var(--card2);
- color:var(--muted);
-}
-
-.empty-state{
- text-align:center;
- padding:48px 20px;
- color:var(--muted);
- background:var(--card);
- border-radius:16px;
- border:1px dashed var(--border);
- line-height:1.5;
-}
-
-.bottom-actions{
- position:fixed;
- bottom:0;
- left:0;
- right:0;
- padding:16px 16px 28px;
- background:linear-gradient(transparent,var(--bg) 25%);
- display:flex;
- flex-direction:column;
- gap:10px;
- z-index:30;
-}
-
-.btn-go-live{
- background:var(--accent);
- font-size:1.15rem;
- font-weight:700;
- padding:16px;
- border-radius:999px;
-}
-
-.btn-secondary{
- background:transparent;
- color:var(--muted);
- padding:12px;
- border-radius:999px;
- border:1px solid var(--border);
-}
-
-/* LIVE */
-
-#live-room{
- position:relative;
- width:100%;
- height:100vh;
- height:100dvh;
- background:#000;
- overflow:hidden;
-}
-
-#video-wrap{
- position:absolute;
- inset:0;
- background:#0d0d10;
- display:flex;
- align-items:center;
- justify-content:center;
-}
-
-video{
- width:100%;
- height:100%;
- object-fit:cover;
- display:none;
-}
-
-#local-video.mirror{
- transform:scaleX(-1);
-}
-
-.cam-off{
- text-align:center;
- color:var(--muted);
-}
-
-.cam-off .icon{
- font-size:3.5rem;
- margin-bottom:10px;
-}
-
-/* HEADER */
-
-.live-header{
- position:absolute;
- top:0;
- left:0;
- right:0;
- padding:12px;
- display:flex;
- justify-content:space-between;
- align-items:flex-start;
- z-index:100;
- pointer-events:none;
-}
-
-.live-header>*{pointer-events:auto}
-
-.live-pill{
- max-width:65%;
- background:rgba(0,0,0,.65);
- backdrop-filter:blur(12px);
- border-radius:999px;
- padding:8px 14px;
- display:flex;
- align-items:center;
- gap:8px;
- font-size:.88rem;
- font-weight:600;
-}
-
-.red-dot{
- width:8px;
- height:8px;
- background:var(--accent);
- border-radius:50%;
- animation:blink 1.3s infinite;
-}
-
-.title-text{
- white-space:nowrap;
- overflow:hidden;
- text-overflow:ellipsis;
-}
-
-.watchers{
- color:var(--muted);
- white-space:nowrap;
-}
-
-.header-btns{
- display:flex;
- gap:8px;
-}
-
-.icon-btn{
- width:40px;
- height:40px;
- border-radius:50%;
- background:rgba(0,0,0,.6);
- backdrop-filter:blur(10px);
- border:1px solid rgba(255,255,255,.08);
- display:flex;
- align-items:center;
- justify-content:center;
-}
-
-.b-btn{
- background:linear-gradient(135deg,#7c3aed,#06b6d4);
- font-weight:900;
-}
-
-/* BOT MENU */
-
-.b-wrap{
- position:relative;
-}
-
-.bot-menu{
- position:absolute;
- top:48px;
- right:0;
- width:220px;
- padding:12px;
- background:rgba(20,20,24,.98);
- border:1px solid #38383f;
- border-radius:16px;
- box-shadow:0 12px 40px #0009;
- display:none;
- z-index:500;
-}
-
-.bot-menu.show{display:block}
-
-.bot-menu-title{
- font-size:.75rem;
- color:var(--muted);
- text-transform:uppercase;
- letter-spacing:1px;
- font-weight:700;
- margin-bottom:9px;
-}
-
-.bot-options{
- display:grid;
- grid-template-columns:repeat(2,1fr);
- gap:7px;
-}
-
-.bot-options button{
- padding:10px 5px;
- border-radius:10px;
- background:var(--card2);
- font-weight:800;
- font-size:.85rem;
-}
-
-.bot-options button.selected{
- background:var(--accent);
-}
-
-.bot-selected{
- margin-top:9px;
- text-align:center;
- color:var(--muted);
- font-size:.72rem;
-}
-
-/* CHAT */
-
-.chat-wrap{
- position:absolute;
- bottom:0;
- left:0;
- right:0;
- height:42%;
- display:flex;
- flex-direction:column;
- background:linear-gradient(to top,#000e 45%,transparent);
- z-index:50;
- pointer-events:none;
-}
-
-.chat-list{
- flex:1;
- overflow:hidden;
- padding:12px 12px 5px;
- display:flex;
- flex-direction:column;
- justify-content:flex-end;
- gap:3px;
- pointer-events:auto;
-}
-
-.msg{
- font-size:.84rem;
- line-height:1.25;
- word-break:break-word;
-}
-
-.msg .uname{
- font-weight:800;
- margin-right:5px;
-}
-
-.msg .c0{color:#ff6b9d}
-.msg .c1{color:#5ac8fa}
-.msg .c2{color:#30d158}
-.msg .c3{color:#ffd60a}
-.msg .c4{color:#bf5af2}
-.msg .c5{color:#ff9f0a}
-.msg .c6{color:#64d2ff}
-.msg .c7{color:#ff375f}
-
-.msg.host .uname{
- color:var(--accent);
-}
-
-.msg.gift-msg{
- color:var(--gold);
- font-weight:700;
-}
-
-.chat-bar{
- display:flex;
- gap:7px;
- padding:6px 10px 16px;
- pointer-events:auto;
- align-items:center;
-}
-
-#chat-input{
- flex:1;
- min-width:0;
- background:#ffffff1a;
- border:1px solid #ffffff1f;
- border-radius:999px;
- padding:11px 15px;
- color:#fff;
- outline:none;
-}
-
-.btn-send,
-.btn-gift{
- font-weight:800;
- padding:11px 13px;
- border-radius:999px;
-}
-
-.btn-send{background:var(--accent)}
-
-.btn-gift{
- background:linear-gradient(135deg,#ffd60a,#ff9f0a);
- color:#111;
-}
-
-/* STATUS */
-
-.mic-status{
- position:absolute;
- bottom:43%;
- left:12px;
- color:var(--green);
- font-size:.75rem;
- z-index:40;
- pointer-events:none;
-}
-
-.coins-badge{
- position:absolute;
- bottom:43%;
- right:12px;
- z-index:40;
- background:#000a;
- backdrop-filter:blur(8px);
- border-radius:999px;
- padding:6px 12px;
- font-size:.82rem;
- font-weight:700;
- border:1px solid #ffd7004d;
-}
-
-/* MODALS */
-
-.modal-bg{
- position:fixed;
- inset:0;
- background:#000b;
- display:none;
- z-index:900;
-}
-
-.modal-bg.show{
- display:flex;
-}
-
-.gift-sheet{
- margin-top:auto;
- width:100%;
- max-height:65vh;
- background:var(--card);
- border-radius:20px 20px 0 0;
-}
-
-.gift-head{
- padding:14px 16px;
- border-bottom:1px solid var(--border);
- display:flex;
- justify-content:space-between;
-}
-
-.gift-grid{
- display:grid;
- grid-template-columns:repeat(4,1fr);
- gap:8px;
- padding:12px;
- overflow-y:auto;
- max-height:55vh;
-}
-
-.gift-item{
- background:var(--card2);
- border-radius:14px;
- padding:10px 6px;
- text-align:center;
-}
-
-.g-emoji{font-size:1.7rem}
-
-.g-name{
- font-size:.66rem;
- color:var(--muted);
-}
-
-.g-cost{
- font-size:.7rem;
- font-weight:800;
- color:var(--gold);
-}
-
-#gift-anim{
- position:fixed;
- inset:0;
- pointer-events:none;
- z-index:1000;
- display:flex;
- align-items:center;
- justify-content:center;
-}
-
-.gift-fly{font-size:4.5rem}
-
-.gift-label{
- position:absolute;
- bottom:38%;
- background:#000c;
- color:var(--gold);
- padding:8px 18px;
- border-radius:999px;
- font-weight:800;
-}
-
-.title-modal{
- align-items:center;
- justify-content:center;
- padding:20px;
-}
-
-.modal-card{
- background:var(--card);
- border-radius:20px;
- padding:28px 22px;
- width:100%;
- max-width:340px;
-}
-
-.modal-card h3{
- text-align:center;
- margin-bottom:18px;
-}
-
-#title-input{
- width:100%;
- background:var(--bg);
- border:1px solid var(--border);
- border-radius:12px;
- padding:14px;
- color:#fff;
- outline:none;
- margin-bottom:16px;
-}
-
-.modal-actions{
- display:flex;
- gap:10px;
-}
-
-.modal-actions button{
- flex:1;
- padding:13px;
- border-radius:12px;
- font-weight:700;
-}
-
-.btn-cancel{background:var(--card2)}
-
-.btn-confirm{background:var(--accent)}
-
-#toast{
- position:fixed;
- top:60px;
- left:50%;
- transform:translateX(-50%) translateY(-12px);
- background:#141418f2;
- padding:10px 18px;
- border-radius:999px;
- font-size:.86rem;
- opacity:0;
- transition:.2s;
- z-index:2000;
- border:1px solid var(--border);
- pointer-events:none;
- max-width:90%;
- text-align:center;
-}
-
-.show-toast{
- opacity:1!important;
- transform:translateX(-50%) translateY(0)!important;
-}
-
-@keyframes blink{
- 0%,100%{opacity:1}
- 50%{opacity:.35}
-}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GoLive</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #080809;
+      color: white;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 620px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 30px;
+    }
+
+    .error {
+      position: fixed;
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #151519;
+      border: 1px solid #303038;
+      border-radius: 40px;
+      padding: 18px 28px;
+      max-width: 90%;
+      text-align: center;
+      color: #fff;
+      display: none;
+      z-index: 10;
+    }
+
+    .logo {
+      font-size: 68px;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+
+    .logo span {
+      color: #ff2454;
+    }
+
+    .subtitle {
+      color: #92929a;
+      font-size: 27px;
+      margin-bottom: 75px;
+    }
+
+    .google-btn {
+      width: 100%;
+      max-width: 620px;
+      height: 90px;
+      border: 0;
+      border-radius: 18px;
+      background: white;
+      color: #202124;
+      font-size: 25px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 25px;
+    }
+
+    .google-btn:disabled {
+      opacity: .65;
+      cursor: wait;
+    }
+
+    .google {
+      font-size: 38px;
+      font-weight: 800;
+      color: #fbbc05;
+    }
+
+    .note {
+      margin-top: 45px;
+      color: #8e8e96;
+      font-size: 20px;
+    }
+
+    .logged-in {
+      display: none;
+      text-align: center;
+    }
+
+    .logged-in img {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      margin-bottom: 15px;
+    }
+
+    .logout {
+      margin-top: 25px;
+      padding: 14px 25px;
+      border: 1px solid #444;
+      border-radius: 12px;
+      background: #17171b;
+      color: white;
+      cursor: pointer;
+    }
+  </style>
 </head>
 
 <body>
 
-<!-- LOGIN -->
+  <div id="error" class="error"></div>
 
-<div id="login-screen" class="screen active">
- <div class="login-box">
+  <main class="app">
 
-  <div class="login-logo">
-   GO <span>LIVE</span>
-  </div>
+    <div id="loginScreen">
+      <div class="logo">
+        GO <span>LIVE</span>
+      </div>
 
-  <div class="login-sub">
-   Broadcast & join lives
-  </div>
+      <div class="subtitle">
+        Broadcast &amp; join lives
+      </div>
 
-  <button class="btn-google" id="btn-google">
+      <button id="googleLogin" class="google-btn">
+        <span class="google">G</span>
+        <span>Continue with Google</span>
+      </button>
 
-   <svg viewBox="0 0 48 48">
-    <path fill="#FFC107"
-    d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
-   </svg>
-
-   Continue with Google
-
-  </button>
-
-  <div class="login-note">
-   Google login + live streaming
-  </div>
-
- </div>
-</div>
-
-
-<!-- MENU -->
-
-<div id="menu" class="screen">
-
- <div class="broadcast-label">
-  Broadcast
- </div>
-
- <div class="menu-title">
-  GO <span>LIVE</span>
- </div>
-
- <div class="signed-in">
-  Signed in as <strong id="display-name">—</strong>
- </div>
-
- <div class="section-label">
-  Live now
- </div>
-
- <div class="lives-list" id="lives-list">
-
-  <div class="empty-state" id="empty-state">
-   No one is live right now.<br>
-   Be the first to go live!
-  </div>
-
- </div>
-
- <div class="bottom-actions">
-
-  <button class="btn-go-live" id="btn-go-live">
-   ● Go Live
-  </button>
-
-  <button class="btn-secondary" id="btn-clear">
-   Clear stuck lives
-  </button>
-
-  <button class="btn-secondary" id="btn-signout">
-   Sign out
-  </button>
-
- </div>
-
-</div>
-
-
-<!-- LIVE ROOM -->
-
-<div id="live-room" class="screen">
-
- <div id="video-wrap">
-
-  <video id="local-video" autoplay playsinline muted></video>
-
-  <video id="remote-video" autoplay playsinline></video>
-
-  <div class="cam-off" id="cam-off">
-   <div class="icon">📷</div>
-   <div>Camera off</div>
-  </div>
-
- </div>
-
-
- <div class="live-header">
-
-  <div class="live-pill">
-
-   <div class="red-dot"></div>
-
-   <span class="title-text" id="live-title-text">
-    LIVE
-   </span>
-
-   <span class="watchers" id="watchers-text">
-    0 watching
-   </span>
-
-  </div>
-
-
-  <div class="header-btns">
-
-   <div class="b-wrap">
-
-    <button class="icon-btn b-btn" id="btn-b" style="display:none">
-     B
-    </button>
-
-    <div class="bot-menu" id="bot-menu">
-
-     <div class="bot-menu-title">
-      Bots per B click
-     </div>
-
-     <div class="bot-options">
-
-      <button data-bots="1">1</button>
-      <button data-bots="10">10</button>
-      <button data-bots="100">100</button>
-      <button data-bots="1000">1K</button>
-      <button data-bots="10000">10K</button>
-      <button data-bots="100000">100K</button>
-      <button data-bots="1000000">1M</button>
-
-     </div>
-
-     <div class="bot-selected" id="bot-selected">
-      Selected: 1
-     </div>
-
+      <div class="note">
+        Google login + live streaming
+      </div>
     </div>
 
-   </div>
-
-   <button class="icon-btn" id="btn-mic">🎤</button>
-   <button class="icon-btn" id="btn-camera">📷</button>
-   <button class="icon-btn" id="btn-flip">🔄</button>
-   <button class="icon-btn" id="btn-leave">✕</button>
-
-  </div>
-
- </div>
-
-
- <div class="mic-status" id="mic-status">
-  Mic: ready
- </div>
-
- <div class="coins-badge">
-  🪙 <span id="coins-count">0</span>
- </div>
-
-
- <div class="chat-wrap">
-
-  <div class="chat-list" id="chat-list"></div>
-
-  <div class="chat-bar">
-
-   <input
-    id="chat-input"
-    type="text"
-    maxlength="140"
-    autocomplete="off"
-    placeholder="Say something..."
-   >
-
-   <button class="btn-gift" id="btn-gift">
-    🎁
-   </button>
-
-   <button class="btn-send" id="btn-send">
-    Send
-   </button>
-
-  </div>
-
- </div>
-
-</div>
-
-
-<!-- GIFTS -->
-
-<div id="gift-panel" class="modal-bg">
-
- <div class="gift-sheet">
-
-  <div class="gift-head">
-
-   <h3>Send a Gift</h3>
-
-   <button id="gift-close">✕</button>
-
-  </div>
-
-  <div class="gift-grid" id="gift-grid"></div>
-
- </div>
-
-</div>
-
-<div id="gift-anim"></div>
-
-
-<!-- TITLE -->
-
-<div id="title-modal" class="modal-bg title-modal">
-
- <div class="modal-card">
-
-  <h3>Name your live</h3>
-
-  <input
-   id="title-input"
-   type="text"
-   maxlength="40"
-   placeholder="e.g. my live"
-  >
-
-  <div class="modal-actions">
-
-   <button class="btn-cancel" id="btn-cancel">
-    Cancel
-   </button>
-
-   <button class="btn-confirm" id="btn-start">
-    Start Live
-   </button>
-
-  </div>
-
- </div>
-
-</div>
-
-
-<div id="toast"></div>
-
-
-<script type="module">
-
-/* =========================================================
-   FIREBASE
-========================================================= */
-
-import {
- initializeApp
-} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
-
-import {
- getAuth,
- GoogleAuthProvider,
- signInWithPopup,
- signInWithRedirect,
- getRedirectResult,
- signOut,
- onAuthStateChanged,
- browserLocalPersistence,
- setPersistence
-} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
-
-import {
- getDatabase,
- ref,
- set,
- update,
- remove,
- push,
- onValue,
- onChildAdded,
- onChildRemoved,
- get
-} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js";
-
-
-const firebaseConfig={
- apiKey:"AIzaSyDaQ06E5ZvjM6XnqOpWgmUsbe5T_EnaPo",
- authDomain:"golive-ff5ad.firebaseapp.com",
- projectId:"golive-ff5ad",
- storageBucket:"golive-ff5ad.firebasestorage.app",
- messagingSenderId:"994701431927",
- appId:"1:994701431927:web:4e7615434facc5b54ae272",
- measurementId:"G-Q99XRZG8EG",
- databaseURL:"https://golive-ff5ad-default-rtdb.firebaseio.com"
-};
-
-const app=initializeApp(firebaseConfig);
-const auth=getAuth(app);
-const provider=new GoogleAuthProvider();
-const db=getDatabase(app);
-
-const SPECIAL_EMAIL="kobik8512@gmail.com";
-
-const ICE_SERVERS={
- iceServers:[
-  {urls:"stun:stun.l.google.com:19302"},
-  {urls:"stun:stun1.l.google.com:19302"}
- ]
-};
-
-
-/* =========================================================
-   STATE
-========================================================= */
-
-let user=null;
-
-let isHost=false;
-let isSpecialUser=false;
-let isInfinite=false;
-
-let currentLiveId=null;
-let liveTitle="";
-
-let viewerId=null;
-
-let stream=null;
-let facingMode="user";
-let isMuted=false;
-let cameraOn=false;
-
-let realViewers=0;
-let botCount=0;
-let botAddAmount=1;
-
-let peerConnections={};
-let viewerPC=null;
-
-let unsubViewers=null;
-let unsubChat=null;
-let unsubGifts=null;
-let unsubLiveEnd=null;
-let unsubBotData=null;
-
-let botExpiryTimer=null;
-let localBotChatTimer=null;
-
-let chatQueue=[];
-let chatFramePending=false;
-
-const MAX_CHAT_DOM=50;
-
-let seenChat=new Set();
-
-let botBatches={};
-
-let coins=0;
-
-
-/* =========================================================
-   BOT NAMES / MESSAGES
-========================================================= */
-
-const adjs=[
- "Cool","Epic","Pro","Shadow","Neon","Cyber","Swift","Fire",
- "Ice","Nova","Turbo","Elite","Ace","Ninja","Pixel","Lucky",
- "Wild","Silent","Blaze","Ghost","Royal","Crystal","Golden",
- "Omega","Alpha","Hyper","Magic","Storm","Jade","Violet"
-];
-
-const nouns=[
- "Gamer","Player","Stream","Live","Chat","Fan","Master","Legend",
- "Hero","Star","Soul","Wave","Blade","Flash","Coder","Dev",
- "Cat","Dog","Panda","Wolf","Dragon","Fox","Tiger","Shark",
- "Raven","Owl","Bro","Kid","Pro","Chad"
-];
-
-const tags=[
- "","123","99","X","XX","YT","TV","GG","OP","Live",
- "Pro","77","01"
-];
-
-const normalMessages=[
- "w","W","WW","lets go","LETS GO","hi","hello","hey","yo","sup",
- "first","nice stream","fire","🔥","🔥🔥","💯","👏","❤️","😂",
- "lmao","lol","haha","love this","keep going","what game?",
- "pog","POG","based","mid","L","W","drop a like",
- "chat is wild","nice cam","10/10","clip that","aura","rizz",
- "no cap","fr","sheesh","yooo","goated","skill issue",
- "huge W","hello host","mic check","respect","I'm early",
- "bro","brooo","chat","yo chat","this is crazy","W stream",
- "nah","wait","what","OMG","LOL","🔥🔥🔥","W W W"
-];
-
-const openingGreetings=[
- "hi","hello","hiii","hey","yo","hi bro","hi kobi",
- "hello kobi","hey bro","yo kobi","hi chat","hello chat",
- "first","im early","hey everyone","sup kobi","hi everyone",
- "hello bro","yooo","hiii kobi","hi hi","hello hello"
-];
-
-function rand(a){
- return a[Math.floor(Math.random()*a.length)];
-}
-
-function makeName(){
- return rand(adjs)+rand(nouns)+rand(tags)+
- (Math.random()<.35?Math.floor(Math.random()*900+100):"");
-}
-
-const names=Array.from({length:2500},makeName);
-
-function nextName(){
- return names[Math.floor(Math.random()*names.length)];
-}
-
-function nextBotMessage(opening=false){
-
- if(opening&&Math.random()<.70)
-  return rand(openingGreetings);
-
- if(Math.random()<.72)
-  return rand(normalMessages);
-
- return rand(normalMessages)+" "+rand(normalMessages);
-}
-
-
-/* =========================================================
-   HELPERS
-========================================================= */
-
-function toast(text,ms=1800){
-
- const el=document.getElementById("toast");
-
- el.textContent=text;
- el.classList.add("show-toast");
-
- clearTimeout(el.__toastTimer);
-
- el.__toastTimer=setTimeout(()=>{
-  el.classList.remove("show-toast");
- },ms);
-}
-
-
-function show(id){
-
- document.querySelectorAll(".screen")
- .forEach(x=>x.classList.remove("active"));
-
- document.getElementById(id)
- .classList.add("active");
-}
-
-
-function esc(s){
-
- return String(s)
- .replace(/&/g,"&amp;")
- .replace(/</g,"&lt;")
- .replace(/>/g,"&gt;")
- .replace(/"/g,"&quot;")
- .replace(/'/g,"&#039;");
-}
-
-
-function format(n){
-
- n=Math.max(0,Number(n)||0);
-
- if(n>=1e9)return (n/1e9).toFixed(1)+"B";
- if(n>=1e6)return (n/1e6).toFixed(1)+"M";
- if(n>=1000)return (n/1000).toFixed(1)+"K";
-
- return String(Math.floor(n));
-}
-
-
-function colorClass(name){
-
- let h=0;
-
- for(let i=0;i<name.length;i++)
-  h=(h*31+name.charCodeAt(i))>>>0;
-
- return "c"+(h%8);
-}
-
-
-/* =========================================================
-   COINS
-========================================================= */
-
-function loadCoins(){
-
- if(isInfinite){
-
-  coins=Infinity;
-  updateCoins();
-  return;
-
- }
-
- const key="gl_coins_v3_"+(user?.email||"guest");
-
- const saved=localStorage.getItem(key);
-
- coins=saved===null?0:parseInt(saved,10);
-
- if(!Number.isFinite(coins)||coins<0)
-  coins=0;
-
- updateCoins();
-}
-
-
-function saveCoins(){
-
- if(isInfinite)return;
-
- localStorage.setItem(
-  "gl_coins_v3_"+(user?.email||"guest"),
-  String(coins)
- );
-}
-
-
-function updateCoins(){
-
- document.getElementById("coins-count")
- .textContent=isInfinite?"∞":format(coins);
-}
-
-
-/* =========================================================
-   AUTH
-========================================================= */
-
-function checkAdmin(){
-
- const email=(user?.email||"").toLowerCase();
-
- if(
-  email===SPECIAL_EMAIL.toLowerCase()||
-  email.includes("kobik8512")||
-  email.includes("kobik")
- )
-  return true;
-
- return localStorage.getItem("gl_admin_unlock")==="blue007";
-}
-
-
-async function handleLoginError(e){
-
- console.error("Firebase login error:",e);
-
- const code=e?.code||"unknown";
-
- if(code==="auth/popup-closed-by-user"){
-  toast("Login cancelled");
-  return;
- }
-
- if(code==="auth/popup-blocked"){
-  toast("Popup blocked — opening Google login...");
-  try{
-   await signInWithRedirect(auth,provider);
-  }catch(err){
-   console.error(err);
-   toast("Google redirect failed: "+(err.code||"unknown"));
-  }
-  return;
- }
-
- if(code==="auth/unauthorized-domain"){
-  toast("Firebase: domain not authorized");
-  return;
- }
-
- if(code==="auth/operation-not-allowed"){
-  toast("Firebase: Google sign-in is disabled");
-  return;
- }
-
- if(code==="auth/network-request-failed"){
-  toast("Network error — check internet");
-  return;
- }
-
- toast("Login failed: "+code);
-}
-
-
-document.getElementById("btn-google").onclick=
-async()=>{
-
- const btn=document.getElementById("btn-google");
-
- btn.disabled=true;
-
- try{
-
-  /*
-   Mobile browsers are much more reliable with
-   redirect authentication than popup authentication.
-  */
-
-  const mobile=/Android|iPhone|iPad|iPod/i.test(
-   navigator.userAgent
-  );
-
-  if(mobile){
-
-   await signInWithRedirect(auth,provider);
-
-  }else{
-
-   try{
-
-    await signInWithPopup(auth,provider);
-
-   }catch(e){
-
-    if(e?.code==="auth/popup-blocked"){
-
-     await signInWithRedirect(auth,provider);
-
-    }else{
-
-     throw e;
-
+    <div id="loggedIn" class="logged-in">
+      <img id="userPhoto" src="" alt="Profile">
+
+      <h2 id="userName"></h2>
+      <p id="userEmail"></p>
+
+      <button id="logout" class="logout">
+        Sign out
+      </button>
+    </div>
+
+  </main>
+
+  <!-- Firebase -->
+  <script type="module">
+
+    /*
+     * YOUR REAL FIREBASE CONFIG
+     * Taken directly from Firebase Project Settings.
+     */
+    const firebaseConfig = {
+      apiKey: "AIzaSyDaQ06E5Zvj6M9XnqOpWgmUsbe5T_EnaPo",
+      authDomain: "golive-ff5ad.firebaseapp.com",
+      databaseURL: "https://golive-ff5ad-default-rtdb.firebaseio.com",
+      projectId: "golive-ff5ad",
+      storageBucket: "golive-ff5ad.firebasestorage.app",
+      messagingSenderId: "994701431927",
+      appId: "1:994701431927:web:4e7615434facc5b54ae272",
+      measurementId: "G-Q99XRZG8EG"
+    };
+
+    /*
+     * IMPORTANT:
+     * Firebase is initialized ONCE.
+     * Do not create another firebaseConfig elsewhere.
+     */
+
+    import {
+      initializeApp
+    } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+
+    import {
+      getAuth,
+      GoogleAuthProvider,
+      signInWithPopup,
+      signOut,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+
+    // Initialize Authentication
+    const auth = getAuth(app);
+
+    // Google provider
+    const provider = new GoogleAuthProvider();
+
+    // Force account selection instead of silently reusing
+    // a potentially bad previous session.
+    provider.setCustomParameters({
+      prompt: "select_account"
+    });
+
+    const loginScreen = document.getElementById("loginScreen");
+    const loggedIn = document.getElementById("loggedIn");
+
+    const loginButton = document.getElementById("googleLogin");
+    const logoutButton = document.getElementById("logout");
+
+    const userPhoto = document.getElementById("userPhoto");
+    const userName = document.getElementById("userName");
+    const userEmail = document.getElementById("userEmail");
+
+    const errorBox = document.getElementById("error");
+
+    function showError(message) {
+      console.error(message);
+
+      errorBox.textContent = message;
+      errorBox.style.display = "block";
+
+      setTimeout(() => {
+        errorBox.style.display = "none";
+      }, 7000);
     }
 
-   }
-
-  }
-
- }catch(e){
-
-  await handleLoginError(e);
-
-  btn.disabled=false;
-
- }
-
-};
-
-
-getRedirectResult(auth)
-.then(result=>{
-
- if(result?.user)
-  console.log("Google redirect login complete");
-
-})
-.catch(async e=>{
-
- console.error("Redirect result error:",e);
-
- if(e?.code)
-  toast("Login failed: "+e.code);
-
-});
-
-
-setPersistence(
- auth,
- browserLocalPersistence
-).catch(e=>{
- console.warn("Auth persistence failed:",e);
-});
-
-
-onAuthStateChanged(auth,fu=>{
-
- if(!fu){
-
-  user=null;
-  isSpecialUser=false;
-  isInfinite=false;
-
-  show("login-screen");
-  return;
-
- }
-
- user={
-  name:
-   fu.displayName||
-   (fu.email?fu.email.split("@")[0]:"User"),
-  email:fu.email||"",
-  picture:fu.photoURL
- };
-
- isSpecialUser=checkAdmin();
- isInfinite=isSpecialUser;
-
- document.getElementById("display-name")
- .textContent=user.name+(isSpecialUser?" 🔑":"");
-
- loadCoins();
-
- show("menu");
-
- listenToLives();
-
-});
-
-
-/* =========================================================
-   ADMIN UNLOCK
-========================================================= */
-
-let adminTaps=0;
-let adminTapTimer=null;
-
-document.querySelector(".signed-in")
-.addEventListener("click",()=>{
-
- adminTaps++;
-
- clearTimeout(adminTapTimer);
-
- adminTapTimer=setTimeout(()=>{
-  adminTaps=0;
- },1500);
-
- if(adminTaps<5)return;
-
- adminTaps=0;
-
- const pin=prompt("Enter admin PIN:");
-
- if(pin==="blue007"){
-
-  localStorage.setItem(
-   "gl_admin_unlock",
-   "blue007"
-  );
-
-  isSpecialUser=true;
-  isInfinite=true;
-
-  loadCoins();
-
-  document.getElementById("display-name")
-  .textContent=(user?.name||"")+" 🔑";
-
-  toast("Admin unlocked!");
-
- }
-
-});
-
-
-/* =========================================================
-   SIGN OUT
-========================================================= */
-
-document.getElementById("btn-signout")
-.onclick=async()=>{
-
- try{
-
-  if(isHost&&currentLiveId)
-   await stopLive();
-
-  await signOut(auth);
-
- }catch(e){
-
-  console.error(e);
-  toast("Sign out failed");
-
- }
-
-};
-
-
-/* =========================================================
-   LIVE LIST
-========================================================= */
-
-let activeLives=[];
-
-function listenToLives(){
-
- onValue(
-  ref(db,"lives"),
-  snap=>{
-
-   const val=snap.val()||{};
-
-   activeLives=
-    Object.keys(val).map(id=>({
-     id,
-     ...val[id]
-    }));
-
-   activeLives.sort(
-    (a,b)=>
-     (b.startedAt||0)-(a.startedAt||0)
-   );
-
-   renderLives();
-
-  },
-  error=>{
-
-   console.error("Lives listener:",error);
-   toast("Database read failed");
-
-  }
- );
-
-}
-
-
-function renderLives(){
-
- const list=document.getElementById("lives-list");
- const empty=document.getElementById("empty-state");
-
- list.querySelectorAll(".live-card")
- .forEach(x=>x.remove());
-
- if(!activeLives.length){
-
-  empty.style.display="block";
-  return;
-
- }
-
- empty.style.display="none";
-
- activeLives.forEach(live=>{
-
-  const card=document.createElement("div");
-
-  card.className="live-card";
-
-  card.innerHTML=`
-
-   <div class="live-info">
-
-    <div class="live-name">
-     ${esc(live.title||"Live")}
-    </div>
-
-    <div class="live-meta">
-     <span class="dot"></span>
-     ${esc(live.host||"Host")}
-     ·
-     ${format(live.viewers||0)}
-     watching
-    </div>
-
-   </div>
-
-   ${
-    (
-     user&&live.hostEmail===user.email
-    )||isSpecialUser
-    ?
-    `<button class="btn-x-small"
-      data-remove="${esc(live.id)}">✕</button>`
-    :""
-   }
-
-   <button class="btn-join"
-    data-join="${esc(live.id)}">
-    Join
-   </button>
-  `;
-
-  list.appendChild(card);
-
- });
-
- list.querySelectorAll("[data-join]")
- .forEach(btn=>{
-
-  btn.onclick=()=>{
-
-   const live=activeLives.find(
-    x=>x.id===btn.dataset.join
-   );
-
-   if(live)joinViewer(live);
-
-  };
-
- });
-
- list.querySelectorAll("[data-remove]")
- .forEach(btn=>{
-
-  btn.onclick=async()=>{
-
-   try{
-
-    await remove(
-     ref(db,"lives/"+btn.dataset.remove)
-    );
-
-   }catch(e){
-
-    toast("Could not remove live");
-
-   }
-
-  };
-
- });
-
-}
-
-
-/* =========================================================
-   CLEAR STUCK LIVES
-========================================================= */
-
-document.getElementById("btn-clear")
-.onclick=async()=>{
-
- if(!isSpecialUser){
-
-  toast("Admin only");
-  return;
-
- }
-
- try{
-
-  await remove(ref(db,"lives"));
-
-  toast("Lives cleared");
-
- }catch(e){
-
-  toast("Could not clear");
-
- }
-
-};
-
-
-/* =========================================================
-   GO LIVE
-========================================================= */
-
-document.getElementById("btn-go-live")
-.onclick=()=>{
-
- document.getElementById("title-input").value="";
-
- document.getElementById("title-modal")
- .classList.add("show");
-
- setTimeout(()=>{
-  document.getElementById("title-input").focus();
- },80);
-
-};
-
-
-document.getElementById("btn-cancel")
-.onclick=()=>{
- document.getElementById("title-modal")
- .classList.remove("show");
-};
-
-
-document.getElementById("btn-start")
-.onclick=startLive;
-
-
-document.getElementById("title-input")
-.onkeydown=e=>{
-
- if(e.key==="Enter")
-  startLive();
-
-};
-
-
-/* =========================================================
-   START LIVE
-========================================================= */
-
-async function startLive(){
-
- if(!user)return;
-
- liveTitle=
- document.getElementById("title-input")
- .value.trim()||
- user.name+"'s Live";
-
- document.getElementById("title-modal")
- .classList.remove("show");
-
- isHost=true;
-
- botCount=0;
- realViewers=0;
- botBatches={};
-
- currentLiveId=
- "l"+Date.now()+"_"+
- Math.random().toString(36).slice(2,8);
-
- window.__liveStartedAt=Date.now();
-
- document.getElementById("chat-list")
- .innerHTML="";
-
- document.getElementById("btn-b")
- .style.display=isSpecialUser?"flex":"none";
-
- document.getElementById("live-title-text")
- .textContent=liveTitle;
-
- document.getElementById("mic-status")
- .textContent="Camera loading...";
-
- try{
-
-  await set(
-   ref(db,"lives/"+currentLiveId),
-   {
-    title:liveTitle,
-    host:user.name,
-    hostEmail:user.email,
-    viewers:0,
-    botCount:0,
-    startedAt:Date.now()
-   }
-  );
-
- }catch(e){
-
-  console.error(e);
-
-  toast("Could not publish live");
-
-  isHost=false;
-  currentLiveId=null;
-
-  return;
-
- }
-
- show("live-room");
-
- await startCamera();
-
- listenForViewers();
- listenToChat(currentLiveId);
- listenToGifts(currentLiveId);
- listenToBotBatches(currentLiveId);
- startBotExpiryWatcher();
-
-}
-
-
-/* =========================================================
-   CAMERA
-========================================================= */
-
-async function startCamera(){
-
- try{
-
-  if(!navigator.mediaDevices?.getUserMedia){
-
-   throw new Error("Camera API unavailable");
-
-  }
-
-  if(stream){
-
-   stream.getTracks()
-   .forEach(t=>t.stop());
-
-   stream=null;
-
-  }
-
-  const newStream=
-  await navigator.mediaDevices.getUserMedia({
-
-   video:{
-    facingMode,
-    width:{ideal:1280},
-    height:{ideal:720},
-    frameRate:{ideal:30,max:30}
-   },
-
-   audio:true
-
-  });
-
-  stream=newStream;
-  cameraOn=true;
-
-  const video=
-  document.getElementById("local-video");
-
-  video.srcObject=stream;
-  video.style.display="block";
-
-  document.getElementById("cam-off")
-  .style.display="none";
-
-  video.classList.toggle(
-   "mirror",
-   facingMode==="user"
-  );
-
-  document.getElementById("mic-status")
-  .textContent=isMuted?"Mic: muted":"Mic: on";
-
-  document.getElementById("btn-camera")
-  .textContent="📷";
-
-  for(const pc of Object.values(peerConnections)){
-
-   const videoSender=
-   pc.getSenders().find(
-    s=>s.track?.kind==="video"
-   );
-
-   const audioSender=
-   pc.getSenders().find(
-    s=>s.track?.kind==="audio"
-   );
-
-   try{
-
-    if(videoSender)
-     await videoSender.replaceTrack(
-      newStream.getVideoTracks()[0]||null
-     );
-
-    if(audioSender)
-     await audioSender.replaceTrack(
-      newStream.getAudioTracks()[0]||null
-     );
-
-   }catch(e){
-
-    console.warn("Track replacement:",e);
-
-   }
-
-  }
-
- }catch(e){
-
-  console.error("Camera:",e);
-
-  cameraOn=false;
-
-  document.getElementById("local-video")
-  .style.display="none";
-
-  document.getElementById("cam-off")
-  .style.display="block";
-
-  document.getElementById("mic-status")
-  .textContent="Camera off";
-
-  toast(
-   e.name==="NotAllowedError"
-   ?"Camera/mic permission denied"
-   :"Camera unavailable"
-  );
-
- }
-
-}
-
-
-/* CAMERA BUTTON */
-
-document.getElementById("btn-camera")
-.onclick=async()=>{
-
- if(!isHost)return;
-
- if(cameraOn){
-
-  if(stream){
-
-   stream.getTracks()
-   .forEach(t=>t.stop());
-
-   stream=null;
-
-  }
-
-  cameraOn=false;
-
-  document.getElementById("local-video")
-  .style.display="none";
-
-  document.getElementById("cam-off")
-  .style.display="block";
-
-  for(const pc of Object.values(peerConnections)){
-
-   const sender=
-   pc.getSenders()
-   .find(s=>s.track?.kind==="video");
-
-   if(sender){
-
-    try{
-     await sender.replaceTrack(null);
-    }catch(e){}
-
-   }
-
-  }
-
-  document.getElementById("mic-status")
-  .textContent=isMuted?"Mic: muted":"Camera off";
-
- }else{
-
-  await startCamera();
-
- }
-
-};
-
-
-/* =========================================================
-   WEBRTC HOST
-========================================================= */
-
-function listenForViewers(){
-
- if(unsubViewers){
-
-  try{unsubViewers()}catch(e){}
-
- }
-
- const viewersRef=
- ref(db,`lives/${currentLiveId}/viewers`);
-
- unsubViewers=
- onChildAdded(
-  viewersRef,
-  async snap=>{
-
-   const id=snap.key;
-
-   if(peerConnections[id])
-    return;
-
-   realViewers++;
-   updateViewerCount();
-
-   await createHostPeer(id);
-
-  }
- );
-
- onChildRemoved(
-  viewersRef,
-  snap=>{
-
-   const id=snap.key;
-
-   if(peerConnections[id]){
-
-    try{
-     peerConnections[id].close();
-    }catch(e){}
-
-    delete peerConnections[id];
-
-   }
-
-   realViewers=Math.max(0,realViewers-1);
-
-   updateViewerCount();
-
-  }
- );
-
-}
-
-
-async function createHostPeer(id){
-
- const pc=
- new RTCPeerConnection(ICE_SERVERS);
-
- peerConnections[id]=pc;
-
- const videoTrans=
- pc.addTransceiver(
-  "video",
-  {direction:"sendonly"}
- );
-
- const audioTrans=
- pc.addTransceiver(
-  "audio",
-  {direction:"sendonly"}
- );
-
- if(stream){
-
-  await videoTrans.sender.replaceTrack(
-   stream.getVideoTracks()[0]||null
-  );
-
-  await audioTrans.sender.replaceTrack(
-   stream.getAudioTracks()[0]||null
-  );
-
- }
-
- pc.onicecandidate=e=>{
-
-  if(!e.candidate)return;
-
-  push(
-   ref(
-    db,
-    `lives/${currentLiveId}/signals/${id}/hostCandidates`
-   ),
-   e.candidate.toJSON()
-  ).catch(()=>{});
-
- };
-
- onValue(
-  ref(
-   db,
-   `lives/${currentLiveId}/signals/${id}/answer`
-  ),
-  async snap=>{
-
-   const answer=snap.val();
-
-   if(
-    !answer||
-    pc.signalingState!=="have-local-offer"
-   )
-    return;
-
-   try{
-
-    await pc.setRemoteDescription(
-     new RTCSessionDescription(answer)
-    );
-
-   }catch(e){
-
-    console.warn("Host answer:",e);
-
-   }
-
-  }
- );
-
- onChildAdded(
-  ref(
-   db,
-   `lives/${currentLiveId}/signals/${id}/viewerCandidates`
-  ),
-  snap=>{
-
-   const c=snap.val();
-
-   if(!c)return;
-
-   pc.addIceCandidate(
-    new RTCIceCandidate(c)
-   ).catch(()=>{});
-
-  }
- );
-
- pc.onconnectionstatechange=()=>{
-
-  if(
-   ["failed","closed"].includes(pc.connectionState)
-  ){
-
-   try{pc.close()}catch(e){}
-
-   delete peerConnections[id];
-
-  }
-
- };
-
- try{
-
-  const offer=await pc.createOffer();
-
-  await pc.setLocalDescription(offer);
-
-  await set(
-   ref(
-    db,
-    `lives/${currentLiveId}/signals/${id}/offer`
-   ),
-   {
-    type:offer.type,
-    sdp:offer.sdp
-   }
-  );
-
- }catch(e){
-
-  console.error("WebRTC offer:",e);
-
- }
-
-}
-
-
-/* =========================================================
-   VIEWER
-========================================================= */
-
-async function joinViewer(live){
-
- await leaveViewer(false);
-
- isHost=false;
-
- currentLiveId=live.id;
-
- document.getElementById("live-title-text")
- .textContent=live.title||"LIVE";
-
- document.getElementById("chat-list")
- .innerHTML="";
-
- document.getElementById("local-video")
- .style.display="none";
-
- document.getElementById("remote-video")
- .style.display="none";
-
- document.getElementById("cam-off")
- .style.display="block";
-
- document.getElementById("btn-b")
- .style.display=isSpecialUser?"flex":"none";
-
- show("live-room");
-
- viewerId=
- "v"+Date.now()+"_"+
- Math.random().toString(36).slice(2,7);
-
- try{
-
-  await set(
-   ref(
-    db,
-    `lives/${live.id}/viewers/${viewerId}`
-   ),
-   {
-    name:user?.name||"Viewer",
-    joinedAt:Date.now()
-   }
-  );
-
- }catch(e){
-
-  toast("Could not join live");
-  currentLiveId=null;
-  viewerId=null;
-  show("menu");
-  return;
-
- }
-
- unsubLiveEnd=
- onValue(
-  ref(db,"lives/"+live.id),
-  snap=>{
-
-   if(
-    !snap.exists()&&
-    currentLiveId===live.id
-   ){
-
-    forceLeaveLive("Live ended");
-
-   }
-
-  }
- );
-
- listenToChat(live.id);
- listenToBotBatches(live.id);
-
- viewerPC=
- new RTCPeerConnection(ICE_SERVERS);
-
- const pendingCandidates=[];
-
- viewerPC.ontrack=e=>{
-
-  const video=
-   document.getElementById("remote-video");
-
-  if(e.streams?.[0]){
-
-   video.srcObject=e.streams[0];
-   video.style.display="block";
-
-   document.getElementById("cam-off")
-   .style.display="none";
-
-   video.play().catch(()=>{});
-
-  }
-
- };
-
- viewerPC.onicecandidate=e=>{
-
-  if(!e.candidate)return;
-
-  push(
-   ref(
-    db,
-    `lives/${live.id}/signals/${viewerId}/viewerCandidates`
-   ),
-   e.candidate.toJSON()
-  ).catch(()=>{});
-
- };
-
- onValue(
-  ref(
-   db,
-   `lives/${live.id}/signals/${viewerId}/offer`
-  ),
-  async snap=>{
-
-   const offer=snap.val();
-
-   if(
-    !offer||
-    !viewerPC||
-    viewerPC.signalingState!=="stable"
-   )
-    return;
-
-   try{
-
-    await viewerPC.setRemoteDescription(
-     new RTCSessionDescription(offer)
-    );
-
-    while(pendingCandidates.length){
-
-     const c=pendingCandidates.shift();
-
-     try{
-      await viewerPC.addIceCandidate(c);
-     }catch(e){}
-
+    function hideError() {
+      errorBox.style.display = "none";
     }
 
-    const answer=
-    await viewerPC.createAnswer();
+    /*
+     * GOOGLE LOGIN
+     */
+    loginButton.addEventListener("click", async () => {
 
-    await viewerPC.setLocalDescription(answer);
+      hideError();
 
-    await set(
-     ref(
-      db,
-      `lives/${live.id}/signals/${viewerId}/answer`
-     ),
-     {
-      type:answer.type,
-      sdp:answer.sdp
-     }
-    );
+      loginButton.disabled = true;
+      loginButton.querySelector("span:last-child").textContent =
+        "Signing in...";
 
-   }catch(e){
+      try {
 
-    console.error("Viewer WebRTC:",e);
+        const result = await signInWithPopup(auth, provider);
 
-   }
+        const user = result.user;
 
-  }
- );
+        console.log("Google login successful:", user);
 
- onChildAdded(
-  ref(
-   db,
-   `lives/${live.id}/signals/${viewerId}/hostCandidates`
-  ),
-  async snap=>{
+        showUser(user);
 
-   const c=snap.val();
+      } catch (error) {
 
-   if(!c||!viewerPC)return;
+        console.error("Firebase login error:", error);
 
-   const candidate=
-    new RTCIceCandidate(c);
+        /*
+         * Show the REAL Firebase error instead of
+         * just saying "Login failed".
+         */
+        if (error.code === "auth/api-key-not-valid") {
 
-   if(
-    viewerPC.remoteDescription
-   ){
+          showError(
+            "Firebase API key rejected. Check that this deployed page is using the config in this script."
+          );
 
-    try{
-     await viewerPC.addIceCandidate(candidate);
-    }catch(e){}
+        } else if (error.code === "auth/unauthorized-domain") {
 
-   }else{
+          showError(
+            "This website domain is not authorized in Firebase Authentication."
+          );
 
-    pendingCandidates.push(candidate);
+        } else if (error.code === "auth/popup-blocked") {
 
-   }
+          showError(
+            "Google login popup was blocked. Allow popups and try again."
+          );
 
-  }
- );
+        } else if (error.code === "auth/popup-closed-by-user") {
 
-}
+          showError(
+            "Google login was cancelled."
+          );
 
+        } else {
 
-/* =========================================================
-   VIEWER CLEANUP
-========================================================= */
+          showError(
+            "Login failed: " +
+            (error.code || "unknown-error") +
+            " — " +
+            (error.message || "Unknown Firebase error")
+          );
+        }
 
-async function leaveViewer(showMenu=true){
+      } finally {
 
- const id=currentLiveId;
- const vid=viewerId;
+        loginButton.disabled = false;
 
- if(unsubLiveEnd){
-  try{unsubLiveEnd()}catch(e){}
-  unsubLiveEnd=null;
- }
+        loginButton.querySelector("span:last-child").textContent =
+          "Continue with Google";
+      }
+    });
 
- if(unsubChat){
-  try{unsubChat()}catch(e){}
-  unsubChat=null;
- }
 
- if(unsubGifts){
-  try{unsubGifts()}catch(e){}
-  unsubGifts=null;
- }
+    /*
+     * DISPLAY USER
+     */
+    function showUser(user) {
 
- if(unsubBotData){
-  try{unsubBotData()}catch(e){}
-  unsubBotData=null;
- }
+      loginScreen.style.display = "none";
+      loggedIn.style.display = "block";
 
- clearTimeout(localBotChatTimer);
- localBotChatTimer=null;
+      userName.textContent =
+        user.displayName || "Google User";
 
- if(viewerPC){
+      userEmail.textContent =
+        user.email || "";
 
-  try{
-   viewerPC.close();
-  }catch(e){}
+      userPhoto.src =
+        user.photoURL ||
+        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Crect width='100%25' height='100%25' fill='%23333'/%3E%3C/svg%3E";
+    }
 
-  viewerPC=null;
 
- }
+    /*
+     * SIGN OUT
+     */
+    logoutButton.addEventListener("click", async () => {
 
- if(vid&&id){
+      try {
 
-  await remove(
-   ref(db,`lives/${id}/viewers/${vid}`)
-  ).catch(()=>{});
+        await signOut(auth);
 
- }
+        loggedIn.style.display = "none";
+        loginScreen.style.display = "block";
 
- viewerId=null;
+      } catch (error) {
 
- if(showMenu)
-  show("menu");
+        console.error("Logout error:", error);
 
-}
+        showError(
+          "Logout failed: " +
+          (error.message || "Unknown error")
+        );
+      }
+    });
 
 
-function forceLeaveLive(message){
+    /*
+     * KEEP UI IN SYNC WITH FIREBASE
+     */
+    onAuthStateChanged(auth, (user) => {
 
- const oldId=currentLiveId;
+      if (user) {
 
- leaveViewer(false).finally(()=>{
+        console.log("Existing Firebase session:", user);
 
-  currentLiveId=null;
+        showUser(user);
 
-  show("menu");
+      } else {
 
-  toast(message||"Live ended");
+        loginScreen.style.display = "block";
+        loggedIn.style.display = "none";
+      }
+    });
 
- });
+  </script>
 
-}
-
-
-/* =========================================================
-   COUNT
-========================================================= */
-
-function calculateBotCount(){
-
- let total=0;
- const now=Date.now();
-
- Object.values(botBatches||{})
- .forEach(batch=>{
-
-  if(
-   batch&&
-   Number(batch.expiresAt||0)>now
-  ){
-
-   total+=Number(batch.amount||0);
-
-  }
-
- });
-
- return total;
-}
-
-
-function updateViewerCount(){
-
- botCount=calculateBotCount();
-
- const total=realViewers+botCount;
-
- document.getElementById("watchers-text")
- .textContent=format(total)+" watching";
-
- if(isHost&&currentLiveId){
-
-  update(
-   ref(db,"lives/"+currentLiveId),
-   {
-    viewers:total,
-    botCount
-   }
-  ).catch(()=>{});
-
- }
-
-}
-
-
-/* =========================================================
-   BOT BATCH LISTENER
-========================================================= */
-
-function listenToBotBatches(id){
-
- if(unsubBotData){
-
-  try{unsubBotData()}catch(e){}
-
- }
-
- unsubBotData=
- onValue(
-  ref(db,`lives/${id}/botBatches`),
-  snap=>{
-
-   botBatches=snap.val()||{};
-
-   updateViewerCount();
-
-   startLocalBotChat();
-
-  }
- );
-
-}
-
-
-async function addBots(amount){
-
- if(
-  !isHost||
-  !isSpecialUser||
-  !currentLiveId
- )
-  return;
-
- const id=
-  "b_"+Date.now()+"_"+
-  Math.random().toString(36).slice(2,7);
-
- const now=Date.now();
-
- try{
-
-  await set(
-   ref(
-    db,
-    `lives/${currentLiveId}/botBatches/${id}`
-   ),
-   {
-    amount:Number(amount),
-    createdAt:now,
-    expiresAt:
-     now+
-     45000+
-     Math.random()*135000
-   }
-  );
-
-  toast("+"+format(amount)+" viewers");
-
- }catch(e){
-
-  console.error(e);
-
-  toast("Could not add viewers");
-
- }
-
-}
-
-
-function startBotExpiryWatcher(){
-
- clearInterval(botExpiryTimer);
-
- botExpiryTimer=
- setInterval(async()=>{
-
-  if(!isHost||!currentLiveId)
-   return;
-
-  const now=Date.now();
-  const updates={};
-
-  Object.entries(botBatches||{})
-  .forEach(([id,b])=>{
-
-   if(
-    b&&
-    Number(b.expiresAt||0)<=now
-   ){
-
-    updates[
-     `lives/${currentLiveId}/botBatches/${id}`
-    ]=null;
-
-   }
-
-  });
-
-  if(Object.keys(updates).length){
-
-   await update(ref(db),updates)
-   .catch(()=>{});
-
-  }
-
-  updateViewerCount();
-
- },5000);
-
-}
-
-
-/* =========================================================
-   BOT CHAT
-========================================================= */
-
-function getChatSpeed(){
-
- const c=calculateBotCount();
-
- if(c<10)return{interval:1600,burst:1};
- if(c<100)return{interval:650,burst:1};
- if(c<1000)return{interval:180,burst:2};
- if(c<3000)return{interval:80,burst:3};
- if(c<7000)return{interval:40,burst:5};
- if(c<20000)return{interval:25,burst:8};
- if(c<100000)return{interval:18,burst:12};
-
- return{interval:16,burst:18};
-}
-
-
-function startLocalBotChat(){
-
- clearTimeout(localBotChatTimer);
-
- if(calculateBotCount()>0)
-  localBotChatTick();
-
-}
-
-
-function localBotChatTick(){
-
- const c=calculateBotCount();
-
- if(c<=0){
-
-  localBotChatTimer=
-   setTimeout(localBotChatTick,1000);
-
-  return;
-
- }
-
- const s=getChatSpeed();
-
- const opening=
-  Date.now()-
-  (window.__liveStartedAt||Date.now())<
-  45000;
-
- for(let i=0;i<s.burst;i++){
-
-  enqueueChat({
-   name:nextName(),
-   text:nextBotMessage(opening),
-   host:false,
-   gift:false
-  });
-
- }
-
- localBotChatTimer=
-  setTimeout(
-   localBotChatTick,
-   s.interval
-  );
-
-}
-
-
-/* =========================================================
-   CHAT RENDERER
-========================================================= */
-
-function enqueueChat(msg){
-
- chatQueue.push(msg);
-
- if(chatQueue.length>300){
-
-  chatQueue.splice(
-   0,
-   chatQueue.length-300
-  );
-
- }
-
- if(!chatFramePending){
-
-  chatFramePending=true;
-
-  requestAnimationFrame(renderChat);
-
- }
-
-}
-
-
-function renderChat(){
-
- chatFramePending=false;
-
- const list=
-  document.getElementById("chat-list");
-
- const batch=
-  chatQueue.splice(0,80);
-
- const fragment=
-  document.createDocumentFragment();
-
- batch.forEach(msg=>{
-
-  const div=
-   document.createElement("div");
-
-  div.className=
-   "msg"+
-   (msg.host?" host":"")+
-   (msg.gift?" gift-msg":"");
-
-  const cls=
-   msg.host||msg.gift
-   ?""
-   :colorClass(msg.name);
-
-  div.innerHTML=
-   `<span class="uname ${cls}">
-    ${esc(msg.name)}
-    </span>${esc(msg.text)}`;
-
-  fragment.appendChild(div);
-
- });
-
- list.appendChild(fragment);
-
- while(
-  list.children.length>MAX_CHAT_DOM
- ){
-
-  list.removeChild(
-   list.firstChild
-  );
-
- }
-
- list.scrollTop=list.scrollHeight;
-
- if(chatQueue.length){
-
-  chatFramePending=true;
-
-  requestAnimationFrame(renderChat);
-
- }
-
-}
-
-
-/* =========================================================
-   FIREBASE CHAT
-========================================================= */
-
-function listenToChat(id){
-
- if(unsubChat){
-
-  try{unsubChat()}catch(e){}
-
- }
-
- seenChat.clear();
-
- unsubChat=
- onChildAdded(
-  ref(db,`lives/${id}/chat`),
-  snap=>{
-
-   if(seenChat.has(snap.key))
-    return;
-
-   seenChat.add(snap.key);
-
-   const msg=snap.val();
-
-   if(!msg||msg.bot)
-    return;
-
-   enqueueChat({
-    name:msg.name||"User",
-    text:msg.text||"",
-    host:!!msg.host,
-    gift:!!msg.gift
-   });
-
-  }
- );
-
-}
-
-
-/* =========================================================
-   SEND CHAT
-========================================================= */
-
-document.getElementById("btn-send")
-.onclick=sendMessage;
-
-document.getElementById("chat-input")
-.onkeydown=e=>{
-
- if(e.key==="Enter")
-  sendMessage();
-
-};
-
-
-async function sendMessage(){
-
- const input=
-  document.getElementById("chat-input");
-
- const text=input.value.trim();
-
- if(!text||!currentLiveId||!user)
-  return;
-
- input.value="";
-
- try{
-
-  await push(
-   ref(
-    db,
-    `lives/${currentLiveId}/chat`
-   ),
-   {
-    name:user.name,
-    text,
-    host:isHost,
-    gift:false,
-    at:Date.now()
-   }
-  );
-
- }catch(e){
-
-  toast("Chat failed");
-
- }
-
-}
-
-
-/* =========================================================
-   GIFTS
-========================================================= */
-
-const GIFTS=[
- ["🌹","Rose",1],
- ["❤️","Heart",5],
- ["🍭","Lollipop",10],
- ["🍦","Ice Cream",15],
- ["🍩","Donut",20],
- ["🎈","Balloon",25],
- ["🎀","Ribbon",30],
- ["🌸","Cherry Blossom",35],
- ["⭐","Star",50],
- ["🌟","Glowing Star",75],
- ["💎","Diamond",100],
- ["👑","Crown",150],
- ["🔥","Fire",200],
- ["🚀","Rocket",300],
- ["🎉","Party",400],
- ["🦄","Unicorn",500],
- ["🌈","Rainbow",600],
- ["🐻","Bear",800],
- ["🐯","Tiger",1000],
- ["🦁","Lion",1500],
- ["🐉","Dragon",2500],
- ["🦅","Eagle",3000],
- ["🦈","Shark",4000],
- ["🐺","Wolf",5000],
- ["🏎️","Race Car",8000],
- ["✈️","Airplane",12000],
- ["🚁","Helicopter",15000],
- ["🛥️","Yacht",25000],
- ["🏰","Castle",40000],
- ["🌌","Galaxy",60000],
- ["☄️","Comet",75000],
- ["🪐","Planet",90000],
- ["🌍","Earth",100000],
- ["✨","Sparkles",85],
- ["🎇","Firework",220],
- ["🏆","Trophy",900],
- ["🥇","Gold Medal",1200],
- ["🎯","Bullseye",95],
- ["🎸","Guitar",700],
- ["🎮","Gamepad",650],
- ["🤖","Robot",1300],
- ["👻","Ghost",175],
- ["🎃","Pumpkin",140],
- ["🎅","Santa",850],
- ["🧙","Wizard",1600],
- ["🧚","Fairy",1400],
- ["🧛","Vampire",1700],
- ["🦸","Hero",2200],
- ["🧞","Genie",5000],
- ["🐬","Dolphin",1600],
- ["🐳","Whale",7000],
- ["🦖","T-Rex",12000],
- ["🌋","Volcano",15000],
- ["🌊","Wave",700],
- ["⚡","Lightning",450],
- ["💥","Boom",550],
- ["💯","100",100],
- ["💸","Money Fly",2000],
- ["💰","Money Bag",5000],
- ["🤑","Rich Face",3000],
- ["🔮","Crystal Ball",2200],
- ["🪄","Magic Wand",1800],
- ["🏟️","Stadium",50000],
- ["🛸","UFO",30000],
- ["🪩","Disco Ball",1200],
- ["🎭","Masks",800],
- ["🎨","Art",600],
- ["🖼️","Painting",1500],
- ["🧬","DNA",1100],
- ["🧪","Potion",700],
- ["🔭","Telescope",1300],
- ["🛰️","Satellite",20000],
- ["👨‍🚀","Astronaut",18000]
-];
-
-
-GIFTS.forEach(g=>{
-
- const d=
-  document.createElement("div");
-
- d.className="gift-item";
-
- d.innerHTML=`
-  <div class="g-emoji">${g[0]}</div>
-  <div class="g-name">${esc(g[1])}</div>
-  <div class="g-cost">
-   🪙 ${format(g[2])}
-  </div>
- `;
-
- d.onclick=()=>sendGift(g);
-
- document.getElementById("gift-grid")
- .appendChild(d);
-
-});
-
-
-document.getElementById("btn-gift")
-.onclick=()=>{
-
- if(isHost){
-
-  toast("You can't gift in your own live");
-  return;
-
- }
-
- document.getElementById("gift-panel")
- .classList.add("show");
-
-};
-
-
-document.getElementById("gift-close")
-.onclick=()=>{
-
- document.getElementById("gift-panel")
- .classList.remove("show");
-
-};
-
-
-function playGiftAnim(emoji,name,cost){
-
- const a=
-  document.getElementById("gift-anim");
-
- a.innerHTML=`
-  <div class="gift-fly">${emoji}</div>
-  <div class="gift-label">
-   ${emoji} ${esc(name)}
-   · 🪙${format(cost)}
-  </div>
- `;
-
- setTimeout(()=>{
-  a.innerHTML="";
- },1200);
-
-}
-
-
-async function sendGift(g){
-
- if(!currentLiveId||isHost)
-  return;
-
- const cost=g[2];
-
- if(!isInfinite&&coins<cost){
-
-  toast("Not enough coins!");
-  return;
-
- }
-
- if(!isInfinite){
-
-  coins-=cost;
-
-  saveCoins();
-  updateCoins();
-
- }
-
- document.getElementById("gift-panel")
- .classList.remove("show");
-
- playGiftAnim(
-  g[0],
-  g[1],
-  cost
- );
-
- try{
-
-  await push(
-   ref(
-    db,
-    `lives/${currentLiveId}/chat`
-   ),
-   {
-    name:user.name,
-    text:
-     `sent ${g[0]} ${g[1]} (🪙${format(cost)})`,
-    host:false,
-    gift:true,
-    at:Date.now()
-   }
-  );
-
-  await push(
-   ref(
-    db,
-    `lives/${currentLiveId}/gifts`
-   ),
-   {
-    from:user.name,
-    emoji:g[0],
-    name:g[1],
-    cost,
-    toHost:Math.floor(cost*.7),
-    at:Date.now()
-   }
-  );
-
- }catch(e){
-
-  toast("Gift failed");
-
- }
-
-}
-
-
-/* =========================================================
-   RECEIVE GIFTS
-========================================================= */
-
-function listenToGifts(id){
-
- if(unsubGifts){
-
-  try{unsubGifts()}catch(e){}
-
- }
-
- unsubGifts=
- onChildAdded(
-  ref(db,`lives/${id}/gifts`),
-  snap=>{
-
-   if(!isHost)return;
-
-   const g=snap.val();
-
-   if(!g)return;
-
-   playGiftAnim(
-    g.emoji,
-    g.name,
-    g.cost
-   );
-
-   if(!isInfinite){
-
-    coins+=Number(g.toHost||0);
-
-    saveCoins();
-    updateCoins();
-
-   }
-
-  }
- );
-
-}
-
-
-/* =========================================================
-   MIC
-========================================================= */
-
-document.getElementById("btn-mic")
-.onclick=()=>{
-
- if(!isHost||!stream)
-  return;
-
- isMuted=!isMuted;
-
- stream
- .getAudioTracks()
- .forEach(track=>{
-  track.enabled=!isMuted;
- });
-
- document.getElementById("btn-mic")
- .textContent=
-  isMuted?"🔇":"🎤";
-
- document.getElementById("mic-status")
- .textContent=
-  isMuted?"Mic: muted":"Mic: on";
-
-};
-
-
-/* =========================================================
-   FLIP CAMERA
-========================================================= */
-
-document.getElementById("btn-flip")
-.onclick=async()=>{
-
- if(!isHost)return;
-
- facingMode=
-  facingMode==="user"
-  ?"environment"
-  :"user";
-
- await startCamera();
-
-};
-
-
-/* =========================================================
-   B BUTTON
-========================================================= */
-
-const bButton=
- document.getElementById("btn-b");
-
-const botMenu=
- document.getElementById("bot-menu");
-
-let holdTimer=null;
-let wasHeld=false;
-
-
-bButton.addEventListener(
- "pointerdown",
- e=>{
-
-  if(!isHost||!isSpecialUser)
-   return;
-
-  e.preventDefault();
-
-  wasHeld=false;
-
-  clearTimeout(holdTimer);
-
-  holdTimer=
-   setTimeout(()=>{
-
-    wasHeld=true;
-
-    botMenu.classList.add("show");
-
-   },450);
-
- }
-);
-
-
-bButton.addEventListener(
- "pointerup",
- async e=>{
-
-  if(!isHost||!isSpecialUser)
-   return;
-
-  e.preventDefault();
-
-  clearTimeout(holdTimer);
-
-  if(!wasHeld)
-   await addBots(botAddAmount);
-
- }
-);
-
-
-bButton.addEventListener(
- "pointercancel",
- ()=>{
-
-  clearTimeout(holdTimer);
-
- }
-);
-
-
-document.addEventListener(
- "pointerdown",
- e=>{
-
-  if(!e.target.closest(".b-wrap"))
-   botMenu.classList.remove("show");
-
- }
-);
-
-
-document.querySelectorAll(
- ".bot-options button"
-).forEach(button=>{
-
- button.onclick=()=>{
-
-  botAddAmount=
-   Number(button.dataset.bots);
-
-  document.querySelectorAll(
-   ".bot-options button"
-  ).forEach(other=>{
-
-   other.classList.toggle(
-    "selected",
-    other===button
-   );
-
-  });
-
-  document.getElementById("bot-selected")
-  .textContent=
-   "Selected: "+format(botAddAmount);
-
-  botMenu.classList.remove("show");
-
-  toast(
-   format(botAddAmount)+
-   " viewers per B click"
-  );
-
- };
-
-});
-
-
-document.querySelector(
- '.bot-options button[data-bots="1"]'
-).classList.add("selected");
-
-
-/* =========================================================
-   STOP LIVE
-========================================================= */
-
-async function stopLive(){
-
- const id=currentLiveId;
-
- clearTimeout(localBotChatTimer);
- clearInterval(botExpiryTimer);
-
- localBotChatTimer=null;
- botExpiryTimer=null;
-
- if(unsubBotData){
-  try{unsubBotData()}catch(e){}
-  unsubBotData=null;
- }
-
- if(unsubViewers){
-  try{unsubViewers()}catch(e){}
-  unsubViewers=null;
- }
-
- if(unsubChat){
-  try{unsubChat()}catch(e){}
-  unsubChat=null;
- }
-
- if(unsubGifts){
-  try{unsubGifts()}catch(e){}
-  unsubGifts=null;
- }
-
- if(unsubLiveEnd){
-  try{unsubLiveEnd()}catch(e){}
-  unsubLiveEnd=null;
- }
-
- if(stream){
-
-  stream.getTracks()
-  .forEach(t=>t.stop());
-
-  stream=null;
-
- }
-
- Object.values(peerConnections)
- .forEach(pc=>{
-
-  try{pc.close()}catch(e){}
-
- });
-
- peerConnections={};
-
- if(viewerPC){
-
-  try{viewerPC.close()}catch(e){}
-
-  viewerPC=null;
-
- }
-
- if(viewerId&&id){
-
-  await remove(
-   ref(
-    db,
-    `lives/${id}/viewers/${viewerId}`
-   )
-  ).catch(()=>{});
-
- }
-
- if(isHost&&id){
-
-  await remove(
-   ref(db,"lives/"+id)
-  ).catch(()=>{});
-
- }
-
- isHost=false;
- cameraOn=false;
-
- currentLiveId=null;
- viewerId=null;
-
- botCount=0;
- realViewers=0;
- botBatches={};
-
- document.getElementById("local-video")
- .srcObject=null;
-
- document.getElementById("remote-video")
- .srcObject=null;
-
- document.getElementById("local-video")
- .style.display="none";
-
- document.getElementById("remote-video")
- .style.display="none";
-
- document.getElementById("cam-off")
- .style.display="block";
-
- document.getElementById("chat-list")
- .innerHTML="";
-
- chatQueue=[];
-
- show("menu");
-
- toast("Live ended");
-
-}
-
-
-/* =========================================================
-   LEAVE BUTTON
-========================================================= */
-
-document.getElementById("btn-leave")
-.onclick=async()=>{
-
- if(isHost){
-
-  await stopLive();
-
- }else{
-
-  await leaveViewer();
-
-  currentLiveId=null;
-
-  show("menu");
-
-  toast("Left live");
-
- }
-
-};
-
-
-/* =========================================================
-   PAGE CLEANUP
-========================================================= */
-
-window.addEventListener(
- "beforeunload",
- ()=>{
-
-  if(viewerId&&currentLiveId){
-
-   remove(
-    ref(
-     db,
-     `lives/${currentLiveId}/viewers/${viewerId}`
-    )
-   ).catch(()=>{});
-
-  }
-
- });
-
-</script>
 </body>
- </html>
+</html>
