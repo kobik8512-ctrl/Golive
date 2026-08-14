@@ -6,45 +6,30 @@
   <title>Go Live</title>
   <style>
     :root {
-      --bg: #0a0a0c;
-      --card: #16161a;
-      --card2: #1c1c22;
-      --accent: #ff2d55;
-      --text: #f2f2f5;
-      --muted: #8b8b96;
-      --green: #30d158;
-      --danger: #ff453a;
-      --border: #2a2a32;
-      --gold: #ffd60a;
+      --bg: #0a0a0c; --card: #16161a; --card2: #1c1c22; --accent: #ff2d55;
+      --text: #f2f2f5; --muted: #8b8b96; --green: #30d158; --danger: #ff453a;
+      --border: #2a2a32; --gold: #ffd60a;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      overflow-x: hidden;
+      background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden;
       -webkit-tap-highlight-color: transparent;
     }
     button { cursor: pointer; border: none; font-family: inherit; background: none; color: inherit; }
     input { font-family: inherit; }
-
     .screen { display: none; min-height: 100vh; flex-direction: column; }
     .screen.active { display: flex; }
 
     /* LOGIN */
-    #login-screen {
-      align-items: center; justify-content: center; padding: 24px;
-      background: radial-gradient(ellipse at top, #1a0a12 0%, var(--bg) 60%);
-    }
+    #login-screen { align-items: center; justify-content: center; padding: 24px; background: radial-gradient(ellipse at top, #1a0a12 0%, var(--bg) 60%); }
     .login-box { width: 100%; max-width: 360px; text-align: center; }
     .login-logo { font-size: 2.4rem; font-weight: 800; letter-spacing: -1px; margin-bottom: 8px; }
     .login-logo span { color: var(--accent); }
     .login-sub { color: var(--muted); font-size: 0.95rem; margin-bottom: 40px; }
     .btn-google {
-      width: 100%; background: #fff; color: #1f1f1f; padding: 14px 20px;
-      border-radius: 14px; font-weight: 600; font-size: 1rem;
-      display: flex; align-items: center; justify-content: center; gap: 12px;
+      width: 100%; background: #fff; color: #1f1f1f; padding: 14px 20px; border-radius: 14px;
+      font-weight: 600; font-size: 1rem; display: flex; align-items: center; justify-content: center; gap: 12px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.3);
     }
     .btn-google:active { transform: scale(0.98); }
@@ -73,16 +58,13 @@
     .btn-join:active { transform: scale(0.96); }
     .btn-x-small { width: 32px; height: 32px; border-radius: 50%; background: var(--card2); color: var(--muted); font-size: 0.9rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .empty-state { text-align: center; padding: 48px 20px; color: var(--muted); background: var(--card); border-radius: 16px; border: 1px dashed var(--border); font-size: 0.95rem; line-height: 1.5; }
-
     .bottom-actions {
       position: fixed; bottom: 0; left: 0; right: 0; padding: 16px 16px 28px;
-      background: linear-gradient(transparent, var(--bg) 25%);
-      display: flex; flex-direction: column; gap: 10px; z-index: 30;
+      background: linear-gradient(transparent, var(--bg) 25%); display: flex; flex-direction: column; gap: 10px; z-index: 30;
     }
     .btn-go-live {
-      background: var(--accent); color: #fff; font-size: 1.15rem; font-weight: 700;
-      padding: 16px; border-radius: 999px; display: flex; align-items: center; justify-content: center; gap: 8px;
-      box-shadow: 0 8px 28px rgba(255, 45, 85, 0.35);
+      background: var(--accent); color: #fff; font-size: 1.15rem; font-weight: 700; padding: 16px; border-radius: 999px;
+      display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 8px 28px rgba(255,45,85,0.35);
     }
     .btn-go-live:active { transform: scale(0.98); }
     .btn-secondary { background: transparent; color: var(--muted); font-size: 0.95rem; font-weight: 500; padding: 12px; border-radius: 999px; border: 1px solid var(--border); }
@@ -91,7 +73,7 @@
     /* LIVE ROOM */
     #live-room { position: relative; background: #000; height: 100vh; height: 100dvh; overflow: hidden; }
     #video-wrap { position: absolute; inset: 0; background: #0d0d10; display: flex; align-items: center; justify-content: center; }
-    #local-video { width: 100%; height: 100%; object-fit: cover; display: none; }
+    #local-video, #remote-video { width: 100%; height: 100%; object-fit: cover; display: none; }
     .cam-off { text-align: center; color: var(--muted); }
     .cam-off .icon { font-size: 3.5rem; margin-bottom: 10px; opacity: 0.5; }
 
@@ -100,7 +82,6 @@
       display: flex; justify-content: space-between; align-items: flex-start; z-index: 40; pointer-events: none;
     }
     .live-header > * { pointer-events: auto; }
-
     .live-pill {
       background: rgba(0,0,0,0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
       border-radius: 999px; padding: 8px 14px; display: flex; align-items: center; gap: 8px;
@@ -110,7 +91,6 @@
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.35} }
     .live-pill .title-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .live-pill .watchers { color: var(--muted); font-weight: 500; white-space: nowrap; }
-
     .header-btns { display: flex; gap: 8px; }
     .icon-btn {
       width: 40px; height: 40px; border-radius: 50%;
@@ -122,19 +102,16 @@
     .icon-btn.muted { background: var(--danger); border-color: transparent; }
     .icon-btn.b-btn { background: linear-gradient(135deg, #7c3aed, #06b6d4); font-weight: 800; font-size: 0.95rem; border: none; }
 
-    /* Smaller chat */
     .chat-wrap {
       position: absolute; bottom: 0; left: 0; right: 0; height: 32%;
       display: flex; flex-direction: column;
-      background: linear-gradient(to top, rgba(0,0,0,0.88) 50%, transparent);
-      z-index: 30; pointer-events: none;
+      background: linear-gradient(to top, rgba(0,0,0,0.88) 50%, transparent); z-index: 30; pointer-events: none;
     }
     .chat-list {
       flex: 1; overflow-y: auto; padding: 10px 12px 6px;
       display: flex; flex-direction: column; gap: 4px; pointer-events: auto; scrollbar-width: none;
     }
     .chat-list::-webkit-scrollbar { display: none; }
-
     .msg { font-size: 0.86rem; line-height: 1.3; animation: msgIn 0.2s ease; word-break: break-word; }
     @keyframes msgIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
     .msg .uname { font-weight: 700; margin-right: 5px; }
@@ -144,82 +121,45 @@
     .msg.host .uname { color: var(--accent); }
     .msg.gift-msg { color: var(--gold); font-weight: 600; }
 
-    .chat-bar {
-      display: flex; gap: 8px; padding: 6px 10px 16px;
-      pointer-events: auto; align-items: center;
-    }
+    .chat-bar { display: flex; gap: 8px; padding: 6px 10px 16px; pointer-events: auto; align-items: center; }
     #chat-input {
       flex: 1; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.12);
       border-radius: 999px; padding: 11px 16px; color: #fff; font-size: 0.9rem; outline: none;
     }
     #chat-input::placeholder { color: rgba(255,255,255,0.4); }
-    .btn-send {
-      background: var(--accent); color: #fff; font-weight: 700; font-size: 0.85rem;
-      padding: 11px 16px; border-radius: 999px; flex-shrink: 0;
-    }
-    .btn-gift {
-      background: linear-gradient(135deg, #ffd60a, #ff9f0a);
-      color: #1a1a1a; font-weight: 800; font-size: 0.85rem;
-      padding: 11px 14px; border-radius: 999px; flex-shrink: 0;
-    }
+    .btn-send { background: var(--accent); color: #fff; font-weight: 700; font-size: 0.85rem; padding: 11px 16px; border-radius: 999px; flex-shrink: 0; }
+    .btn-gift { background: linear-gradient(135deg, #ffd60a, #ff9f0a); color: #1a1a1a; font-weight: 800; font-size: 0.85rem; padding: 11px 14px; border-radius: 999px; flex-shrink: 0; }
     .btn-send:active, .btn-gift:active { transform: scale(0.96); }
 
-    .mic-status {
-      position: absolute; bottom: 34%; left: 12px; font-size: 0.78rem;
-      color: var(--green); z-index: 25; pointer-events: none; opacity: 0.85;
-    }
-
-    /* Coins badge */
+    .mic-status { position: absolute; bottom: 34%; left: 12px; font-size: 0.78rem; color: var(--green); z-index: 25; pointer-events: none; opacity: 0.85; }
     .coins-badge {
       position: absolute; bottom: 34%; right: 12px; z-index: 25;
-      background: rgba(0,0,0,0.65); backdrop-filter: blur(8px);
-      border-radius: 999px; padding: 6px 12px; font-size: 0.82rem; font-weight: 700;
-      display: flex; align-items: center; gap: 5px; border: 1px solid rgba(255,215,0,0.3);
-      pointer-events: none;
+      background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); border-radius: 999px;
+      padding: 6px 12px; font-size: 0.82rem; font-weight: 700; display: flex; align-items: center; gap: 5px;
+      border: 1px solid rgba(255,215,0,0.3); pointer-events: none;
     }
     .coins-badge .coin-icon { color: var(--gold); }
 
     /* Gift panel */
-    #gift-panel {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
-      display: none; align-items: flex-end; justify-content: center; z-index: 90;
-    }
+    #gift-panel { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: flex-end; justify-content: center; z-index: 90; }
     #gift-panel.show { display: flex; }
     .gift-sheet {
       background: var(--card); border-radius: 20px 20px 0 0; width: 100%; max-width: 480px;
-      max-height: 62vh; display: flex; flex-direction: column; border: 1px solid var(--border);
-      animation: sheetUp 0.25s ease;
+      max-height: 62vh; display: flex; flex-direction: column; border: 1px solid var(--border); animation: sheetUp 0.25s ease;
     }
     @keyframes sheetUp { from{transform:translateY(100%)} to{transform:none} }
-    .gift-sheet-header {
-      padding: 14px 16px 10px; display: flex; justify-content: space-between; align-items: center;
-      border-bottom: 1px solid var(--border); flex-shrink: 0;
-    }
+    .gift-sheet-header { padding: 14px 16px 10px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); flex-shrink: 0; }
     .gift-sheet-header h3 { font-size: 1.05rem; }
     .gift-close { font-size: 1.3rem; color: var(--muted); padding: 4px 8px; }
-    .gift-grid {
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
-      padding: 12px; overflow-y: auto; flex: 1;
-    }
-    .gift-item {
-      background: var(--card2); border-radius: 14px; padding: 10px 6px;
-      display: flex; flex-direction: column; align-items: center; gap: 4px;
-      border: 1px solid transparent; transition: border 0.15s;
-    }
+    .gift-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 12px; overflow-y: auto; flex: 1; }
+    .gift-item { background: var(--card2); border-radius: 14px; padding: 10px 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; border: 1px solid transparent; }
     .gift-item:active { border-color: var(--accent); transform: scale(0.95); }
     .gift-item .g-emoji { font-size: 1.7rem; }
     .gift-item .g-name { font-size: 0.68rem; color: var(--muted); text-align: center; line-height: 1.2; }
     .gift-item .g-cost { font-size: 0.72rem; font-weight: 700; color: var(--gold); }
 
-    /* Gift animation overlay */
-    #gift-anim {
-      position: fixed; inset: 0; pointer-events: none; z-index: 100;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .gift-fly {
-      font-size: 4.5rem; animation: giftFly 1.6s ease forwards;
-      text-shadow: 0 0 30px rgba(255,215,0,0.5);
-    }
+    #gift-anim { position: fixed; inset: 0; pointer-events: none; z-index: 100; display: flex; align-items: center; justify-content: center; }
+    .gift-fly { font-size: 4.5rem; animation: giftFly 1.6s ease forwards; text-shadow: 0 0 30px rgba(255,215,0,0.5); }
     @keyframes giftFly {
       0% { transform: scale(0.3) translateY(80px); opacity: 0; }
       30% { transform: scale(1.3) translateY(0); opacity: 1; }
@@ -228,32 +168,20 @@
     }
     .gift-label {
       position: absolute; bottom: 38%; left: 50%; transform: translateX(-50%);
-      background: rgba(0,0,0,0.75); color: var(--gold); padding: 8px 18px;
-      border-radius: 999px; font-weight: 700; font-size: 0.95rem;
-      animation: giftLabel 1.6s ease forwards;
+      background: rgba(0,0,0,0.75); color: var(--gold); padding: 8px 18px; border-radius: 999px;
+      font-weight: 700; font-size: 0.95rem; animation: giftLabel 1.6s ease forwards;
     }
     @keyframes giftLabel {
       0% { opacity: 0; transform: translateX(-50%) translateY(20px); }
       25% { opacity: 1; transform: translateX(-50%) translateY(0); }
-      75% { opacity: 1; }
-      100% { opacity: 0; transform: translateX(-50%) translateY(-30px); }
+      75% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-30px); }
     }
 
-    /* Modal */
-    #title-modal {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.75);
-      display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px;
-    }
+    #title-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
     #title-modal.show { display: flex; }
-    .modal-card {
-      background: var(--card); border-radius: 20px; padding: 28px 22px;
-      width: 100%; max-width: 340px; border: 1px solid var(--border);
-    }
+    .modal-card { background: var(--card); border-radius: 20px; padding: 28px 22px; width: 100%; max-width: 340px; border: 1px solid var(--border); }
     .modal-card h3 { text-align: center; font-size: 1.2rem; margin-bottom: 18px; }
-    #title-input {
-      width: 100%; background: var(--bg); border: 1px solid var(--border);
-      border-radius: 12px; padding: 14px 16px; color: #fff; font-size: 1rem; margin-bottom: 16px; outline: none;
-    }
+    #title-input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; color: #fff; font-size: 1rem; margin-bottom: 16px; outline: none; }
     .modal-actions { display: flex; gap: 10px; }
     .modal-actions button { flex: 1; padding: 13px; border-radius: 12px; font-weight: 600; font-size: 0.95rem; }
     .btn-cancel { background: var(--card2); color: var(--text); }
@@ -262,15 +190,13 @@
     #toast {
       position: fixed; top: 60px; left: 50%; transform: translateX(-50%) translateY(-12px);
       background: rgba(20,20,24,0.92); color: #fff; padding: 10px 18px; border-radius: 999px;
-      font-size: 0.88rem; opacity: 0; transition: all 0.28s; z-index: 200; pointer-events: none;
-      border: 1px solid var(--border);
+      font-size: 0.88rem; opacity: 0; transition: all 0.28s; z-index: 200; pointer-events: none; border: 1px solid var(--border);
     }
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   </style>
 </head>
 <body>
 
-  <!-- LOGIN -->
   <div id="login-screen" class="screen active">
     <div class="login-box">
       <div class="login-logo">GO <span>LIVE</span></div>
@@ -279,11 +205,10 @@
         <svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
         Continue with Google
       </button>
-      <div class="login-note">Real Google login powered by Firebase</div>
+      <div class="login-note">Real Google login + live streaming</div>
     </div>
   </div>
 
-  <!-- MENU -->
   <div id="menu" class="screen">
     <div class="broadcast-label">Broadcast</div>
     <div class="menu-title">GO <span>LIVE</span></div>
@@ -299,13 +224,12 @@
     </div>
   </div>
 
-  <!-- LIVE ROOM -->
   <div id="live-room" class="screen">
     <div id="video-wrap">
       <video id="local-video" autoplay playsinline muted></video>
+      <video id="remote-video" autoplay playsinline></video>
       <div class="cam-off" id="cam-off"><div class="icon">📷</div><div>Camera off</div></div>
     </div>
-
     <div class="live-header">
       <div class="live-pill">
         <div class="red-dot"></div>
@@ -319,13 +243,11 @@
         <button class="icon-btn" id="btn-leave" title="Leave">✕</button>
       </div>
     </div>
-
     <div class="mic-status" id="mic-status">Mic: listening...</div>
     <div class="coins-badge" id="coins-badge">
       <span class="coin-icon">🪙</span>
-      <span id="coins-count">9</span>
+      <span id="coins-count">0</span>
     </div>
-
     <div class="chat-wrap">
       <div class="chat-list" id="chat-list"></div>
       <div class="chat-bar">
@@ -336,21 +258,14 @@
     </div>
   </div>
 
-  <!-- Gift panel -->
   <div id="gift-panel">
     <div class="gift-sheet">
-      <div class="gift-sheet-header">
-        <h3>Send a Gift</h3>
-        <button class="gift-close" id="gift-close">✕</button>
-      </div>
+      <div class="gift-sheet-header"><h3>Send a Gift</h3><button class="gift-close" id="gift-close">✕</button></div>
       <div class="gift-grid" id="gift-grid"></div>
     </div>
   </div>
-
-  <!-- Gift animation -->
   <div id="gift-anim"></div>
 
-  <!-- Title modal -->
   <div id="title-modal">
     <div class="modal-card">
       <h3>Name your live</h3>
@@ -361,13 +276,12 @@
       </div>
     </div>
   </div>
-
   <div id="toast"></div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
-    import { getDatabase, ref, set, onValue, remove, update } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js";
+    import { getDatabase, ref, set, onValue, remove, update, push, onChildAdded, onChildRemoved } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDaQ06E5Zvj6M9XnqOpWgmUsbe5T_EnaPo",
@@ -386,569 +300,573 @@
     const db = getDatabase(app);
 
     const SPECIAL_EMAIL = 'kobik8512@gmail.com';
-    let currentLiveId = null;   // the live we are hosting
-    let isSpecialUser = false;
+    const ICE_SERVERS = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
 
-    // ================== GIFTS (100+) ==================
+    let user = null, isHost = false, isSpecialUser = false, isInfinite = false;
+    let liveTitle = '', currentLiveId = null, viewerId = null;
+    let stream = null, facingMode = 'user', isMuted = false;
+    let botCount = 0, realViewers = 0;
+    let botTimer = null, chatTimer = null, realTimer = null;
+    let activeLives = [], coins = 0;
+    let peerConnections = {};   // host: viewerId -> PC
+    let viewerPC = null;        // viewer side PC
+    let unsubViewers = null, unsubSignals = null;
+
+    // Gifts
     const GIFTS = [
-      { emoji: '🌹', name: 'Rose', cost: 1 },
-      { emoji: '❤️', name: 'Heart', cost: 5 },
-      { emoji: '🍭', name: 'Lollipop', cost: 10 },
-      { emoji: '🍦', name: 'Ice Cream', cost: 15 },
-      { emoji: '🍩', name: 'Donut', cost: 20 },
-      { emoji: '🎈', name: 'Balloon', cost: 25 },
-      { emoji: '🎀', name: 'Ribbon', cost: 30 },
-      { emoji: '🌸', name: 'Cherry Blossom', cost: 35 },
-      { emoji: '🍀', name: 'Clover', cost: 40 },
-      { emoji: '⭐', name: 'Star', cost: 50 },
-      { emoji: '🌟', name: 'Glowing Star', cost: 75 },
-      { emoji: '💎', name: 'Diamond', cost: 100 },
-      { emoji: '👑', name: 'Crown', cost: 150 },
-      { emoji: '🔥', name: 'Fire', cost: 200 },
-      { emoji: '🚀', name: 'Rocket', cost: 300 },
-      { emoji: '🎉', name: 'Party', cost: 400 },
-      { emoji: '🦄', name: 'Unicorn', cost: 500 },
-      { emoji: '🌈', name: 'Rainbow', cost: 600 },
-      { emoji: '🐻', name: 'Bear', cost: 800 },
-      { emoji: '🐯', name: 'Tiger', cost: 1000 },
-      { emoji: '🦁', name: 'Lion', cost: 1500 },
-      { emoji: '🐉', name: 'Dragon', cost: 2500 },
-      { emoji: '🦅', name: 'Eagle', cost: 3000 },
-      { emoji: '🦈', name: 'Shark', cost: 4000 },
-      { emoji: '🐺', name: 'Wolf', cost: 5000 },
-      { emoji: '🦋', name: 'Butterfly', cost: 80 },
-      { emoji: '🌺', name: 'Hibiscus', cost: 45 },
-      { emoji: '🌻', name: 'Sunflower', cost: 55 },
-      { emoji: '🌷', name: 'Tulip', cost: 60 },
-      { emoji: '💐', name: 'Bouquet', cost: 120 },
-      { emoji: '🍫', name: 'Chocolate', cost: 70 },
-      { emoji: '🍰', name: 'Cake', cost: 90 },
-      { emoji: '🧁', name: 'Cupcake', cost: 65 },
-      { emoji: '🍾', name: 'Champagne', cost: 250 },
-      { emoji: '🥂', name: 'Cheers', cost: 180 },
-      { emoji: '🎁', name: 'Gift Box', cost: 350 },
-      { emoji: '🧸', name: 'Teddy', cost: 450 },
-      { emoji: '💍', name: 'Ring', cost: 2000 },
-      { emoji: '⌚', name: 'Watch', cost: 3500 },
-      { emoji: '🏎️', name: 'Race Car', cost: 8000 },
-      { emoji: '✈️', name: 'Airplane', cost: 12000 },
-      { emoji: '🚁', name: 'Helicopter', cost: 15000 },
-      { emoji: '🛥️', name: 'Yacht', cost: 25000 },
-      { emoji: '🏰', name: 'Castle', cost: 40000 },
-      { emoji: '🦁', name: 'Golden Lion', cost: 49000 },
-      { emoji: '🌌', name: 'Galaxy', cost: 60000 },
-      { emoji: '☄️', name: 'Comet', cost: 75000 },
-      { emoji: '🪐', name: 'Planet', cost: 90000 },
-      { emoji: '🌍', name: 'Earth', cost: 100000 },
-      { emoji: '💫', name: 'Dizzy Star', cost: 110 },
-      { emoji: '✨', name: 'Sparkles', cost: 85 },
-      { emoji: '🎇', name: 'Firework', cost: 220 },
-      { emoji: '🎆', name: 'Fireworks', cost: 280 },
-      { emoji: '🏅', name: 'Medal', cost: 160 },
-      { emoji: '🏆', name: 'Trophy', cost: 900 },
-      { emoji: '🥇', name: 'Gold Medal', cost: 1200 },
-      { emoji: '🎯', name: 'Bullseye', cost: 95 },
-      { emoji: '🎸', name: 'Guitar', cost: 700 },
-      { emoji: '🎹', name: 'Piano', cost: 1100 },
-      { emoji: '🎤', name: 'Mic', cost: 320 },
-      { emoji: '🎧', name: 'Headphones', cost: 280 },
-      { emoji: '📸', name: 'Camera', cost: 550 },
-      { emoji: '🎬', name: 'Clapper', cost: 400 },
-      { emoji: '🎮', name: 'Gamepad', cost: 650 },
-      { emoji: '🕹️', name: 'Joystick', cost: 480 },
-      { emoji: '👾', name: 'Alien', cost: 750 },
-      { emoji: '🤖', name: 'Robot', cost: 1300 },
-      { emoji: '👻', name: 'Ghost', cost: 175 },
-      { emoji: '🎃', name: 'Pumpkin', cost: 140 },
-      { emoji: '🎄', name: 'Tree', cost: 300 },
-      { emoji: '🎅', name: 'Santa', cost: 850 },
-      { emoji: '🧙', name: 'Wizard', cost: 1600 },
-      { emoji: '🧚', name: 'Fairy', cost: 1400 },
-      { emoji: '🧛', name: 'Vampire', cost: 1700 },
-      { emoji: '🧜', name: 'Mermaid', cost: 1800 },
-      { emoji: '🦸', name: 'Hero', cost: 2200 },
-      { emoji: '🧞', name: 'Genie', cost: 5000 },
-      { emoji: '🐉', name: 'Fire Dragon', cost: 35000 },
-      { emoji: '🦚', name: 'Peacock', cost: 2800 },
-      { emoji: '🦩', name: 'Flamingo', cost: 950 },
-      { emoji: '🦢', name: 'Swan', cost: 1100 },
-      { emoji: '🐬', name: 'Dolphin', cost: 1600 },
-      { emoji: '🐳', name: 'Whale', cost: 7000 },
-      { emoji: '🦀', name: 'Crab', cost: 130 },
-      { emoji: '🐙', name: 'Octopus', cost: 900 },
-      { emoji: '🦊', name: 'Fox', cost: 750 },
-      { emoji: '🐨', name: 'Koala', cost: 600 },
-      { emoji: '🐼', name: 'Panda', cost: 1800 },
-      { emoji: '🐸', name: 'Frog', cost: 120 },
-      { emoji: '🐢', name: 'Turtle', cost: 200 },
-      { emoji: '🦖', name: 'T-Rex', cost: 12000 },
-      { emoji: '🦕', name: 'Dino', cost: 9000 },
-      { emoji: '🌋', name: 'Volcano', cost: 15000 },
-      { emoji: '🏔️', name: 'Mountain', cost: 8000 },
-      { emoji: '🌊', name: 'Wave', cost: 700 },
-      { emoji: '⚡', name: 'Lightning', cost: 450 },
-      { emoji: '❄️', name: 'Snowflake', cost: 90 },
-      { emoji: '☀️', name: 'Sun', cost: 300 },
-      { emoji: '🌙', name: 'Moon', cost: 400 },
-      { emoji: '🌠', name: 'Shooting Star', cost: 2500 },
-      { emoji: '💥', name: 'Boom', cost: 550 },
-      { emoji: '💢', name: 'Anger', cost: 80 },
-      { emoji: '💯', name: '100', cost: 100 },
-      { emoji: '💸', name: 'Money Fly', cost: 2000 },
-      { emoji: '💰', name: 'Money Bag', cost: 5000 },
-      { emoji: '🤑', name: 'Rich Face', cost: 3000 },
-      { emoji: '🧿', name: 'Nazar', cost: 150 },
-      { emoji: '🔮', name: 'Crystal Ball', cost: 2200 },
-      { emoji: '🪄', name: 'Magic Wand', cost: 1800 },
-      { emoji: '🧨', name: 'Firecracker', cost: 350 },
-      { emoji: '🍾', name: 'Bottle', cost: 400 },
-      { emoji: '🥇', name: 'Champion', cost: 10000 },
-      { emoji: '🏟️', name: 'Stadium', cost: 50000 },
-      { emoji: '🛸', name: 'UFO', cost: 30000 },
-      { emoji: '🪩', name: 'Disco Ball', cost: 1200 },
-      { emoji: '🎤', name: 'Concert', cost: 2500 },
-      { emoji: '🎭', name: 'Masks', cost: 800 },
-      { emoji: '🎨', name: 'Art', cost: 600 },
-      { emoji: '🖼️', name: 'Painting', cost: 1500 },
-      { emoji: '🗝️', name: 'Key', cost: 900 },
-      { emoji: '🧱', name: 'Brick', cost: 50 },
-      { emoji: '🧲', name: 'Magnet', cost: 70 },
-      { emoji: '🧿', name: 'Eye', cost: 180 },
-      { emoji: '🧬', name: 'DNA', cost: 1100 },
-      { emoji: '🧪', name: 'Potion', cost: 700 },
-      { emoji: '⚗️', name: 'Lab', cost: 850 },
-      { emoji: '🔭', name: 'Telescope', cost: 1300 },
-      { emoji: '🛰️', name: 'Satellite', cost: 20000 },
-      { emoji: '🚀', name: 'SpaceX', cost: 45000 },
-      { emoji: '👨‍🚀', name: 'Astronaut', cost: 18000 },
-      { emoji: '🌌', name: 'Universe', cost: 99999 },
+      {emoji:'🌹',name:'Rose',cost:1},{emoji:'❤️',name:'Heart',cost:5},{emoji:'🍭',name:'Lollipop',cost:10},
+      {emoji:'🍦',name:'Ice Cream',cost:15},{emoji:'🍩',name:'Donut',cost:20},{emoji:'🎈',name:'Balloon',cost:25},
+      {emoji:'🎀',name:'Ribbon',cost:30},{emoji:'🌸',name:'Cherry Blossom',cost:35},{emoji:'🍀',name:'Clover',cost:40},
+      {emoji:'⭐',name:'Star',cost:50},{emoji:'🌟',name:'Glowing Star',cost:75},{emoji:'💎',name:'Diamond',cost:100},
+      {emoji:'👑',name:'Crown',cost:150},{emoji:'🔥',name:'Fire',cost:200},{emoji:'🚀',name:'Rocket',cost:300},
+      {emoji:'🎉',name:'Party',cost:400},{emoji:'🦄',name:'Unicorn',cost:500},{emoji:'🌈',name:'Rainbow',cost:600},
+      {emoji:'🐻',name:'Bear',cost:800},{emoji:'🐯',name:'Tiger',cost:1000},{emoji:'🦁',name:'Lion',cost:1500},
+      {emoji:'🐉',name:'Dragon',cost:2500},{emoji:'🦅',name:'Eagle',cost:3000},{emoji:'🦈',name:'Shark',cost:4000},
+      {emoji:'🐺',name:'Wolf',cost:5000},{emoji:'🦋',name:'Butterfly',cost:80},{emoji:'🌺',name:'Hibiscus',cost:45},
+      {emoji:'🌻',name:'Sunflower',cost:55},{emoji:'🌷',name:'Tulip',cost:60},{emoji:'💐',name:'Bouquet',cost:120},
+      {emoji:'🍫',name:'Chocolate',cost:70},{emoji:'🍰',name:'Cake',cost:90},{emoji:'🧁',name:'Cupcake',cost:65},
+      {emoji:'🍾',name:'Champagne',cost:250},{emoji:'🥂',name:'Cheers',cost:180},{emoji:'🎁',name:'Gift Box',cost:350},
+      {emoji:'🧸',name:'Teddy',cost:450},{emoji:'💍',name:'Ring',cost:2000},{emoji:'⌚',name:'Watch',cost:3500},
+      {emoji:'🏎️',name:'Race Car',cost:8000},{emoji:'✈️',name:'Airplane',cost:12000},{emoji:'🚁',name:'Helicopter',cost:15000},
+      {emoji:'🛥️',name:'Yacht',cost:25000},{emoji:'🏰',name:'Castle',cost:40000},{emoji:'🦁',name:'Golden Lion',cost:49000},
+      {emoji:'🌌',name:'Galaxy',cost:60000},{emoji:'☄️',name:'Comet',cost:75000},{emoji:'🪐',name:'Planet',cost:90000},
+      {emoji:'🌍',name:'Earth',cost:100000},{emoji:'💫',name:'Dizzy Star',cost:110},{emoji:'✨',name:'Sparkles',cost:85},
+      {emoji:'🎇',name:'Firework',cost:220},{emoji:'🎆',name:'Fireworks',cost:280},{emoji:'🏅',name:'Medal',cost:160},
+      {emoji:'🏆',name:'Trophy',cost:900},{emoji:'🥇',name:'Gold Medal',cost:1200},{emoji:'🎯',name:'Bullseye',cost:95},
+      {emoji:'🎸',name:'Guitar',cost:700},{emoji:'🎹',name:'Piano',cost:1100},{emoji:'🎤',name:'Mic',cost:320},
+      {emoji:'🎧',name:'Headphones',cost:280},{emoji:'📸',name:'Camera',cost:550},{emoji:'🎬',name:'Clapper',cost:400},
+      {emoji:'🎮',name:'Gamepad',cost:650},{emoji:'🕹️',name:'Joystick',cost:480},{emoji:'👾',name:'Alien',cost:750},
+      {emoji:'🤖',name:'Robot',cost:1300},{emoji:'👻',name:'Ghost',cost:175},{emoji:'🎃',name:'Pumpkin',cost:140},
+      {emoji:'🎄',name:'Tree',cost:300},{emoji:'🎅',name:'Santa',cost:850},{emoji:'🧙',name:'Wizard',cost:1600},
+      {emoji:'🧚',name:'Fairy',cost:1400},{emoji:'🧛',name:'Vampire',cost:1700},{emoji:'🧜',name:'Mermaid',cost:1800},
+      {emoji:'🦸',name:'Hero',cost:2200},{emoji:'🧞',name:'Genie',cost:5000},{emoji:'🐉',name:'Fire Dragon',cost:35000},
+      {emoji:'🦚',name:'Peacock',cost:2800},{emoji:'🦩',name:'Flamingo',cost:950},{emoji:'🦢',name:'Swan',cost:1100},
+      {emoji:'🐬',name:'Dolphin',cost:1600},{emoji:'🐳',name:'Whale',cost:7000},{emoji:'🦀',name:'Crab',cost:130},
+      {emoji:'🐙',name:'Octopus',cost:900},{emoji:'🦊',name:'Fox',cost:750},{emoji:'🐨',name:'Koala',cost:600},
+      {emoji:'🐼',name:'Panda',cost:1800},{emoji:'🐸',name:'Frog',cost:120},{emoji:'🐢',name:'Turtle',cost:200},
+      {emoji:'🦖',name:'T-Rex',cost:12000},{emoji:'🦕',name:'Dino',cost:9000},{emoji:'🌋',name:'Volcano',cost:15000},
+      {emoji:'🏔️',name:'Mountain',cost:8000},{emoji:'🌊',name:'Wave',cost:700},{emoji:'⚡',name:'Lightning',cost:450},
+      {emoji:'❄️',name:'Snowflake',cost:90},{emoji:'☀️',name:'Sun',cost:300},{emoji:'🌙',name:'Moon',cost:400},
+      {emoji:'🌠',name:'Shooting Star',cost:2500},{emoji:'💥',name:'Boom',cost:550},{emoji:'💯',name:'100',cost:100},
+      {emoji:'💸',name:'Money Fly',cost:2000},{emoji:'💰',name:'Money Bag',cost:5000},{emoji:'🤑',name:'Rich Face',cost:3000},
+      {emoji:'🔮',name:'Crystal Ball',cost:2200},{emoji:'🪄',name:'Magic Wand',cost:1800},{emoji:'🧨',name:'Firecracker',cost:350},
+      {emoji:'🥇',name:'Champion',cost:10000},{emoji:'🏟️',name:'Stadium',cost:50000},{emoji:'🛸',name:'UFO',cost:30000},
+      {emoji:'🪩',name:'Disco Ball',cost:1200},{emoji:'🎭',name:'Masks',cost:800},{emoji:'🎨',name:'Art',cost:600},
+      {emoji:'🖼️',name:'Painting',cost:1500},{emoji:'🗝️',name:'Key',cost:900},{emoji:'🧱',name:'Brick',cost:50},
+      {emoji:'🧲',name:'Magnet',cost:70},{emoji:'🧬',name:'DNA',cost:1100},{emoji:'🧪',name:'Potion',cost:700},
+      {emoji:'🔭',name:'Telescope',cost:1300},{emoji:'🛰️',name:'Satellite',cost:20000},{emoji:'🚀',name:'SpaceX',cost:45000},
+      {emoji:'👨‍🚀',name:'Astronaut',cost:18000},{emoji:'🌌',name:'Universe',cost:99999}
     ];
 
-    // ================== STATE ==================
-    let user = null;
-    let isHost = false;
-    let liveTitle = '';
-    let stream = null;
-    let facingMode = 'user';
-    let isMuted = false;
-    let botCount = 0;
-    let realViewers = 0;
-    let botTimer = null;
-    let chatTimer = null;
-    let realTimer = null;
-    let activeLives = [];
-    let coins = 9;
-    let isInfinite = false;
-
-    // ================== NAME / MSG POOLS ==================
-    const adjs = ['Cool','Epic','Pro','Shadow','Neon','Cyber','Swift','Fire','Ice','Nova','Turbo','Elite','Ace','Ninja','Pixel','Lucky','Wild','Silent','Blaze','Ghost','Royal','Crystal','Golden','Omega','Alpha','Hyper','Magic','Storm','Jade','Violet'];
-    const nouns = ['Gamer','Player','Stream','Live','Chat','Fan','Master','Legend','Hero','Star','Soul','Wave','Blade','Flash','Coder','Dev','Cat','Dog','Panda','Wolf','Dragon','Fox','Tiger','Shark','Raven','Owl','Bro','Kid','Pro','Chad'];
-    const tags = ['', '123', '99', 'X', 'XX', '69', '420', 'YT', 'TV', 'GG', 'OP', 'Live', 'Pro', '77', '01'];
-    const phrases = ['w','W','WW','lets go','LETS GO','hi','hello','hey','yo','sup','first','nice stream','fire','🔥','🔥🔥','💯','👏','❤️','😂','lmao','lol','haha','love this','keep going','what game?','pog','POG','based','cringe','mid','ratio','L','W','drop a like','chat is wild','nice cam','10/10','clip that','aura','rizz','no cap','fr','sheesh','yooo','bussin','goated','skill issue','fyp','peak internet','huge W','hello host','mic check','hype train','day 1 viewer','instant classic','respect','I\'m early'];
-    const fillers = ['omg','bruh','dude','bro','fam','chat','guys','tbh','ngl','fr','idk','lowkey','highkey','sheesh','yooo','bussin','cooked','mid','goated'];
-
-    function rand(a) { return a[Math.floor(Math.random()*a.length)]; }
-    function makeName() { return rand(adjs)+rand(nouns)+rand(tags)+(Math.random()<0.35?Math.floor(Math.random()*900+100):''); }
-    function makeMsg() {
-      if (Math.random()<0.6) return rand(phrases);
-      const p=[]; const n=1+Math.floor(Math.random()*3);
-      for(let i=0;i<n;i++) p.push(Math.random()<0.55?rand(phrases):rand(fillers));
-      if(Math.random()<0.25) p.push(String(Math.floor(Math.random()*99)));
-      return p.join(' ').slice(0,90);
-    }
+    // Name/msg pools
+    const adjs=['Cool','Epic','Pro','Shadow','Neon','Cyber','Swift','Fire','Ice','Nova','Turbo','Elite','Ace','Ninja','Pixel','Lucky','Wild','Silent','Blaze','Ghost','Royal','Crystal','Golden','Omega','Alpha','Hyper','Magic','Storm','Jade','Violet'];
+    const nouns=['Gamer','Player','Stream','Live','Chat','Fan','Master','Legend','Hero','Star','Soul','Wave','Blade','Flash','Coder','Dev','Cat','Dog','Panda','Wolf','Dragon','Fox','Tiger','Shark','Raven','Owl','Bro','Kid','Pro','Chad'];
+    const tags=['','123','99','X','XX','69','420','YT','TV','GG','OP','Live','Pro','77','01'];
+    const phrases=['w','W','WW','lets go','LETS GO','hi','hello','hey','yo','sup','first','nice stream','fire','🔥','🔥🔥','💯','👏','❤️','😂','lmao','lol','haha','love this','keep going','what game?','pog','POG','based','cringe','mid','ratio','L','W','drop a like','chat is wild','nice cam','10/10','clip that','aura','rizz','no cap','fr','sheesh','yooo','bussin','goated','skill issue','fyp','peak internet','huge W','hello host','mic check','hype train','day 1 viewer','instant classic','respect','I\'m early'];
+    const fillers=['omg','bruh','dude','bro','fam','chat','guys','tbh','ngl','fr','idk','lowkey','highkey','sheesh','yooo','bussin','cooked','mid','goated'];
+    function rand(a){return a[Math.floor(Math.random()*a.length)];}
+    function makeName(){return rand(adjs)+rand(nouns)+rand(tags)+(Math.random()<0.35?Math.floor(Math.random()*900+100):'');}
+    function makeMsg(){if(Math.random()<0.6)return rand(phrases);const p=[];const n=1+Math.floor(Math.random()*3);for(let i=0;i<n;i++)p.push(Math.random()<0.55?rand(phrases):rand(fillers));if(Math.random()<0.25)p.push(String(Math.floor(Math.random()*99)));return p.join(' ').slice(0,90);}
     const NAMES=[...new Set(Array.from({length:4000},makeName))];
     const MSGS=[...new Set(Array.from({length:6000},makeMsg))];
-    let ni=0, mi=0;
-    function nextName(){ const n=NAMES[ni%NAMES.length]; ni++; return ni>NAMES.length?n+Math.floor(Math.random()*50):n; }
-    function nextMsg(){ const m=MSGS[mi%MSGS.length]; mi++; return mi>MSGS.length&&Math.random()<0.3?m+' '+Math.floor(Math.random()*99):m; }
+    let ni=0,mi=0;
+    function nextName(){const n=NAMES[ni%NAMES.length];ni++;return ni>NAMES.length?n+Math.floor(Math.random()*50):n;}
+    function nextMsg(){const m=MSGS[mi%MSGS.length];mi++;return mi>MSGS.length&&Math.random()<0.3?m+' '+Math.floor(Math.random()*99):m;}
 
-    // ================== HELPERS ==================
-    function toast(t,ms=1600){ const e=document.getElementById('toast'); e.textContent=t; e.classList.add('show'); setTimeout(()=>e.classList.remove('show'),ms); }
-    function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
-    function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-    function colorClass(n){ let h=0; for(let i=0;i<n.length;i++) h=(h*31+n.charCodeAt(i))>>>0; return 'c'+(h%8); }
-    function formatCoins(n){ if(n>=1e6) return (n/1e6).toFixed(1)+'M'; if(n>=1000) return (n/1000).toFixed(1)+'K'; return String(n); }
+    function toast(t,ms=1600){const e=document.getElementById('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),ms);}
+    function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+    function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+    function colorClass(n){let h=0;for(let i=0;i<n.length;i++)h=(h*31+n.charCodeAt(i))>>>0;return 'c'+(h%8);}
+    function formatCoins(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1000)return(n/1000).toFixed(1)+'K';return String(n);}
+    function format(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1000)return(n/1000).toFixed(1)+'K';return String(n);}
 
-    // ================== COINS ==================
-    function loadCoins() {
-      if (isInfinite) { coins = Infinity; updateCoinsUI(); return; }
-      const saved = localStorage.getItem('gl_coins_' + (user?.email || 'guest'));
-      coins = saved !== null ? parseInt(saved, 10) : 9;
-      if (isNaN(coins)) coins = 9;
+    // Coins
+    function loadCoins(){
+      if(isInfinite){coins=Infinity;updateCoinsUI();return;}
+      const key='gl_coins_v2_'+(user?.email||'guest');
+      const saved=localStorage.getItem(key);
+      coins=saved!==null?parseInt(saved,10):0;
+      if(isNaN(coins)||coins<0)coins=0;
       updateCoinsUI();
     }
-    function saveCoins() {
-      if (isInfinite) return;
-      localStorage.setItem('gl_coins_' + (user?.email || 'guest'), String(coins));
-    }
-    function updateCoinsUI() {
-      const el = document.getElementById('coins-count');
-      el.textContent = isInfinite ? '∞' : formatCoins(coins);
-    }
+    function saveCoins(){if(isInfinite)return;localStorage.setItem('gl_coins_v2_'+(user?.email||'guest'),String(coins));}
+    function updateCoinsUI(){document.getElementById('coins-count').textContent=isInfinite?'∞':formatCoins(coins);}
 
-    // ================== AUTH ==================
-    const btnGoogle = document.getElementById('btn-google');
-    btnGoogle.onclick = async () => {
-      btnGoogle.disabled = true;
-      try { await signInWithPopup(auth, provider); }
-      catch (err) {
-        toast(err.code === 'auth/popup-closed-by-user' ? 'Login cancelled' : (err.message || 'Login failed'));
-        btnGoogle.disabled = false;
-      }
+    // Auth
+    const btnGoogle=document.getElementById('btn-google');
+    btnGoogle.onclick=async()=>{
+      btnGoogle.disabled=true;
+      try{await signInWithPopup(auth,provider);}
+      catch(err){toast(err.code==='auth/popup-closed-by-user'?'Login cancelled':(err.message||'Login failed'));btnGoogle.disabled=false;}
     };
-
-    onAuthStateChanged(auth, (fu) => {
-      if (fu) {
-        user = {
-          name: fu.displayName || (fu.email ? fu.email.split('@')[0] : 'User'),
-          email: fu.email || '',
-          picture: fu.photoURL
-        };
-        const emailLower = user.email.toLowerCase();
-        isSpecialUser = emailLower === SPECIAL_EMAIL.toLowerCase() || emailLower.includes('kobik8512');
-        isInfinite = isSpecialUser;
-        document.getElementById('display-name').textContent = user.name;
-        loadCoins();
-        show('menu');
-        listenToLives();   // start listening to shared lives
-        toast('Signed in as ' + user.name);
-        btnGoogle.disabled = false;
+    onAuthStateChanged(auth,(fu)=>{
+      if(fu){
+        user={name:fu.displayName||(fu.email?fu.email.split('@')[0]:'User'),email:fu.email||'',picture:fu.photoURL};
+        const el=user.email.toLowerCase();
+        isSpecialUser=el===SPECIAL_EMAIL.toLowerCase()||el.includes('kobik8512');
+        isInfinite=isSpecialUser;
+        document.getElementById('display-name').textContent=user.name;
+        loadCoins();show('menu');listenToLives();toast('Signed in as '+user.name);btnGoogle.disabled=false;
       } else {
-        user = null; isInfinite = false; isSpecialUser = false;
-        show('login-screen');
-        btnGoogle.disabled = false;
+        user=null;isInfinite=false;isSpecialUser=false;show('login-screen');btnGoogle.disabled=false;
       }
     });
-
-    document.getElementById('btn-signout').onclick = async () => {
-      try {
-        if (currentLiveId) await endLiveInDb();
-        await signOut(auth);
-        toast('Signed out');
-      } catch(e){ toast('Sign out failed'); }
+    document.getElementById('btn-signout').onclick=async()=>{
+      try{if(currentLiveId&&isHost)await endLiveInDb();await signOut(auth);toast('Signed out');}catch(e){toast('Sign out failed');}
     };
-    document.getElementById('btn-clear').onclick = async () => {
-      // only special user can clear all
-      if (!isSpecialUser) { toast('Only admin can clear'); return; }
-      try {
-        await remove(ref(db, 'lives'));
-        toast('Cleared all lives');
-      } catch(e) { toast('Clear failed'); }
+    document.getElementById('btn-clear').onclick=async()=>{
+      if(!isSpecialUser){toast('Only admin can clear');return;}
+      try{await remove(ref(db,'lives'));toast('Cleared all lives');}catch(e){toast('Clear failed');}
     };
 
-    // ================== LIVES (shared via Firebase) ==================
-    function listenToLives() {
-      const livesRef = ref(db, 'lives');
-      onValue(livesRef, (snap) => {
-        activeLives = [];
-        const val = snap.val() || {};
-        Object.keys(val).forEach(id => {
-          activeLives.push({ id, ...val[id] });
-        });
-        // sort newest first
-        activeLives.sort((a,b) => (b.startedAt || 0) - (a.startedAt || 0));
+    // Lives list
+    function listenToLives(){
+      onValue(ref(db,'lives'),(snap)=>{
+        activeLives=[];
+        const val=snap.val()||{};
+        Object.keys(val).forEach(id=>activeLives.push({id,...val[id]}));
+        activeLives.sort((a,b)=>(b.startedAt||0)-(a.startedAt||0));
         renderLives();
       });
     }
-
-    function renderLives() {
-      const list = document.getElementById('lives-list');
-      const empty = document.getElementById('empty-state');
-      list.querySelectorAll('.live-card').forEach(c => c.remove());
-      if (!activeLives.length) { empty.style.display = 'block'; return; }
-      empty.style.display = 'none';
-      activeLives.forEach(live => {
-        const isMine = user && live.hostEmail === user.email;
-        const card = document.createElement('div');
-        card.className = 'live-card';
-        card.innerHTML = `
+    function renderLives(){
+      const list=document.getElementById('lives-list');
+      const empty=document.getElementById('empty-state');
+      list.querySelectorAll('.live-card').forEach(c=>c.remove());
+      if(!activeLives.length){empty.style.display='block';return;}
+      empty.style.display='none';
+      activeLives.forEach(live=>{
+        const isMine=user&&live.hostEmail===user.email;
+        const card=document.createElement('div');
+        card.className='live-card';
+        card.innerHTML=`
           <div class="live-info">
             <div class="live-name">${esc(live.title)}</div>
-            <div class="live-meta"><span class="dot"></span>${esc(live.host)} · ${live.viewers || 0} watching</div>
+            <div class="live-meta"><span class="dot"></span>${esc(live.host)} · ${live.viewers||0} watching</div>
           </div>
-          ${isMine || isSpecialUser ? `<button class="btn-x-small" data-remove="${live.id}">✕</button>` : ''}
+          ${isMine||isSpecialUser?`<button class="btn-x-small" data-remove="${live.id}">✕</button>`:''}
           <button class="btn-join" data-join="${live.id}">Join</button>`;
         list.appendChild(card);
       });
-      list.querySelectorAll('[data-join]').forEach(btn => {
-        btn.onclick = () => {
-          const live = activeLives.find(l => l.id === btn.dataset.join);
-          if (live) joinViewer(live);
-        };
+      list.querySelectorAll('[data-join]').forEach(btn=>{
+        btn.onclick=()=>{const live=activeLives.find(l=>l.id===btn.dataset.join);if(live)joinViewer(live);};
       });
-      list.querySelectorAll('[data-remove]').forEach(btn => {
-        btn.onclick = async () => {
-          try { await remove(ref(db, 'lives/' + btn.dataset.remove)); }
-          catch(e) { toast('Remove failed'); }
-        };
+      list.querySelectorAll('[data-remove]').forEach(btn=>{
+        btn.onclick=async()=>{try{await remove(ref(db,'lives/'+btn.dataset.remove));}catch(e){toast('Remove failed');}};
       });
     }
-
-    async function endLiveInDb() {
-      if (!currentLiveId) return;
-      try { await remove(ref(db, 'lives/' + currentLiveId)); } catch(e) {}
-      currentLiveId = null;
+    async function endLiveInDb(){
+      if(!currentLiveId)return;
+      try{await remove(ref(db,'lives/'+currentLiveId));}catch(e){}
+      currentLiveId=null;
     }
 
-    // ================== GO LIVE ==================
-    document.getElementById('btn-go-live').onclick = () => {
-      if (!user) return;
-      document.getElementById('title-input').value = '';
+    // Go Live
+    document.getElementById('btn-go-live').onclick=()=>{
+      if(!user)return;
+      document.getElementById('title-input').value='';
       document.getElementById('title-modal').classList.add('show');
-      setTimeout(() => document.getElementById('title-input').focus(), 80);
+      setTimeout(()=>document.getElementById('title-input').focus(),80);
     };
-    document.getElementById('btn-cancel').onclick = () => document.getElementById('title-modal').classList.remove('show');
-    document.getElementById('btn-start').onclick = startLive;
-    document.getElementById('title-input').onkeydown = e => { if (e.key==='Enter') startLive(); };
+    document.getElementById('btn-cancel').onclick=()=>document.getElementById('title-modal').classList.remove('show');
+    document.getElementById('btn-start').onclick=startLive;
+    document.getElementById('title-input').onkeydown=e=>{if(e.key==='Enter')startLive();};
 
-    async function startLive() {
-      liveTitle = document.getElementById('title-input').value.trim() || (user.name + "'s Live");
+    async function startLive(){
+      liveTitle=document.getElementById('title-input').value.trim()||(user.name+"'s Live");
       document.getElementById('title-modal').classList.remove('show');
-      isHost = true; botCount = 0; realViewers = 0; ni = 0; mi = 0; updateCount();
+      isHost=true;botCount=0;realViewers=0;ni=0;mi=0;updateCount();
+      peerConnections={};
 
-      // Create shared live in Firebase so other phones can see it
-      currentLiveId = 'l' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
-      try {
-        await set(ref(db, 'lives/' + currentLiveId), {
-          title: liveTitle,
-          host: user.name,
-          hostEmail: user.email,
-          viewers: 0,
-          startedAt: Date.now()
+      currentLiveId='l'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+      try{
+        await set(ref(db,'lives/'+currentLiveId),{
+          title:liveTitle,host:user.name,hostEmail:user.email,viewers:0,startedAt:Date.now()
         });
-      } catch (e) {
-        console.error(e);
-        toast('Could not publish live (check Database rules)');
-      }
+      }catch(e){console.error(e);toast('Could not publish live');}
 
-      // B button + bots ONLY for special user
-      document.getElementById('btn-b').style.display = isSpecialUser ? 'flex' : 'none';
-
-      document.getElementById('live-title-text').textContent = liveTitle;
-      document.getElementById('chat-list').innerHTML = '';
-      document.getElementById('mic-status').textContent = 'Mic: listening...';
-      document.getElementById('mic-status').style.color = 'var(--green)';
+      document.getElementById('btn-b').style.display=isSpecialUser?'flex':'none';
+      document.getElementById('live-title-text').textContent=liveTitle;
+      document.getElementById('chat-list').innerHTML='';
+      document.getElementById('mic-status').textContent='Mic: listening...';
+      document.getElementById('mic-status').style.color='var(--green)';
+      document.getElementById('remote-video').style.display='none';
       show('live-room');
       await startCam();
-
-      if (isSpecialUser) startBots();   // bots only for you
+      if(isSpecialUser)startBots();
       startRealSim();
+      listenForViewers();  // host listens for people joining
+      listenToChat(currentLiveId);  // shared chat
     }
 
-    // ================== CAMERA ==================
-    async function startCam() {
+    // ============ WEBRTC ============
+    async function startCam(){
       stopCam();
-      const vid = document.getElementById('local-video');
-      const off = document.getElementById('cam-off');
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode, width:{ideal:1280}, height:{ideal:720} }, audio: true });
-        vid.srcObject = stream; vid.style.display = 'block'; off.style.display = 'none';
-        vid.muted = true; isMuted = false;
-        document.getElementById('btn-mic').textContent = '🎤';
+      const vid=document.getElementById('local-video');
+      const off=document.getElementById('cam-off');
+      try{
+        stream=await navigator.mediaDevices.getUserMedia({
+          video:{facingMode,width:{ideal:1280},height:{ideal:720}},
+          audio:true
+        });
+        vid.srcObject=stream;vid.style.display='block';off.style.display='none';
+        vid.muted=true;isMuted=false;
+        document.getElementById('btn-mic').textContent='🎤';
         document.getElementById('btn-mic').classList.remove('muted');
-      } catch(e) {
-        vid.style.display = 'none'; off.style.display = 'block';
+        // If already connected to viewers, replace tracks
+        Object.values(peerConnections).forEach(pc=>{
+          stream.getTracks().forEach(track=>{
+            const sender=pc.getSenders().find(s=>s.track&&s.track.kind===track.kind);
+            if(sender)sender.replaceTrack(track);
+          });
+        });
+      }catch(e){
+        vid.style.display='none';off.style.display='block';
         toast('Camera permission denied');
       }
     }
-    function stopCam() {
-      if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-      document.getElementById('local-video').srcObject = null;
+    function stopCam(){
+      if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+      document.getElementById('local-video').srcObject=null;
     }
 
-    document.getElementById('btn-mic').onclick = () => {
-      if (!isHost || !stream) return;
-      isMuted = !isMuted;
-      stream.getAudioTracks().forEach(t => t.enabled = !isMuted);
-      const btn = document.getElementById('btn-mic');
-      btn.textContent = isMuted ? '🔇' : '🎤';
-      btn.classList.toggle('muted', isMuted);
-      document.getElementById('mic-status').textContent = isMuted ? 'Mic: muted' : 'Mic: listening...';
-      document.getElementById('mic-status').style.color = isMuted ? 'var(--danger)' : 'var(--green)';
-      toast(isMuted ? 'Muted' : 'Mic on');
-    };
-    document.getElementById('btn-flip').onclick = async () => {
-      if (!isHost) return;
-      facingMode = facingMode === 'user' ? 'environment' : 'user';
-      await startCam();
-      toast(facingMode === 'user' ? 'Front camera' : 'Back camera');
-    };
-    document.getElementById('btn-leave').onclick = () => stopLive();
-
-    async function stopLive() {
-      stopCam(); stopBots(); stopRealSim();
-      isHost = false; botCount = 0; realViewers = 0;
-      await endLiveInDb();
-      show('menu');
-      toast('Live ended');
+    // Host: listen for new viewers and create peer connections
+    function listenForViewers(){
+      if(unsubViewers)unsubViewers();
+      const viewersRef=ref(db,'lives/'+currentLiveId+'/viewers');
+      unsubViewers=onChildAdded(viewersRef,async(snap)=>{
+        const vid=snap.key;
+        if(peerConnections[vid])return;
+        await createHostPeer(vid);
+      });
+      onChildRemoved(viewersRef,(snap)=>{
+        const vid=snap.key;
+        if(peerConnections[vid]){
+          peerConnections[vid].close();
+          delete peerConnections[vid];
+        }
+      });
     }
 
-    function joinViewer(live) {
-      isHost = false;
-      currentLiveId = null;
-      document.getElementById('btn-b').style.display = 'none';
-      document.getElementById('live-title-text').textContent = live.title;
-      document.getElementById('chat-list').innerHTML = '';
-      document.getElementById('local-video').style.display = 'none';
-      document.getElementById('cam-off').style.display = 'block';
-      document.getElementById('mic-status').textContent = '';
-      updateCountDisplay(live.viewers || 1);
+    async function createHostPeer(viewerId){
+      const pc=new RTCPeerConnection(ICE_SERVERS);
+      peerConnections[viewerId]=pc;
+
+      if(stream){
+        stream.getTracks().forEach(track=>pc.addTrack(track,stream));
+      }
+
+      pc.onicecandidate=e=>{
+        if(e.candidate){
+          push(ref(db,`lives/${currentLiveId}/signals/${viewerId}/hostCandidates`),e.candidate.toJSON());
+        }
+      };
+
+      // Listen for answer from this viewer
+      onValue(ref(db,`lives/${currentLiveId}/signals/${viewerId}/answer`),(snap)=>{
+        const answer=snap.val();
+        if(answer&&pc.signalingState!=='closed'){
+          pc.setRemoteDescription(new RTCSessionDescription(answer)).catch(()=>{});
+        }
+      });
+
+      // Listen for ICE from viewer
+      onChildAdded(ref(db,`lives/${currentLiveId}/signals/${viewerId}/viewerCandidates`),(snap)=>{
+        const c=snap.val();
+        if(c)pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
+      });
+
+      try{
+        const offer=await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        await set(ref(db,`lives/${currentLiveId}/signals/${viewerId}/offer`),{
+          type:offer.type,sdp:offer.sdp
+        });
+      }catch(e){console.error('Host offer failed',e);}
+    }
+
+    // Viewer joins
+    async function joinViewer(live){
+      isHost=false;currentLiveId=live.id;
+      document.getElementById('btn-b').style.display='none';
+      document.getElementById('live-title-text').textContent=live.title;
+      document.getElementById('chat-list').innerHTML='';
+      document.getElementById('local-video').style.display='none';
+      document.getElementById('remote-video').style.display='none';
+      document.getElementById('cam-off').style.display='block';
+      document.getElementById('mic-status').textContent='Connecting...';
+      document.getElementById('mic-status').style.color='var(--muted)';
+      updateCountDisplay(live.viewers||1);
       show('live-room');
-      toast('Joined ' + live.title);
+      toast('Joining '+live.title+'...');
+
+      viewerId='v'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+
+      // Announce presence
+      await set(ref(db,`lives/${live.id}/viewers/${viewerId}`),{
+        name:user?.name||'Viewer',joinedAt:Date.now()
+      });
+
+      // Kick viewer when host ends the live
+      onValue(ref(db,'lives/'+live.id),(snap)=>{
+        if(!snap.exists() && !isHost && currentLiveId===live.id){
+          // Live was deleted by host
+          forceLeaveLive('Live ended by host');
+        }
+      });
+
+      // Shared chat listener
+      listenToChat(live.id);
+
+      // Create peer connection as viewer
+      viewerPC=new RTCPeerConnection(ICE_SERVERS);
+
+      viewerPC.ontrack=e=>{
+        const remoteVid=document.getElementById('remote-video');
+        remoteVid.srcObject=e.streams[0];
+        remoteVid.style.display='block';
+        document.getElementById('cam-off').style.display='none';
+        document.getElementById('mic-status').textContent='Connected';
+        document.getElementById('mic-status').style.color='var(--green)';
+      };
+
+      viewerPC.onicecandidate=e=>{
+        if(e.candidate){
+          push(ref(db,`lives/${live.id}/signals/${viewerId}/viewerCandidates`),e.candidate.toJSON());
+        }
+      };
+
+      // Wait for host offer
+      onValue(ref(db,`lives/${live.id}/signals/${viewerId}/offer`),async(snap)=>{
+        const offer=snap.val();
+        if(!offer||!viewerPC||viewerPC.signalingState==='closed')return;
+        try{
+          await viewerPC.setRemoteDescription(new RTCSessionDescription(offer));
+          const answer=await viewerPC.createAnswer();
+          await viewerPC.setLocalDescription(answer);
+          await set(ref(db,`lives/${live.id}/signals/${viewerId}/answer`),{
+            type:answer.type,sdp:answer.sdp
+          });
+        }catch(e){console.error('Viewer answer failed',e);}
+      });
+
+      // Host ICE candidates
+      onChildAdded(ref(db,`lives/${live.id}/signals/${viewerId}/hostCandidates`),(snap)=>{
+        const c=snap.val();
+        if(c&&viewerPC)viewerPC.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
+      });
     }
 
-    // ================== VIEWERS ==================
-    function updateCount() {
-      const total = botCount + realViewers;
+    function forceLeaveLive(msg){
+      stopCam();stopBots();stopRealSim();
+      if(viewerPC){viewerPC.close();viewerPC=null;}
+      Object.values(peerConnections).forEach(pc=>pc.close());
+      peerConnections={};
+      isHost=false;botCount=0;realViewers=0;viewerId=null;currentLiveId=null;
+      document.getElementById('remote-video').srcObject=null;
+      document.getElementById('remote-video').style.display='none';
+      show('menu');
+      toast(msg||'Live ended');
+    }
+
+    // Controls
+    document.getElementById('btn-mic').onclick=()=>{
+      if(!isHost||!stream)return;
+      isMuted=!isMuted;
+      stream.getAudioTracks().forEach(t=>t.enabled=!isMuted);
+      const btn=document.getElementById('btn-mic');
+      btn.textContent=isMuted?'🔇':'🎤';
+      btn.classList.toggle('muted',isMuted);
+      document.getElementById('mic-status').textContent=isMuted?'Mic: muted':'Mic: listening...';
+      document.getElementById('mic-status').style.color=isMuted?'var(--danger)':'var(--green)';
+      toast(isMuted?'Muted':'Mic on');
+    };
+    document.getElementById('btn-flip').onclick=async()=>{
+      if(!isHost)return;
+      facingMode=facingMode==='user'?'environment':'user';
+      await startCam();
+      toast(facingMode==='user'?'Front camera':'Back camera');
+    };
+    document.getElementById('btn-leave').onclick=()=>stopLive();
+
+    async function stopLive(){
+      stopCam();stopBots();stopRealSim();
+      // Close all peer connections
+      Object.values(peerConnections).forEach(pc=>pc.close());
+      peerConnections={};
+      if(viewerPC){viewerPC.close();viewerPC=null;}
+      if(viewerId&&currentLiveId&&!isHost){
+        try{await remove(ref(db,`lives/${currentLiveId}/viewers/${viewerId}`));}catch(e){}
+      }
+      if(isHost)await endLiveInDb();
+      isHost=false;botCount=0;realViewers=0;viewerId=null;
+      document.getElementById('remote-video').srcObject=null;
+      document.getElementById('remote-video').style.display='none';
+      show('menu');toast('Live ended');
+    }
+
+    // Viewers count
+    function updateCount(){
+      const total=botCount+realViewers;
       updateCountDisplay(total);
-      // push viewer count to Firebase so others see it
-      if (isHost && currentLiveId) {
-        update(ref(db, 'lives/' + currentLiveId), { viewers: total }).catch(()=>{});
+      if(isHost&&currentLiveId){
+        update(ref(db,'lives/'+currentLiveId),{viewers:total}).catch(()=>{});
       }
     }
-    function updateCountDisplay(n) {
-      document.getElementById('watchers-text').textContent = format(n) + ' watching';
-    }
-    function format(n) {
-      if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
-      if (n >= 1000) return (n/1000).toFixed(1)+'K';
-      return String(n);
+    function updateCountDisplay(n){
+      document.getElementById('watchers-text').textContent=format(n)+' watching';
     }
 
-    // ================== B BUTTON ==================
-    document.getElementById('btn-b').onclick = () => {
-      if (!isHost || !isSpecialUser) return;
-      addBot(); toast('+1 bot');
+    // B button (only special)
+    document.getElementById('btn-b').onclick=()=>{
+      if(!isHost||!isSpecialUser)return;
+      addBot();toast('+1 bot');
     };
-    function addBot() {
-      botCount++; updateCount();
-      if (Math.random() < 0.55) addMsg(nextName(), nextMsg());
+    function addBot(){
+      botCount++;updateCount();
+      if(Math.random()<0.55)addMsg(nextName(),nextMsg());
     }
 
-    // ================== BOTS ==================
-    function startBots() {
+    // Bots
+    function startBots(){
       stopBots();
-      botTimer = setTimeout(scheduleJoin, 6000 + Math.random()*6000);
+      botTimer=setTimeout(scheduleJoin,6000+Math.random()*6000);
       scheduleChat();
     }
-    function stopBots() {
-      clearTimeout(botTimer); botTimer = null;
-      clearTimeout(chatTimer); chatTimer = null;
-    }
-    function scheduleJoin() {
+    function stopBots(){clearTimeout(botTimer);botTimer=null;clearTimeout(chatTimer);chatTimer=null;}
+    function scheduleJoin(){
       let delay;
-      if (botCount < 3) delay = 8000+Math.random()*7000;
-      else if (botCount < 10) delay = 5000+Math.random()*5000;
-      else if (botCount < 25) delay = 3000+Math.random()*3000;
-      else if (botCount < 60) delay = 1800+Math.random()*1800;
-      else if (botCount < 150) delay = 900+Math.random()*900;
-      else if (botCount < 400) delay = 450+Math.random()*400;
-      else delay = 250+Math.random()*250;
-      const burst = botCount > 100 ? (1+Math.floor(Math.random()*Math.min(3,Math.floor(botCount/120)))) : 1;
-      botTimer = setTimeout(() => { for(let i=0;i<burst;i++) addBot(); scheduleJoin(); }, delay);
+      if(botCount<3)delay=8000+Math.random()*7000;
+      else if(botCount<10)delay=5000+Math.random()*5000;
+      else if(botCount<25)delay=3000+Math.random()*3000;
+      else if(botCount<60)delay=1800+Math.random()*1800;
+      else if(botCount<150)delay=900+Math.random()*900;
+      else if(botCount<400)delay=450+Math.random()*400;
+      else delay=250+Math.random()*250;
+      const burst=botCount>100?(1+Math.floor(Math.random()*Math.min(3,Math.floor(botCount/120)))):1;
+      botTimer=setTimeout(()=>{for(let i=0;i<burst;i++)addBot();scheduleJoin();},delay);
     }
-    function scheduleChat() {
+    function scheduleChat(){
       let delay;
-      if (botCount < 4) delay = 7000+Math.random()*8000;
-      else if (botCount < 12) delay = 4000+Math.random()*4000;
-      else if (botCount < 30) delay = 2200+Math.random()*2000;
-      else if (botCount < 80) delay = 1200+Math.random()*1000;
-      else if (botCount < 200) delay = 600+Math.random()*500;
-      else if (botCount < 500) delay = 280+Math.random()*220;
-      else delay = 140+Math.random()*140;
-      const multi = botCount > 250 ? Math.min(3,1+Math.floor(botCount/300)) : 1;
-      chatTimer = setTimeout(() => {
-        if (botCount > 0) for(let i=0;i<multi;i++) addMsg(nextName(), nextMsg());
+      if(botCount<4)delay=7000+Math.random()*8000;
+      else if(botCount<12)delay=4000+Math.random()*4000;
+      else if(botCount<30)delay=2200+Math.random()*2000;
+      else if(botCount<80)delay=1200+Math.random()*1000;
+      else if(botCount<200)delay=600+Math.random()*500;
+      else if(botCount<500)delay=280+Math.random()*220;
+      else delay=140+Math.random()*140;
+      const multi=botCount>250?Math.min(3,1+Math.floor(botCount/300)):1;
+      chatTimer=setTimeout(()=>{
+        if(botCount>0)for(let i=0;i<multi;i++)addMsg(nextName(),nextMsg());
         scheduleChat();
-      }, delay);
+      },delay);
     }
-    function startRealSim() {
+    function startRealSim(){
       stopRealSim();
-      realTimer = setInterval(() => {
-        if (Math.random() < 0.35) {
-          realViewers = Math.max(0, Math.min(8, realViewers + (Math.random()<0.55?1:-1)));
+      realTimer=setInterval(()=>{
+        if(Math.random()<0.35){
+          realViewers=Math.max(0,Math.min(8,realViewers+(Math.random()<0.55?1:-1)));
           updateCount();
         }
-      }, 10000+Math.random()*8000);
+      },10000+Math.random()*8000);
     }
-    function stopRealSim() { clearInterval(realTimer); realTimer = null; }
+    function stopRealSim(){clearInterval(realTimer);realTimer=null;}
 
-    // ================== CHAT ==================
-    function addMsg(name, text, host=false, isGift=false) {
-      const list = document.getElementById('chat-list');
-      const div = document.createElement('div');
-      div.className = 'msg' + (host ? ' host' : '') + (isGift ? ' gift-msg' : '');
-      const cls = host || isGift ? '' : colorClass(name);
-      div.innerHTML = `<span class="uname ${cls}">${esc(name)}</span>${esc(text)}`;
+    // Chat (synced via Firebase)
+    const seenChatIds=new Set();
+    function listenToChat(liveId){
+      seenChatIds.clear();
+      onChildAdded(ref(db,`lives/${liveId}/chat`),(snap)=>{
+        const msg=snap.val();
+        if(!msg||seenChatIds.has(snap.key))return;
+        seenChatIds.add(snap.key);
+        displayMsg(msg.name,msg.text,!!msg.host,!!msg.gift);
+      });
+    }
+    function displayMsg(name,text,host=false,isGift=false){
+      const list=document.getElementById('chat-list');
+      const div=document.createElement('div');
+      div.className='msg'+(host?' host':'')+(isGift?' gift-msg':'');
+      const cls=host||isGift?'':colorClass(name);
+      div.innerHTML=`<span class="uname ${cls}">${esc(name)}</span>${esc(text)}`;
       list.appendChild(div);
-      while (list.children.length > 80) list.removeChild(list.firstChild);
-      list.scrollTop = list.scrollHeight;
+      while(list.children.length>80)list.removeChild(list.firstChild);
+      list.scrollTop=list.scrollHeight;
     }
-    document.getElementById('btn-send').onclick = sendMsg;
-    document.getElementById('chat-input').onkeydown = e => { if (e.key==='Enter') sendMsg(); };
-    function sendMsg() {
-      const input = document.getElementById('chat-input');
-      const t = input.value.trim();
-      if (!t) return;
-      addMsg(isHost ? user.name : 'You', t, isHost);
-      input.value = '';
+    // Local-only messages (bots) still use this
+    function addMsg(name,text,host=false,isGift=false){
+      displayMsg(name,text,host,isGift);
+    }
+    document.getElementById('btn-send').onclick=sendMsg;
+    document.getElementById('chat-input').onkeydown=e=>{if(e.key==='Enter')sendMsg();};
+    async function sendMsg(){
+      const input=document.getElementById('chat-input');
+      const t=input.value.trim();
+      if(!t||!currentLiveId)return;
+      const name=user?user.name:'You';
+      try{
+        await push(ref(db,`lives/${currentLiveId}/chat`),{
+          name, text:t, host:isHost, gift:false, at:Date.now()
+        });
+      }catch(e){toast('Chat failed');}
+      input.value='';
     }
 
-    // ================== GIFTS ==================
-    function buildGiftGrid() {
-      const grid = document.getElementById('gift-grid');
-      grid.innerHTML = '';
-      GIFTS.forEach((g, i) => {
-        const item = document.createElement('div');
-        item.className = 'gift-item';
-        item.innerHTML = `
-          <div class="g-emoji">${g.emoji}</div>
-          <div class="g-name">${esc(g.name)}</div>
-          <div class="g-cost">🪙 ${formatCoins(g.cost)}</div>`;
-        item.onclick = () => sendGift(g);
+    // Gifts
+    function buildGiftGrid(){
+      const grid=document.getElementById('gift-grid');
+      grid.innerHTML='';
+      GIFTS.forEach(g=>{
+        const item=document.createElement('div');
+        item.className='gift-item';
+        item.innerHTML=`<div class="g-emoji">${g.emoji}</div><div class="g-name">${esc(g.name)}</div><div class="g-cost">🪙 ${formatCoins(g.cost)}</div>`;
+        item.onclick=()=>sendGift(g);
         grid.appendChild(item);
       });
     }
     buildGiftGrid();
 
-    document.getElementById('btn-gift').onclick = () => {
+    document.getElementById('btn-gift').onclick=()=>{
+      if(isHost){toast("You can't gift in your own live");return;}
       document.getElementById('gift-panel').classList.add('show');
     };
-    document.getElementById('gift-close').onclick = () => {
-      document.getElementById('gift-panel').classList.remove('show');
-    };
-    document.getElementById('gift-panel').onclick = (e) => {
-      if (e.target.id === 'gift-panel') document.getElementById('gift-panel').classList.remove('show');
-    };
+    document.getElementById('gift-close').onclick=()=>document.getElementById('gift-panel').classList.remove('show');
+    document.getElementById('gift-panel').onclick=e=>{if(e.target.id==='gift-panel')document.getElementById('gift-panel').classList.remove('show');};
 
-    function sendGift(gift) {
-      if (!isInfinite && coins < gift.cost) {
-        toast('Not enough coins!');
-        return;
-      }
-      if (!isInfinite) {
-        coins -= gift.cost;
-        saveCoins();
-        updateCoinsUI();
-      }
-
+    async function sendGift(gift){
+      if(isHost){toast("You can't gift in your own live");return;}
+      if(!currentLiveId){toast('Not in a live');return;}
+      if(!isInfinite&&coins<gift.cost){toast('Not enough coins!');return;}
+      if(!isInfinite){coins-=gift.cost;saveCoins();updateCoinsUI();}
       document.getElementById('gift-panel').classList.remove('show');
 
-      // Animation
-      const anim = document.getElementById('gift-anim');
-      anim.innerHTML = `
-        <div class="gift-fly">${gift.emoji}</div>
-        <div class="gift-label">${gift.emoji} ${gift.name} · 🪙${formatCoins(gift.cost)}</div>`;
-      setTimeout(() => { anim.innerHTML = ''; }, 1700);
+      // Animation on sender side
+      const anim=document.getElementById('gift-anim');
+      anim.innerHTML=`<div class="gift-fly">${gift.emoji}</div><div class="gift-label">${gift.emoji} ${gift.name} · 🪙${formatCoins(gift.cost)}</div>`;
+      setTimeout(()=>{anim.innerHTML='';},1700);
 
-      // Chat message
-      const sender = user ? user.name : 'You';
-      const toHost = isHost ? 'your live' : liveTitle;
-      addMsg(sender, `sent ${gift.emoji} ${gift.name} (🪙${formatCoins(gift.cost)})`, false, true);
+      const sender=user?user.name:'You';
+      const text=`sent ${gift.emoji} ${gift.name} (🪙${formatCoins(gift.cost)})`;
+      const toStreamer=Math.floor(gift.cost*0.7);
 
-      // 70% to streamer, 30% gone (simulated)
-      const toStreamer = Math.floor(gift.cost * 0.7);
-      toast(`+${formatCoins(toStreamer)} coins to streamer`);
+      try{
+        // Shared chat message so everyone sees the gift
+        await push(ref(db,`lives/${currentLiveId}/chat`),{
+          name:sender, text, host:false, gift:true, at:Date.now(),
+          giftEmoji:gift.emoji, giftName:gift.name, giftCost:gift.cost
+        });
+        // Credit coins to host (70%)
+        const liveSnap=await new Promise(res=>onValue(ref(db,'lives/'+currentLiveId),s=>{res(s);},{onlyOnce:true}));
+        const hostEmail=liveSnap.val()?.hostEmail;
+        if(hostEmail){
+          const earnRef=ref(db,'earnings/'+hostEmail.replace(/\./g,','));
+          onValue(earnRef,async(s)=>{
+            const cur=s.val()||0;
+            await set(earnRef,cur+toStreamer);
+          },{onlyOnce:true});
+        }
+      }catch(e){console.error(e);}
+      toast(`Gift sent! +${formatCoins(toStreamer)} to streamer`);
     }
   </script>
 </body>
