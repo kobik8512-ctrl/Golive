@@ -679,6 +679,19 @@
       setTimeout(()=>document.getElementById('title-input').focus(),80);
     };
     document.getElementById('mode-game').onclick=()=>{
+      // IMPORTANT: Android Chrome currently does not expose getDisplayMedia().
+      // Do not pretend Game Live can work there; the browser itself must provide
+      // the screen-capture API. IRL camera live remains unchanged.
+      const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');
+      const canScreenShare=!!navigator.mediaDevices?.getDisplayMedia;
+      if(isMobile && !canScreenShare){
+        toast('Game Live screen sharing is not available in this mobile browser. Use desktop Chrome/Edge/Firefox, or a native app.');
+        return;
+      }
+      if(!canScreenShare){
+        toast('Game Live needs a browser with screen sharing support.');
+        return;
+      }
       pendingLiveMode='game';
       document.getElementById('mode-modal').classList.remove('show');
       document.getElementById('title-input').value='';
@@ -747,8 +760,12 @@
 
     // ============ WEBRTC ============
     async function startGameShare(){
+      // Keep the working IRL camera path completely separate.
       if(!navigator.mediaDevices?.getDisplayMedia){
-        toast('Screen sharing is not supported in this browser.');
+        const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');
+        toast(isMobile
+          ? 'This mobile browser cannot share the screen. Game Live needs a native app or a supported desktop browser.'
+          : 'Screen sharing is not supported in this browser.');
         return false;
       }
       try{
