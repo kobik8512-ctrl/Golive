@@ -428,7 +428,7 @@
     let stream = null, facingMode = 'user', isMuted = false;
     let botCount = 0, realViewers = 0;
     let botSyncTimer = null, botSyncPending = false;
-    let botTimer = null, chatTimer = null, realTimer = null, viewerBotChatTimer = null;
+    let botTimer = null, chatTimer = null, realTimer = null, viewerBotChatTimer = null, botGiftTimer = null;
     let activeLives = [], coins = 0;
     let peerConnections = {};   // host: viewerId -> PC
     let viewerPC = null;        // viewer side PC
@@ -524,7 +524,9 @@
       const key='gl_coins_v2_'+(user?.email||'guest');
       const saved=localStorage.getItem(key);
       coins=saved!==null?parseInt(saved,10):0;
-      if(isNaN(coins)||coins<0)coins=0;
+      if(isNaN(coins)||!isFinite(coins)||coins<0)coins=0;
+      // Older builds could have stored an invalid/infinite admin balance.
+      if(isSpecialUser && saved!==null && !isFinite(Number(saved))) coins=0;
       updateCoinsUI();
     }
     function saveCoins(){if(isInfinite)return;localStorage.setItem('gl_coins_v2_'+(user?.email||'guest'),String(coins));}
@@ -555,9 +557,20 @@
           picture:fu.photoURL
         };
         isSpecialUser=checkAdmin();
-        isInfinite=isSpecialUser;
+        // Admin now uses the normal coin economy too. Keep the B/admin tools,
+        // but do not grant infinite coins.
+        isInfinite=false;
         document.getElementById('display-name').textContent=user.name+(isSpecialUser?' 🔑':'');
-        loadCoins();show('menu');listenToLives();
+        loadCoins();
+        // One-time migration: the old build gave the admin infinite coins.
+        // Start the new economy at exactly 0, then keep earned coins normally.
+        if(isSpecialUser && localStorage.getItem('gl_admin_coin_reset_v1')!=='1'){
+          coins=0;
+          saveCoins();
+          updateCoinsUI();
+          localStorage.setItem('gl_admin_coin_reset_v1','1');
+        }
+        show('menu');listenToLives();
         toast(isSpecialUser?'Signed in as Admin 🔑':'Signed in as '+user.name);
         btnGoogle.disabled=false;
       } else {
@@ -576,10 +589,10 @@
         const pin=prompt('Enter admin PIN:');
         if(pin==='blue007'){
           localStorage.setItem('gl_admin_unlock','blue007');
-          isSpecialUser=true;isInfinite=true;
+          isSpecialUser=true;isInfinite=false;
           loadCoins();
           document.getElementById('display-name').textContent=(user?.name||'')+' 🔑';
-          toast('Admin unlocked! ∞ coins + B button');
+          toast('Admin unlocked! 0 starting coins + B button');
         } else if(pin!==null){
           toast('Wrong PIN');
         }
@@ -1335,6 +1348,9 @@
       botCount=Math.max(0,botCount+delta);
       pendingBotDelta+=delta;
       updateCount();
+      // If bots were previously at 0, the donation scheduler had no reason
+      // to stay armed. Re-arm it as soon as the first bots arrive.
+      if(botCount>0 && !botGiftTimer) scheduleBotDonation();
       if(botDeltaTimer)return;
       botDeltaTimer=setTimeout(flushBotDelta,300);
     }
@@ -1418,12 +1434,14 @@
       botTimer=setTimeout(scheduleJoin,4000+Math.random()*4000);
       scheduleChat();
       scheduleLeave();
+      scheduleBotDonation();
     }
     function stopBots(){
       clearTimeout(botTimer);botTimer=null;
       clearTimeout(chatTimer);chatTimer=null;
       stopViewerBotChat();
       clearTimeout(leaveTimer);leaveTimer=null;
+      clearTimeout(botGiftTimer);botGiftTimer=null;
     }
     let leaveTimer=null;
 
@@ -1589,6 +1607,90 @@
         scheduleChat();
       },delay);
     }
+    // Bot donation economy: more bots create more donation opportunities,
+    // but a richer host gets fewer/cheaper gifts. Expensive gifts are always
+    // much rarer than low-cost gifts, and Rose becomes more common as the
+    // room grows large.
+    function pickBotGift(){
+      if(!GIFTS.length)return null;
+      const b=Math.max(0,Math.floor(Number(botCount)||0));
+      const wealth=Math.max(0,Number(coins)||0);
+      const wealthPenalty=1/(1+wealth/5000);
+      const weights=GIFTS.map(g=>{
+        // Strongly favor affordable gifts; high-cost gifts fall off quickly.
+        let w=1/Math.pow(Math.max(1,g.cost),0.82);
+        // Rose is intentionally uncommon in small rooms and increasingly
+        // common as the audience becomes large.
+        if(g.name==='Rose'){
+          const roseBoost=b<10?0.03:b<20?0.06:b<50?0.20:b<200?0.85:2.5;
+          w*=roseBoost;
+        }
+        // More coins means less chance of any gift, especially premium ones.
+        if(g.cost>=100) w*=wealthPenalty;
+        if(g.cost>=1000) w*=wealthPenalty*0.65;
+        if(g.cost>=10000) w*=wealthPenalty*0.35;
+        return Math.max(0.000001,w);
+      });
+      let total=weights.reduce((a,v)=>a+v,0), r=Math.random()*total;
+      for(let i=0;i<GIFTS.length;i++){
+        r-=weights[i];
+        if(r<=0)return GIFTS[i];
+      }
+      return GIFTS[0];
+    }
+
+    function scheduleBotDonation(){
+      clearTimeout(botGiftTimer);botGiftTimer=null;
+      if(!isHost||!isSpecialUser||!currentLiveId||botCount<=0)return;
+
+      const b=Math.max(1,Math.floor(Number(botCount)||1));
+      const wealth=Math.max(0,Number(coins)||0);
+      // More bots = shorter time between donations.
+      let delay;
+      if(b<5) delay=30000+Math.random()*30000;
+      else if(b<10) delay=22000+Math.random()*22000;
+      else if(b<20) delay=14000+Math.random()*18000;
+      else if(b<50) delay=9000+Math.random()*12000;
+      else if(b<200) delay=5000+Math.random()*8000;
+      else if(b<1000) delay=2500+Math.random()*4500;
+      else if(b<5000) delay=1400+Math.random()*2600;
+      else if(b<20000) delay=1200+Math.random()*1800;
+      else delay=1000+Math.random()*1500;
+
+      // A growing wallet slows the economy instead of making it snowball.
+      delay*=1+Math.min(12,wealth/2500);
+
+      botGiftTimer=setTimeout(async()=>{
+        botGiftTimer=null;
+        if(!isHost||!isSpecialUser||!currentLiveId||botCount<=0){scheduleBotDonation();return;}
+
+        // A donation is not guaranteed every tick, especially in small rooms.
+        const chance=Math.min(0.92,0.22+Math.log10(b+1)*0.18);
+        if(Math.random()<chance){
+          const gift=pickBotGift();
+          if(gift){
+            const from=nextName();
+            const toStreamer=Math.floor(gift.cost*0.7);
+            const now=Date.now();
+            try{
+              await push(ref(db,`lives/${currentLiveId}/gifts`),{
+                from,emoji:gift.emoji,name:gift.name,cost:gift.cost,
+                toHost:toStreamer,bot:true,at:now
+              });
+              await push(ref(db,`lives/${currentLiveId}/chat`),{
+                name:from,
+                text:`sent ${gift.emoji} ${gift.name} (🪙${formatCoins(gift.cost)})`,
+                host:false,gift:true,bot:true,at:now,
+                giftEmoji:gift.emoji,giftName:gift.name,giftCost:gift.cost,
+                coinsToHost:toStreamer
+              });
+            }catch(e){console.warn('Bot gift failed:',e);}
+          }
+        }
+        scheduleBotDonation();
+      },delay);
+    }
+
     function startRealSim(){
       stopRealSim();
       realTimer=setInterval(()=>{
