@@ -414,7 +414,6 @@
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        // Free public TURN (helps when camera fails on mobile data)
         { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
         { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
         { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
@@ -428,14 +427,13 @@
     let stream = null, facingMode = 'user', isMuted = false;
     let botCount = 0, realViewers = 0;
     let botSyncTimer = null, botSyncPending = false;
-    let botTimer = null, chatTimer = null, realTimer = null, viewerBotChatTimer = null, botGiftTimer = null;
+    let botTimer = null, chatTimer = null, realTimer = null, viewerBotChatTimer = null;
     let activeLives = [], coins = 0;
-    let peerConnections = {};   // host: viewerId -> PC
-    let viewerPC = null;        // viewer side PC
+    let peerConnections = {};
+    let viewerPC = null;
     let unsubLives = null, unsubViewers = null, unsubViewerRemoved = null, unsubLiveEnd = null, unsubLiveCount = null, unsubChat = null, unsubLiveMeta = null;
     let offerHandled = false;
 
-    // Gifts
     const GIFTS = [
       {emoji:'🌹',name:'Rose',cost:1},{emoji:'❤️',name:'Heart',cost:5},{emoji:'🍭',name:'Lollipop',cost:10},
       {emoji:'🍦',name:'Ice Cream',cost:15},{emoji:'🍩',name:'Donut',cost:20},{emoji:'🎈',name:'Balloon',cost:25},
@@ -481,29 +479,26 @@
       {emoji:'👨‍🚀',name:'Astronaut',cost:18000},{emoji:'🌌',name:'Universe',cost:99999}
     ];
 
-    // Name/msg pools
     const adjs=['Cool','Epic','Pro','Shadow','Neon','Cyber','Swift','Fire','Ice','Nova','Turbo','Elite','Ace','Ninja','Pixel','Lucky','Wild','Silent','Blaze','Ghost','Royal','Crystal','Golden','Omega','Alpha','Hyper','Magic','Storm','Jade','Violet'];
     const nouns=['Gamer','Player','Stream','Live','Chat','Fan','Master','Legend','Hero','Star','Soul','Wave','Blade','Flash','Coder','Dev','Cat','Dog','Panda','Wolf','Dragon','Fox','Tiger','Shark','Raven','Owl','Bro','Kid','Pro','Chad'];
     const tags=['','123','99','X','XX','69','420','YT','TV','GG','OP','Live','Pro','77','01'];
     const phrases=['w','W','WW','lets go','LETS GO','hi','hello','hey','yo','sup','first','nice stream','fire','🔥','🔥🔥','💯','👏','❤️','😂','lmao','lol','haha','love this','keep going','what game?','pog','POG','based','cringe','mid','ratio','L','W','drop a like','chat is wild','nice cam','10/10','clip that','aura','rizz','no cap','fr','sheesh','yooo','bussin','goated','skill issue','fyp','peak internet','huge W','hello host','mic check','hype train','day 1 viewer','instant classic','respect','I\'m early','camera good','quality is good','still watching','respect','lag?','fire stream','main character','phone stream still clean'];
     const greetings=['hi','hello','hii','hiii','hi!','hey','yo','sup','hi bro','helloo','hi kobi','hey host','hi everyone','first','im early','hello chat','hi hi','heyyy','wassup','hi there','hola','yo yo','gm','hi stream','joined'];
     const fillers=['omg','bruh','dude','bro','fam','chat','guys','tbh','ngl','fr','idk','lowkey','highkey','sheesh','yooo','bussin','cooked','mid','goated'];
+
     function rand(a){return a[Math.floor(Math.random()*a.length)];}
     function makeName(){return rand(adjs)+rand(nouns)+rand(tags)+(Math.random()<0.35?Math.floor(Math.random()*900+100):'');}
     function makeMsg(){if(Math.random()<0.6)return rand(phrases);const p=[];const n=1+Math.floor(Math.random()*3);for(let i=0;i<n;i++)p.push(Math.random()<0.55?rand(phrases):rand(fillers));if(Math.random()<0.25)p.push(String(Math.floor(Math.random()*99)));return p.join(' ').slice(0,90);}
     const NAMES=[...new Set(Array.from({length:4000},makeName))];
     const MSGS=[...new Set(Array.from({length:6000},makeMsg))];
-    let ni=0,mi=0,chatPhase='greet'; // greet first, then normal
+    let ni=0,mi=0,chatPhase='greet';
     function nextName(){const n=NAMES[ni%NAMES.length];ni++;return ni>NAMES.length?n+Math.floor(Math.random()*50):n;}
     function nextMsg(){
-      // First phase: mostly greetings
-      if(chatPhase==='greet' && Math.random()<0.72){
-        return rand(greetings);
-      }
+      if(chatPhase==='greet' && Math.random()<0.72)return rand(greetings);
       const m=MSGS[mi%MSGS.length];mi++;
       return mi>MSGS.length&&Math.random()<0.3?m+' '+Math.floor(Math.random()*99):m;
     }
-    let botsPerClick=1; // set by B hold menu
+    let botsPerClick=1;
 
     function toast(t,ms=1600){const e=document.getElementById('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),ms);}
     function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
@@ -518,32 +513,27 @@
       return String(Math.floor(n));
     }
 
-    // Coins
     function loadCoins(){
       if(isInfinite){coins=Infinity;updateCoinsUI();return;}
       const key='gl_coins_v2_'+(user?.email||'guest');
       const saved=localStorage.getItem(key);
       coins=saved!==null?parseInt(saved,10):0;
-      if(isNaN(coins)||!isFinite(coins)||coins<0)coins=0;
-      // Older builds could have stored an invalid/infinite admin balance.
-      if(isSpecialUser && saved!==null && !isFinite(Number(saved))) coins=0;
+      if(isNaN(coins)||coins<0)coins=0;
       updateCoinsUI();
     }
     function saveCoins(){if(isInfinite)return;localStorage.setItem('gl_coins_v2_'+(user?.email||'guest'),String(coins));}
     function updateCoinsUI(){document.getElementById('coins-count').textContent=isInfinite?'∞':formatCoins(coins);}
 
-    // Auth
     const btnGoogle=document.getElementById('btn-google');
     btnGoogle.onclick=async()=>{
       btnGoogle.disabled=true;
       try{await signInWithPopup(auth,provider);}
       catch(err){toast(err.code==='auth/popup-closed-by-user'?'Login cancelled':(err.message||'Login failed'));btnGoogle.disabled=false;}
     };
+
     function checkAdmin(){
-      // Method 1: email
       const el=(user?.email||'').toLowerCase();
       if(el===SPECIAL_EMAIL.toLowerCase()||el.includes('kobik8512')||el.includes('kobik')) return true;
-      // Method 2: unlocked via secret PIN (saved forever on this device)
       if(localStorage.getItem('gl_admin_unlock')==='blue007') return true;
       return false;
     }
@@ -557,20 +547,9 @@
           picture:fu.photoURL
         };
         isSpecialUser=checkAdmin();
-        // Admin now uses the normal coin economy too. Keep the B/admin tools,
-        // but do not grant infinite coins.
-        isInfinite=false;
+        isInfinite=isSpecialUser;
         document.getElementById('display-name').textContent=user.name+(isSpecialUser?' 🔑':'');
-        loadCoins();
-        // One-time migration: the old build gave the admin infinite coins.
-        // Start the new economy at exactly 0, then keep earned coins normally.
-        if(isSpecialUser && localStorage.getItem('gl_admin_coin_reset_v1')!=='1'){
-          coins=0;
-          saveCoins();
-          updateCoinsUI();
-          localStorage.setItem('gl_admin_coin_reset_v1','1');
-        }
-        show('menu');listenToLives();
+        loadCoins();show('menu');listenToLives();
         toast(isSpecialUser?'Signed in as Admin 🔑':'Signed in as '+user.name);
         btnGoogle.disabled=false;
       } else {
@@ -578,7 +557,6 @@
       }
     });
 
-    // Secret: tap "Signed in as" 5 times → enter PIN blue007 to unlock admin forever on this phone
     let tapCount=0,tapTimer=null;
     document.getElementById('display-name').parentElement.addEventListener('click',()=>{
       tapCount++;
@@ -589,30 +567,28 @@
         const pin=prompt('Enter admin PIN:');
         if(pin==='blue007'){
           localStorage.setItem('gl_admin_unlock','blue007');
-          isSpecialUser=true;isInfinite=false;
+          isSpecialUser=true;isInfinite=true;
           loadCoins();
           document.getElementById('display-name').textContent=(user?.name||'')+' 🔑';
-          toast('Admin unlocked! 0 starting coins + B button');
+          toast('Admin unlocked! ∞ coins + B button');
         } else if(pin!==null){
           toast('Wrong PIN');
         }
       }
     });
+
     document.getElementById('btn-signout').onclick=async()=>{
       try{if(currentLiveId&&isHost)await endLiveInDb();await signOut(auth);toast('Signed out');}catch(e){toast('Sign out failed');}
     };
+
     document.getElementById('btn-clear').onclick=async()=>{
       if(!isSpecialUser){toast('Only admin can clear');return;}
       try{await remove(ref(db,'lives'));toast('Cleared all lives');}catch(e){toast('Clear failed');}
     };
 
-    // Lives list
     function listenToLives(){
       if(unsubLives)unsubLives();
       unsubLives=onValue(ref(db,'lives'),(snap)=>{
-        // Do not rebuild the menu while a live room is open. The lives tree
-        // also contains chat/signaling data, so rebuilding from it on every
-        // message wastes work and can compete with WebRTC on mobile.
         if(document.getElementById('live-room').classList.contains('active'))return;
         activeLives=[];
         const val=snap.val()||{};
@@ -620,398 +596,13 @@
           const live=val[id]||{};
           activeLives.push({
             id,title:live.title,host:live.host,hostEmail:live.hostEmail,
-            viewers:live.viewerCount||0,botCount:live.botCount||0,hostUid:live.hostUid||'' ,startedAt:live.startedAt||0
+            viewers:live.viewerCount||0,botCount:live.botCount||0,hostUid:live.hostUid||'',startedAt:live.startedAt||0
           });
         });
         activeLives.sort((a,b)=>(b.startedAt||0)-(a.startedAt||0));
         renderLives();
       });
-    }
-    function pauseLivesListener(){
-      if(typeof unsubLives==='function'){
-        try{unsubLives();}catch(e){}
-        unsubLives=null;
-      }
-    }
-
-    function renderLives(){
-      const list=document.getElementById('lives-list');
-      const empty=document.getElementById('empty-state');
-      list.querySelectorAll('.live-card').forEach(c=>c.remove());
-      if(!activeLives.length){empty.style.display='block';return;}
-      empty.style.display='none';
-      activeLives.forEach(live=>{
-        // Ownership must use the Firebase Auth UID.  Keep this check strict so
-        // only the actual host gets the X/end-live button after a refresh.
-        const isMine=!!(user?.uid && live?.hostUid && live.hostUid===user.uid);
-        const card=document.createElement('div');
-        card.className='live-card';
-        card.innerHTML=`
-          <div class="live-info">
-            <div class="live-name">${esc(live.title)}</div>
-            <div class="live-meta"><span class="dot"></span>${esc(live.host)} · ${format(live.viewers)} watching</div>
-          </div>
-          ${isMine?`<button class="btn-x-small" data-remove="${live.id}" title="End live">✕</button>`:''}
-          <button class="btn-join" data-join="${live.id}">Join</button>`;
-        list.appendChild(card);
-      });
-      list.querySelectorAll('[data-join]').forEach(btn=>{
-        btn.onclick=()=>{const live=activeLives.find(l=>l.id===btn.dataset.join);if(live)joinViewer(live);};
-      });
-      list.querySelectorAll('[data-remove]').forEach(btn=>{
-        btn.onclick=async()=>{
-          const live=activeLives.find(l=>l.id===btn.dataset.remove);
-          if(!live || !user?.uid || live.hostUid!==user.uid){
-            toast('Only the host can end this live');
-            return;
-          }
-          try{
-            await remove(ref(db,'lives/'+btn.dataset.remove));
-          }catch(e){toast('Remove failed');}
-        };
-      });
-    }
-    async function endLiveInDb(){
-      if(!currentLiveId)return;
-      try{await remove(ref(db,'lives/'+currentLiveId));}catch(e){}
-      currentLiveId=null;
-    }
-
-    // Go Live
-    document.getElementById('btn-go-live').onclick=()=>{
-      if(!user)return;
-      pendingLiveMode=null;
-      document.getElementById('mode-modal').classList.add('show');
-    };
-    document.getElementById('mode-cancel').onclick=()=>document.getElementById('mode-modal').classList.remove('show');
-    document.getElementById('mode-irl').onclick=()=>{
-      pendingLiveMode='irl';
-      document.getElementById('mode-modal').classList.remove('show');
-      document.getElementById('title-input').value='';
-      document.getElementById('title-modal').classList.add('show');
-      setTimeout(()=>document.getElementById('title-input').focus(),80);
-    };
-    document.getElementById('mode-game').onclick=()=>{
-      // IMPORTANT: Android Chrome currently does not expose getDisplayMedia().
-      // Do not pretend Game Live can work there; the browser itself must provide
-      // the screen-capture API. IRL camera live remains unchanged.
-      const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');
-      const canScreenShare=!!navigator.mediaDevices?.getDisplayMedia;
-      if(isMobile && !canScreenShare){
-        toast('Game Live screen sharing is not available in this mobile browser. Use desktop Chrome/Edge/Firefox, or a native app.');
-        return;
-      }
-      if(!canScreenShare){
-        toast('Game Live needs a browser with screen sharing support.');
-        return;
-      }
-      pendingLiveMode='game';
-      document.getElementById('mode-modal').classList.remove('show');
-      document.getElementById('title-input').value='';
-      document.getElementById('title-modal').classList.add('show');
-      setTimeout(()=>document.getElementById('title-input').focus(),80);
-    };
-    document.getElementById('btn-cancel').onclick=()=>document.getElementById('title-modal').classList.remove('show');
-    document.getElementById('btn-start').onclick=startLive;
-    document.getElementById('title-input').onkeydown=e=>{if(e.key==='Enter')startLive();};
-
-    async function startLive(){
-      if(!user?.uid){toast('Please sign in again');return;}
-      liveTitle=document.getElementById('title-input').value.trim()||(user.name+"'s Live");
-      document.getElementById('title-modal').classList.remove('show');
-      isHost=true;botCount=0;realViewers=0;ni=0;mi=0;chatPhase='greet';botsPerClick=botsPerClick||1;
-      peerConnections={};
-
-      liveMode=pendingLiveMode||'irl';
-      pendingLiveMode=null;
-
-      // IRL keeps the existing camera path untouched. Game Live uses a separate
-      // screen-share path and combines the shared screen video with the host mic.
-      const mediaOk=liveMode==='game'?await startGameShare():await startCam();
-      if(!mediaOk){
-        isHost=false;
-        currentLiveId=null;
-        return;
-      }
-
-      currentLiveId='l'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-      try{
-        await set(ref(db,'lives/'+currentLiveId),{
-          title:liveTitle,host:user.name,hostEmail:user.email,hostUid:user.uid,
-          viewerCount:0,botCount:0,mode:liveMode,startedAt:Date.now()
-        });
-      }catch(e){
-        console.error('Could not publish live:',e);
-        stopCam();
-        isHost=false;
-        const code=e?.code||'';
-        const msg=String(e?.message||'').replace(/^FirebaseError:\s*/,'');
-        toast(code==='PERMISSION_DENIED'||/permission_denied/i.test(msg)
-          ? 'Live publish blocked by Firebase rules for this account.'
-          : 'Could not publish live'+(msg?' ('+msg+')':''));
-        currentLiveId=null;
-        return;
-      }
-
-      document.getElementById('btn-b').style.display=isSpecialUser?'flex':'none';
-      applyLiveModeUI();
-      updateCount();
-      document.getElementById('live-title-text').textContent=liveTitle;
-      document.getElementById('chat-list').innerHTML='';
-      document.getElementById('mic-status').textContent='Mic: listening...';
-      document.getElementById('mic-status').style.color='var(--green)';
-      document.getElementById('remote-video').style.display='none';
-      document.getElementById('cam-off').style.display='none';
-      pauseLivesListener();
-      show('live-room');
-      if(isSpecialUser)startBots();
-      stopRealSim();
-      listenForViewers();
-      listenToChat(currentLiveId);
-      listenForGifts(currentLiveId);
-    }
-
-    // ============ WEBRTC ============
-    async function startGameShare(){
-      // Keep the working IRL camera path completely separate.
-      if(!navigator.mediaDevices?.getDisplayMedia){
-        const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');
-        toast(isMobile
-          ? 'This mobile browser cannot share the screen. Game Live needs a native app or a supported desktop browser.'
-          : 'Screen sharing is not supported in this browser.');
-        return false;
-      }
-      try{
-        // Must be called from the Go Live button flow so mobile browsers allow it.
-        screenStream=await navigator.mediaDevices.getDisplayMedia({
-          video:{frameRate:{ideal:30,max:60}},
-          audio:false
-        });
-        // Microphone is requested separately so viewers hear the host even when
-        // the browser does not expose system audio from screen capture.
-        screenMicStream=await navigator.mediaDevices.getUserMedia({
-          audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},
-          video:false
-        });
-        const videoTracks=screenStream.getVideoTracks();
-        const audioTracks=screenMicStream.getAudioTracks();
-        if(!videoTracks.length||!audioTracks.length)throw new Error('Screen or microphone track missing');
-        stream=new MediaStream([...videoTracks,...audioTracks]);
-
-        const vid=document.getElementById('local-video');
-        vid.srcObject=stream;vid.style.display='block';vid.muted=true;vid.autoplay=true;vid.playsInline=true;
-        document.getElementById('cam-off').style.display='none';
-        document.getElementById('btn-mic').textContent='🎤';
-        document.getElementById('btn-mic').classList.remove('muted');
-        try{await vid.play();}catch(e){}
-
-        videoTracks[0].addEventListener('ended',()=>{
-          if(isHost&&liveMode==='game'&&currentLiveId){
-            toast('Screen sharing stopped');
-            stopLive();
-          }
-        });
-        return true;
-      }catch(e){
-        console.error('getDisplayMedia failed:',e);
-        stopGameShare();
-        const name=e?.name||'';
-        toast(name==='NotAllowedError'?'Screen sharing cancelled.':'Could not start screen sharing.');
-        return false;
-      }
-    }
-    function stopGameShare(){
-      if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null;}
-      if(screenMicStream){screenMicStream.getTracks().forEach(t=>t.stop());screenMicStream=null;}
-    }
-
-    function applyLiveModeUI(){
-      const room=document.getElementById('live-room');
-      room.classList.toggle('game-mode',liveMode==='game');
-      room.classList.remove('game-chat-closed');
-      document.getElementById('game-b').style.display=isSpecialUser?'flex':'none';
-      document.getElementById('game-mic').style.display=(isHost&&liveMode==='game')?'flex':'none';
-      document.getElementById('game-leave').style.display='flex';
-      document.getElementById('game-panel-head').style.display=liveMode==='game'?'flex':'none';
-      if(liveMode!=='game')room.classList.remove('game-chat-closed');
-    }
-
-    function closeGameChat(){
-      if(liveMode!=='game')return;
-      document.getElementById('live-room').classList.add('game-chat-closed');
-    }
-    function openGameChat(){
-      if(liveMode!=='game')return;
-      document.getElementById('live-room').classList.remove('game-chat-closed');
-    }
-
-    document.getElementById('game-chat-close').onclick=(e)=>{e.stopPropagation();closeGameChat();};
-    document.getElementById('game-leave').onclick=()=>stopLive();
-    document.getElementById('game-mic').onclick=()=>document.getElementById('btn-mic').click();
-    document.getElementById('game-b').onclick=()=>document.getElementById('btn-b').dispatchEvent(new PointerEvent('pointerup',{bubbles:true}));
-    document.getElementById('live-room').querySelector('.live-pill').onclick=()=>{
-      if(liveMode==='game'&&document.getElementById('live-room').classList.contains('game-chat-closed'))openGameChat();
-    };
-
-    // Make the game chat box draggable without interfering with chat scrolling.
-    (()=>{
-      const room=document.getElementById('live-room'),panel=document.querySelector('#live-room .chat-wrap'),head=document.getElementById('game-panel-head');
-      let drag=false,startX=0,startY=0,startL=0,startT=0;
-      head.addEventListener('pointerdown',e=>{
-        if(liveMode!=='game'||e.target.closest('button'))return;
-        drag=true;head.setPointerCapture?.(e.pointerId);
-        const r=panel.getBoundingClientRect();startX=e.clientX;startY=e.clientY;startL=r.left;startT=r.top;
-      });
-      head.addEventListener('pointermove',e=>{
-        if(!drag)return;
-        const maxL=Math.max(8,innerWidth-panel.offsetWidth-8),maxT=Math.max(8,innerHeight-panel.offsetHeight-8);
-        panel.style.left=Math.max(8,Math.min(maxL,startL+e.clientX-startX))+'px';
-        panel.style.top=Math.max(8,Math.min(maxT,startT+e.clientY-startY))+'px';
-        panel.style.right='auto';panel.style.bottom='auto';
-      });
-      head.addEventListener('pointerup',()=>{drag=false;});
-      head.addEventListener('pointercancel',()=>{drag=false;});
-    })();
-
-    async function startCam(){
-      stopCam();
-      const vid=document.getElementById('local-video');
-      const off=document.getElementById('cam-off');
-      if(!navigator.mediaDevices?.getUserMedia){
-        vid.style.display='none';off.style.display='block';
-        toast('Camera requires HTTPS and browser camera support.');
-        return false;
-      }
-      try{
-        stream=await navigator.mediaDevices.getUserMedia({
-          video:{facingMode:{ideal:facingMode},width:{ideal:1280},height:{ideal:720}},
-          audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}
-        });
-        vid.srcObject=stream;vid.style.display='block';off.style.display='none';
-        vid.muted=true;vid.autoplay=true;vid.playsInline=true;isMuted=false;
-        vid.classList.remove('mirror');
-        if(facingMode==='user') vid.classList.add('mirror');
-        else vid.classList.remove('mirror');
-        document.getElementById('btn-mic').textContent='🎤';
-        document.getElementById('btn-mic').classList.remove('muted');
-        try{await vid.play();}catch(e){}
-
-        // If a viewer somehow connected while the camera was restarting,
-        // replace/add the fresh tracks instead of leaving the old connection
-        // without video/audio.
-        Object.entries(peerConnections).forEach(([viewerKey,pc])=>{
-          if(pc.signalingState==='closed')return;
-          stream.getTracks().forEach(track=>{
-            const sender=pc.getSenders().find(s=>s.track&&s.track.kind===track.kind);
-            if(sender) sender.replaceTrack(track).catch(()=>{});
-            else pc.addTrack(track,stream);
-          });
-        });
-        return true;
-      }catch(e){
-        console.error('getUserMedia failed:',e);
-        vid.style.display='none';off.style.display='block';
-        return false;
-      }
-    }
-    function stopCam(){
-      if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
-      document.getElementById('local-video').srcObject=null;
-    }
-
-    // Host: listen for real viewers and create peer connections.
-    // Bot counts live in /botCount, while real viewers are represented by
-    // /viewers. Keeping those separate prevents a viewer adding bots from
-    // being overwritten by the host's local counter.
-    function listenForViewers(){
-      if(unsubViewers)unsubViewers();
-      const viewersRef=ref(db,'lives/'+currentLiveId+'/viewers');
-      realViewers=0;
-      unsubViewers=onChildAdded(viewersRef,async(snap)=>{
-        realViewers++;
-        scheduleViewerCountSync();
-        const vid=snap.key;
-        if(peerConnections[vid])return;
-        await createHostPeer(vid);
-      });
-      unsubViewerRemoved=onChildRemoved(viewersRef,(snap)=>{
-        realViewers=Math.max(0,realViewers-1);
-        scheduleViewerCountSync();
-        const vid=snap.key;
-        if(peerConnections[vid]){
-          peerConnections[vid].close();
-          delete peerConnections[vid];
-        }
-      });
-
-      // Watch botCount changes made by other users/admins.
-      if(unsubLiveMeta)unsubLiveMeta();
-      unsubLiveMeta=onValue(ref(db,'lives/'+currentLiveId+'/botCount'),(snap)=>{
-        const data=snap.val();
-        if(!isHost || currentLiveId===null)return;
-        const remoteBots=Math.max(0,Math.floor(Number(data)||0));
-        if(remoteBots!==botCount){
-          botCount=remoteBots;
-          scheduleViewerCountSync();
-        }
-        updateCountDisplay(botCount+realViewers);
-      });
-    }
-
-    async function createHostPeer(viewerId){
-      // Wait briefly for camera if not ready yet
-      for(let i=0;i<100&&!stream;i++) await new Promise(r=>setTimeout(r,100));
-
-      const pc=new RTCPeerConnection({...ICE_SERVERS, iceCandidatePoolSize:10});
-      peerConnections[viewerId]=pc;
-      let recoveryTimer=null;
-      pc.onconnectionstatechange=()=>{
-        if(pc.connectionState==='failed' || pc.iceConnectionState==='failed'){
-          clearTimeout(recoveryTimer);
-          recoveryTimer=setTimeout(()=>{
-            if(peerConnections[viewerId]===pc && currentLiveId && isHost){
-              try{pc.restartIce?.();}catch(e){}
-            }
-          },1200);
-        }
-      };
-
-      if(stream){
-        stream.getTracks().forEach(track=>pc.addTrack(track,stream));
-      } else {
-        console.warn('No stream when creating peer');
-      }
-
-      let iceQ=[], iceT=null, hostRemoteReady=false, pendingViewerCandidates=[];
-      pc.onicecandidate=e=>{
-        if(!e.candidate)return;
-        iceQ.push(e.candidate.toJSON());
-        if(!iceT){
-          iceT=setTimeout(()=>{
-            iceQ.forEach(c=>push(ref(db,`lives/${currentLiveId}/signals/${viewerId}/hostCandidates`),c).catch(()=>{}));
-            iceQ=[];iceT=null;
-          },250);
-        }
-      };
-
-      // Listen for answer from this viewer (once)
-      let answerDone=false;
-      onValue(ref(db,`lives/${currentLiveId}/signals/${viewerId}/answer`),(snap)=>{
-        const answer=snap.val();
-        if(!answer||answerDone||pc.signalingState==='closed')return;
-        answerDone=true;
-        pc.setRemoteDescription(new RTCSessionDescription(answer)).then(()=>{
-          hostRemoteReady=true;
-          const pending=pendingViewerCandidates.splice(0);
-          pending.forEach(c=>pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{}));
-        }).catch(()=>{answerDone=false;});
-      });
-
-      // Listen for ICE from viewer
-      onChildAdded(ref(db,`lives/${currentLiveId}/signals/${viewerId}/viewerCandidates`),(snap)=>{
-        const c=snap.val();
-        if(!c)return;
-        if(hostRemoteReady) pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
+    }        if(hostRemoteReady) pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
         else pendingViewerCandidates.push(c);
       });
 
@@ -1044,10 +635,6 @@
 
       viewerId='v'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
 
-      // Keep the WebRTC connection isolated from chat/gifts/signaling data.
-      // Listening to the whole live node makes Firebase resend the entire
-      // subtree on every chat message, which can overload mobile clients and
-      // make the camera appear to disappear. Watch only tiny scalar paths.
       const liveTitleRef=ref(db,`lives/${live.id}/title`);
       const liveCountRef=ref(db,`lives/${live.id}/viewerCount`);
       const liveBotCountRef=ref(db,`lives/${live.id}/botCount`);
@@ -1059,13 +646,16 @@
           forceLeaveLive('Live ended by host');
         }
       });
+
       unsubLiveCount=onValue(liveCountRef,(snap)=>{
         if(currentLiveId===live.id && !isHost){
           liveCountCache=Number(snap.val())||0;
           updateCountDisplay(liveCountCache+liveBotCountCache);
         }
       });
+
       if(unsubLiveMeta)try{unsubLiveMeta();}catch(e){}
+
       unsubLiveMeta=onValue(liveBotCountRef,(snap)=>{
         if(currentLiveId===live.id && !isHost){
           liveBotCountCache=Number(snap.val())||0;
@@ -1073,27 +663,33 @@
           updateCountDisplay(liveCountCache+liveBotCountCache);
         }
       });
+
       listenToChat(live.id);
 
-      if(viewerPC){try{viewerPC.close();}catch(e){} viewerPC=null;}
+      if(viewerPC){
+        try{viewerPC.close();}catch(e){}
+        viewerPC=null;
+      }
+
       viewerPC=new RTCPeerConnection({...ICE_SERVERS, iceCandidatePoolSize:10});
 
       viewerPC.ontrack=async(e)=>{
         const remoteVid=document.getElementById('remote-video');
+
         remoteVid.autoplay=true;
         remoteVid.playsInline=true;
         remoteVid.muted=false;
         remoteVid.volume=1;
 
-        // Prefer the MediaStream supplied by WebRTC. This is more reliable on
-        // mobile Safari/Chrome than rebuilding a stream track-by-track.
         if(e.streams && e.streams[0]){
           remoteVid.srcObject=e.streams[0];
         }else{
           if(!remoteVid.srcObject || !(remoteVid.srcObject instanceof MediaStream)){
             remoteVid.srcObject=new MediaStream();
           }
+
           const targetStream=remoteVid.srcObject;
+
           if(e.track && !targetStream.getTracks().some(t=>t.id===e.track.id)){
             targetStream.addTrack(e.track);
           }
@@ -1103,85 +699,141 @@
         document.getElementById('cam-off').style.display='none';
         document.getElementById('mic-status').textContent='Connected';
         document.getElementById('mic-status').style.color='var(--green)';
-        try{ await remoteVid.play(); }catch(err){
-          // Autoplay may be blocked until the user taps the page. The video
-          // element remains ready and will play on the next user gesture.
+
+        try{
+          await remoteVid.play();
+        }catch(err){
+          // Autoplay may be blocked until the user taps the page.
         }
       };
+
       document.getElementById('remote-video').onloadedmetadata=()=>{
         const v=document.getElementById('remote-video');
         v.style.display='block';
         document.getElementById('cam-off').style.display='none';
         v.play().catch(()=>{});
       };
+
       viewerPC.onconnectionstatechange=()=>{
         if(viewerPC.connectionState==='connected'){
           document.getElementById('remote-video').style.display='block';
           document.getElementById('cam-off').style.display='none';
           document.getElementById('mic-status').textContent='Connected';
           document.getElementById('mic-status').style.color='var(--green)';
-        } else if(viewerPC.connectionState==='failed'){
-          // Do not hide the last good camera frame just because Firebase chat
-          // or bot-count traffic is busy. The connection can recover.
+        }
+
+        else if(viewerPC.connectionState==='failed'){
           document.getElementById('mic-status').textContent='Reconnecting...';
-          document.getElementById('mic-status').style.color='var(--muted)';
+          document.getElementById('mic-status').style.color='var(--muted');
+
           setTimeout(()=>{
-            if(viewerPC&&viewerPC.connectionState==='failed'){
+            if(viewerPC && viewerPC.connectionState==='failed'){
               viewerPC.restartIce?.();
             }
           },1000);
-        } else if(viewerPC.connectionState==='disconnected'){
+        }
+
+        else if(viewerPC.connectionState==='disconnected'){
           document.getElementById('mic-status').textContent='Reconnecting...';
           document.getElementById('mic-status').style.color='var(--muted)';
         }
       };
 
-      // Throttle ICE writes to avoid flooding Firebase (causes freeze)
-      let iceQueue=[], iceTimer=null, viewerRemoteReady=false, pendingHostCandidates=[];
+      // Throttle ICE writes to avoid flooding Firebase
+      let iceQueue=[],iceTimer=null,viewerRemoteReady=false,pendingHostCandidates=[];
+
       viewerPC.onicecandidate=e=>{
         if(!e.candidate)return;
+
         iceQueue.push(e.candidate.toJSON());
+
         if(!iceTimer){
           iceTimer=setTimeout(()=>{
-            iceQueue.forEach(c=>push(ref(db,`lives/${live.id}/signals/${viewerId}/viewerCandidates`),c).catch(()=>{}));
-            iceQueue=[];iceTimer=null;
+            iceQueue.forEach(c=>
+              push(
+                ref(db,`lives/${live.id}/signals/${viewerId}/viewerCandidates`),
+                c
+              ).catch(()=>{})
+            );
+
+            iceQueue=[];
+            iceTimer=null;
           },300);
         }
       };
 
-      // Wait for host offer — only handle once
-      onValue(ref(db,`lives/${live.id}/signals/${viewerId}/offer`),async(snap)=>{
-        const offer=snap.val();
-        if(!offer||!viewerPC||offerHandled)return;
-        if(viewerPC.signalingState==='closed')return;
-        offerHandled=true;
-        try{
-          await viewerPC.setRemoteDescription(new RTCSessionDescription(offer));
-          viewerRemoteReady=true;
-          const pending=pendingHostCandidates.splice(0);
-          pending.forEach(c=>viewerPC.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{}));
-          const answer=await viewerPC.createAnswer();
-          await viewerPC.setLocalDescription(answer);
-          await set(ref(db,`lives/${live.id}/signals/${viewerId}/answer`),{
-            type:answer.type,sdp:answer.sdp
-          });
-        }catch(e){console.error('Viewer answer failed',e);offerHandled=false;}
-      });
+      // Wait for host offer
+      onValue(
+        ref(db,`lives/${live.id}/signals/${viewerId}/offer`),
+        async(snap)=>{
+          const offer=snap.val();
 
-      onChildAdded(ref(db,`lives/${live.id}/signals/${viewerId}/hostCandidates`),(snap)=>{
-        const c=snap.val();
-        if(!c||!viewerPC)return;
-        if(viewerRemoteReady) viewerPC.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
-        else pendingHostCandidates.push(c);
-      });
+          if(!offer || !viewerPC || offerHandled)return;
+          if(viewerPC.signalingState==='closed')return;
 
-      // Register the viewer only AFTER the offer listener exists. This removes
-      // the small signaling race where the host could publish an offer before
-      // this phone started listening for it.
+          offerHandled=true;
+
+          try{
+            await viewerPC.setRemoteDescription(
+              new RTCSessionDescription(offer)
+            );
+
+            viewerRemoteReady=true;
+
+            const pending=pendingHostCandidates.splice(0);
+
+            pending.forEach(c=>
+              viewerPC.addIceCandidate(
+                new RTCIceCandidate(c)
+              ).catch(()=>{})
+            );
+
+            const answer=await viewerPC.createAnswer();
+
+            await viewerPC.setLocalDescription(answer);
+
+            await set(
+              ref(db,`lives/${live.id}/signals/${viewerId}/answer`),
+              {
+                type:answer.type,
+                sdp:answer.sdp
+              }
+            );
+
+          }catch(e){
+            console.error('Viewer answer failed',e);
+            offerHandled=false;
+          }
+        }
+      );
+
+      onChildAdded(
+        ref(db,`lives/${live.id}/signals/${viewerId}/hostCandidates`),
+        (snap)=>{
+          const c=snap.val();
+
+          if(!c || !viewerPC)return;
+
+          if(viewerRemoteReady){
+            viewerPC.addIceCandidate(
+              new RTCIceCandidate(c)
+            ).catch(()=>{});
+          }else{
+            pendingHostCandidates.push(c);
+          }
+        }
+      );
+
+      // Register viewer only after offer listener exists
       try{
-        await set(ref(db,`lives/${live.id}/viewers/${viewerId}`),{
-          name:user?.name||'Viewer',joinedAt:Date.now()
-        });
+        await set(
+          ref(db,`lives/${live.id}/viewers/${viewerId}`),
+          {
+            name:user?.name||'Viewer',
+            joinedAt:Date.now()
+          }
+        );
+
       }catch(e){
         console.error('Viewer registration failed:',e);
         toast('Could not join this live (Firebase permission).');
@@ -1189,283 +841,611 @@
     }
 
     function cleanupViewerListeners(){
-      if(typeof unsubLiveEnd==='function'){try{unsubLiveEnd();}catch(e){} unsubLiveEnd=null;}
-      if(typeof unsubLiveCount==='function'){try{unsubLiveCount();}catch(e){} unsubLiveCount=null;}
-      if(typeof unsubChat==='function'){try{unsubChat();}catch(e){} unsubChat=null;}
-      if(typeof unsubViewers==='function'){try{unsubViewers();}catch(e){} unsubViewers=null;}
-      if(typeof unsubViewerRemoved==='function'){try{unsubViewerRemoved();}catch(e){} unsubViewerRemoved=null;}
-      if(typeof unsubLiveMeta==='function'){try{unsubLiveMeta();}catch(e){} unsubLiveMeta=null;}
+      if(typeof unsubLiveEnd==='function'){
+        try{unsubLiveEnd();}catch(e){}
+        unsubLiveEnd=null;
+      }
+
+      if(typeof unsubLiveCount==='function'){
+        try{unsubLiveCount();}catch(e){}
+        unsubLiveCount=null;
+      }
+
+      if(typeof unsubChat==='function'){
+        try{unsubChat();}catch(e){}
+        unsubChat=null;
+      }
+
+      if(typeof unsubViewers==='function'){
+        try{unsubViewers();}catch(e){}
+        unsubViewers=null;
+      }
+
+      if(typeof unsubViewerRemoved==='function'){
+        try{unsubViewerRemoved();}catch(e){}
+        unsubViewerRemoved=null;
+      }
+
+      if(typeof unsubLiveMeta==='function'){
+        try{unsubLiveMeta();}catch(e){}
+        unsubLiveMeta=null;
+      }
     }
 
     function forceLeaveLive(msg){
       cleanupViewerListeners();
-      clearTimeout(viewerCountSyncTimer);viewerCountSyncTimer=null;
-      clearTimeout(botDeltaTimer);botDeltaTimer=null;pendingBotDelta=0;
-      stopCam();stopGameShare();stopBots();stopRealSim();
-      if(viewerPC){try{viewerPC.close();}catch(e){} viewerPC=null;}
-      Object.values(peerConnections).forEach(pc=>{try{pc.close();}catch(e){}});
+
+      clearTimeout(viewerCountSyncTimer);
+      viewerCountSyncTimer=null;
+
+      clearTimeout(botDeltaTimer);
+      botDeltaTimer=null;
+      pendingBotDelta=0;
+
+      stopCam();
+      stopGameShare();
+      stopBots();
+      stopRealSim();
+
+      if(viewerPC){
+        try{viewerPC.close();}catch(e){}
+        viewerPC=null;
+      }
+
+      Object.values(peerConnections).forEach(pc=>{
+        try{pc.close();}catch(e){}
+      });
+
       peerConnections={};
-      const leftId=currentLiveId, leftViewer=viewerId;
-      isHost=false;botCount=0;realViewers=0;viewerId=null;currentLiveId=null;offerHandled=false;
+
+      const leftId=currentLiveId;
+      const leftViewer=viewerId;
+
+      isHost=false;
+      botCount=0;
+      realViewers=0;
+      viewerId=null;
+      currentLiveId=null;
+      offerHandled=false;
+
       document.getElementById('remote-video').srcObject=null;
       document.getElementById('remote-video').style.display='none';
-      if(leftViewer&&leftId){
-        remove(ref(db,`lives/${leftId}/viewers/${leftViewer}`)).catch(()=>{});
+
+      if(leftViewer && leftId){
+        remove(
+          ref(db,`lives/${leftId}/viewers/${leftViewer}`)
+        ).catch(()=>{});
       }
+
       show('menu');
       pauseLivesListener();
       listenToLives();
+
       toast(msg||'Live ended');
     }
 
     // Controls
     document.getElementById('btn-mic').onclick=()=>{
-      if(!isHost||!stream)return;
+      if(!isHost || !stream)return;
+
       isMuted=!isMuted;
-      stream.getAudioTracks().forEach(t=>t.enabled=!isMuted);
+
+      stream.getAudioTracks().forEach(
+        t=>t.enabled=!isMuted
+      );
+
       const btn=document.getElementById('btn-mic');
+
       btn.textContent=isMuted?'🔇':'🎤';
       btn.classList.toggle('muted',isMuted);
-      document.getElementById('mic-status').textContent=isMuted?'Mic: muted':'Mic: listening...';
-      document.getElementById('mic-status').style.color=isMuted?'var(--danger)':'var(--green)';
+
+      document.getElementById('mic-status').textContent=
+        isMuted?'Mic: muted':'Mic: listening...';
+
+      document.getElementById('mic-status').style.color=
+        isMuted?'var(--danger)':'var(--green)';
+
       toast(isMuted?'Muted':'Mic on');
     };
+
     document.getElementById('btn-flip').onclick=async()=>{
       if(!isHost)return;
-      facingMode=facingMode==='user'?'environment':'user';
+
+      facingMode=
+        facingMode==='user'
+          ?'environment'
+          :'user';
+
       await startCam();
-      toast(facingMode==='user'?'Front camera':'Back camera');
+
+      toast(
+        facingMode==='user'
+          ?'Front camera'
+          :'Back camera'
+      );
     };
+
     document.getElementById('btn-leave').onclick=()=>stopLive();
 
     async function stopLive(){
       cleanupViewerListeners();
-      clearTimeout(viewerCountSyncTimer);viewerCountSyncTimer=null;
-      clearTimeout(botDeltaTimer);botDeltaTimer=null;pendingBotDelta=0;
-      stopCam();stopGameShare();stopBots();stopRealSim();
-      Object.values(peerConnections).forEach(pc=>{try{pc.close();}catch(e){}});
+
+      clearTimeout(viewerCountSyncTimer);
+      viewerCountSyncTimer=null;
+
+      clearTimeout(botDeltaTimer);
+      botDeltaTimer=null;
+      pendingBotDelta=0;
+
+      stopCam();
+      stopGameShare();
+      stopBots();
+      stopRealSim();
+
+      Object.values(peerConnections).forEach(pc=>{
+        try{pc.close();}catch(e){}
+      });
+
       peerConnections={};
-      if(viewerPC){try{viewerPC.close();}catch(e){} viewerPC=null;}
-      if(viewerId&&currentLiveId&&!isHost){
-        try{await remove(ref(db,`lives/${currentLiveId}/viewers/${viewerId}`));}catch(e){}
+
+      if(viewerPC){
+        try{viewerPC.close();}catch(e){}
+        viewerPC=null;
       }
+
+      if(viewerId && currentLiveId && !isHost){
+        try{
+          await remove(
+            ref(db,`lives/${currentLiveId}/viewers/${viewerId}`)
+          );
+        }catch(e){}
+      }
+
       if(isHost)await endLiveInDb();
-      isHost=false;botCount=0;realViewers=0;viewerId=null;currentLiveId=null;offerHandled=false;
+
+      isHost=false;
+      botCount=0;
+      realViewers=0;
+      viewerId=null;
+      currentLiveId=null;
+      offerHandled=false;
+
       document.getElementById('remote-video').srcObject=null;
       document.getElementById('remote-video').style.display='none';
-      document.getElementById('live-room').classList.remove('game-mode','game-chat-closed');
+
+      document.getElementById('live-room')
+        .classList.remove('game-mode','game-chat-closed');
+
       document.querySelector('#live-room .chat-wrap').style.left='';
       document.querySelector('#live-room .chat-wrap').style.top='';
       document.querySelector('#live-room .chat-wrap').style.right='';
       document.querySelector('#live-room .chat-wrap').style.bottom='';
+
       show('menu');
       pauseLivesListener();
       listenToLives();
+
       toast('Live ended');
     }
 
-    // Viewers count. The displayed/published count is derived from the
-    // shared botCount plus actual viewer connections. Writes are throttled so
-    // rapid bot joins/leaves cannot hammer Firebase or interfere with WebRTC.
+    // Viewers count
     function updateCount(){
-      const total=Math.max(0,Math.floor(Number(botCount)+Number(realViewers))||0);
+      const total=
+        Math.max(
+          0,
+          Math.floor(
+            Number(botCount)+Number(realViewers)
+          )||0
+        );
+
       updateCountDisplay(total);
-      if(isHost&&currentLiveId)scheduleViewerCountSync();
+
+      if(isHost && currentLiveId)
+        scheduleViewerCountSync();
     }
 
     let viewerCountSyncTimer=null;
+
     function scheduleViewerCountSync(){
-      if(!currentLiveId||!isSpecialUser)return;
+      if(!currentLiveId || !isSpecialUser)return;
+
       clearTimeout(viewerCountSyncTimer);
+
       viewerCountSyncTimer=setTimeout(()=>{
         viewerCountSyncTimer=null;
-        const total=Math.max(0,Math.floor(Number(botCount)+Number(realViewers))||0);
-        update(ref(db,'lives/'+currentLiveId),{viewerCount:Math.max(0,Math.floor(Number(realViewers)||0)),botCount:Math.max(0,Math.floor(Number(botCount)||0))}).catch(()=>{});
+
+        const total=
+          Math.max(
+            0,
+            Math.floor(
+              Number(botCount)+Number(realViewers)
+            )||0
+          );
+
+        update(
+          ref(db,'lives/'+currentLiveId),
+          {
+            viewerCount:Math.max(
+              0,
+              Math.floor(Number(realViewers)||0)
+            ),
+
+            botCount:Math.max(
+              0,
+              Math.floor(Number(botCount)||0)
+            )
+          }
+        ).catch(()=>{});
+
       },250);
     }
+
     function updateCountDisplay(n){
-      document.getElementById('watchers-text').textContent=format(n)+' watching';
+      document.getElementById('watchers-text').textContent=
+        format(n)+' watching';
     }
 
-    // Mobile browsers can reject an unmuted remote video until the user has
-    // interacted with the page. Retry playback on the next tap without ever
-    // replacing the active WebRTC MediaStream.
-    document.addEventListener('pointerdown',()=>{
-      const v=document.getElementById('remote-video');
-      if(v && v.srcObject) v.play().catch(()=>{});
-    },{passive:true});
+    // Retry remote video playback after user interaction
+    document.addEventListener(
+      'pointerdown',
+      ()=>{
+        const v=document.getElementById('remote-video');
 
-    // B button (only special)
-    // B button: click = add botsPerClick, hold = open amount menu
-    let bHoldTimer=null, bHoldFired=false;
+        if(v && v.srcObject)
+          v.play().catch(()=>{});
+      },
+      {passive:true}
+    );
+
+    // B button
+    // click = add botsPerClick
+    // hold = open amount menu
+    let bHoldTimer=null;
+    let bHoldFired=false;
+
     const btnB=document.getElementById('btn-b');
     const bMenu=document.getElementById('b-menu');
 
     function highlightBMenu(){
       bMenu.querySelectorAll('.b-opt').forEach(o=>{
-        o.classList.toggle('active', Number(o.dataset.amt)===botsPerClick);
+        o.classList.toggle(
+          'active',
+          Number(o.dataset.amt)===botsPerClick
+        );
       });
     }
+
     bMenu.querySelectorAll('.b-opt').forEach(opt=>{
       opt.onclick=(e)=>{
         e.stopPropagation();
-        botsPerClick=Number(opt.dataset.amt)||1;
+
+        botsPerClick=
+          Number(opt.dataset.amt)||1;
+
         highlightBMenu();
+
         bMenu.classList.remove('show');
-        toast('B = +'+format(botsPerClick)+' per click');
+
+        toast(
+          'B = +'+format(botsPerClick)+' per click'
+        );
       };
     });
 
     btnB.addEventListener('pointerdown',(e)=>{
       if(!isSpecialUser)return;
+
       bHoldFired=false;
+
       bHoldTimer=setTimeout(()=>{
         bHoldFired=true;
+
         highlightBMenu();
         bMenu.classList.add('show');
       },450);
     });
+
     btnB.addEventListener('pointerup',async(e)=>{
       clearTimeout(bHoldTimer);
-      if(bHoldFired)return; // menu was opened
+
+      if(bHoldFired)return;
       if(!isSpecialUser)return;
+
       await addBotsBatch(botsPerClick);
     });
-    btnB.addEventListener('pointerleave',()=>clearTimeout(bHoldTimer));
+
+    btnB.addEventListener(
+      'pointerleave',
+      ()=>clearTimeout(bHoldTimer)
+    );
+
     document.addEventListener('click',(e)=>{
-      if(!bMenu.contains(e.target)&&e.target!==btnB) bMenu.classList.remove('show');
+      if(!bMenu.contains(e.target) && e.target!==btnB){
+        bMenu.classList.remove('show');
+      }
     });
 
     let pendingBotDelta=0;
     let botDeltaTimer=null;
 
-    // Queue host-side bot changes and commit them in small batches. This keeps
-    // the bot counter shared between host/viewers without flooding Firebase.
+    // Queue host-side bot changes
     function queueBotDelta(delta){
-      if(!isHost||!currentLiveId)return;
+      if(!isHost || !currentLiveId)return;
+
       delta=Math.trunc(Number(delta)||0);
+
       if(!delta)return;
-      botCount=Math.max(0,botCount+delta);
+
+      botCount=Math.max(
+        0,
+        botCount+delta
+      );
+
       pendingBotDelta+=delta;
+
       updateCount();
-      // If bots were previously at 0, the donation scheduler had no reason
-      // to stay armed. Re-arm it as soon as the first bots arrive.
-      if(botCount>0 && !botGiftTimer) scheduleBotDonation();
+
       if(botDeltaTimer)return;
-      botDeltaTimer=setTimeout(flushBotDelta,300);
+
+      botDeltaTimer=setTimeout(
+        flushBotDelta,
+        300
+      );
     }
 
     async function flushBotDelta(){
       botDeltaTimer=null;
-      if(!isHost||!currentLiveId||!pendingBotDelta)return;
+
+      if(
+        !isHost ||
+        !currentLiveId ||
+        !pendingBotDelta
+      )return;
+
       const liveId=currentLiveId;
       const delta=pendingBotDelta;
+
       pendingBotDelta=0;
+
       try{
-        const result=await runTransaction(ref(db,`lives/${liveId}/botCount`),current=>{
-          const value=Math.max(0,Math.floor(Number(current)||0));
-          return Math.max(0,value+delta);
-        });
+        const result=await runTransaction(
+          ref(db,`lives/${liveId}/botCount`),
+          current=>{
+            const value=
+              Math.max(
+                0,
+                Math.floor(Number(current)||0)
+              );
+
+            return Math.max(
+              0,
+              value+delta
+            );
+          }
+        );
+
         if(liveId===currentLiveId){
-          botCount=Math.max(0,Math.floor(Number(result.snapshot.val())||0));
+          botCount=
+            Math.max(
+              0,
+              Math.floor(
+                Number(result.snapshot.val())||0
+              )
+            );
+
           updateCount();
         }
+
       }catch(e){
-        // Re-read the shared value rather than leaving the UI permanently out
-        // of sync if a transaction is interrupted.
+
         try{
-          const snap=await new Promise(resolve=>onValue(ref(db,`lives/${liveId}/botCount`),resolve,{onlyOnce:true}));
-          if(liveId===currentLiveId)botCount=Math.max(0,Math.floor(Number(snap.val())||0));
+          const snap=
+            await new Promise(resolve=>
+              onValue(
+                ref(db,`lives/${liveId}/botCount`),
+                resolve,
+                {onlyOnce:true}
+              )
+            );
+
+          if(liveId===currentLiveId){
+            botCount=
+              Math.max(
+                0,
+                Math.floor(
+                  Number(snap.val())||0
+                )
+              );
+          }
+
           updateCount();
+
         }catch(_e){}
       }
-      if(pendingBotDelta&&!botDeltaTimer)botDeltaTimer=setTimeout(flushBotDelta,300);
+
+      if(
+        pendingBotDelta &&
+        !botDeltaTimer
+      ){
+        botDeltaTimer=setTimeout(
+          flushBotDelta,
+          300
+        );
+      }
     }
 
     async function addBotsBatch(n){
       n=Math.floor(Number(n))||1;
+
       if(isHost){
+
         queueBotDelta(n);
-        // A few chat lines, not n lines (keeps chat clean).
-        const msgs=Math.min(8, Math.max(1, Math.floor(Math.log10(n+1))+1));
+
+        // Only a few chat lines instead of one line per bot
+        const msgs=
+          Math.min(
+            8,
+            Math.max(
+              1,
+              Math.floor(
+                Math.log10(n+1)
+              )+1
+            )
+          );
+
         for(let i=0;i<msgs;i++){
           const botName=nextName();
           const botText=nextMsg();
-          broadcastBotChat(botName,botText);
+
+          broadcastBotChat(
+            botName,
+            botText
+          );
         }
+
         toast('+'+format(n)+' bots');
-      } else if(currentLiveId){
-        // Do not let a viewer transaction /botCount directly. That commonly
-        // fails under Firebase rules because only the host should own the
-        // shared counter. Send a normal chat write as a hidden bot request;
-        // the host receives it and performs the counter transaction.
-        const amount=Math.max(1,Math.min(1000000,n));
-        const requestRef=push(ref(db,`lives/${currentLiveId}/chat`));
+
+      }else if(currentLiveId){
+
+        // Viewer requests bots through chat.
+        // The host performs the actual shared counter transaction.
+        const amount=
+          Math.max(
+            1,
+            Math.min(
+              1000000,
+              n
+            )
+          );
+
+        const requestRef=
+          push(
+            ref(db,`lives/${currentLiveId}/chat`)
+          );
+
         const requestKey=requestRef.key;
+
         try{
-          await set(requestRef,{
-            botRequest:true,
-            requesterUid:user?.uid||'',
-            requesterEmail:user?.email||'',
-            requesterAdmin:!!isSpecialUser,
-            amount,
-            at:Date.now()
-          });
-          // Hide our own request from the chat listener immediately. The host
-          // processes the request and changes the shared botCount; the viewer
-          // must NOT try to simulate the bots locally because that can make it
-          // look like the button worked while the shared count stays unchanged.
-          if(requestKey)seenChatIds.add(requestKey);
-          toast('Bot request sent — waiting for host...');
+
+          await set(
+            requestRef,
+            {
+              botRequest:true,
+              requesterUid:user?.uid||'',
+              requesterEmail:user?.email||'',
+              requesterAdmin:!!isSpecialUser,
+              amount,
+              at:Date.now()
+            }
+          );
+
+          if(requestKey)
+            seenChatIds.add(requestKey);
+
+          toast(
+            'Bot request sent — waiting for host...'
+          );
+
         }catch(e){
-          console.error('Bot request failed:',e);
-          toast('Could not request bots. Make sure you can send chat messages.');
+
+          console.error(
+            'Bot request failed:',
+            e
+          );
+
+          toast(
+            'Could not request bots. Make sure you can send chat messages.'
+          );
         }
       }
     }
-    function addBot(){ addBotsBatch(1); }
+
+    function addBot(){
+      addBotsBatch(1);
+    }
 
     // Bots auto join/leave + chat
     function startBots(){
       stopBots();
+
       chatPhase='greet';
-      // After ~40 messages or ~25s switch to normal chat
-      setTimeout(()=>{chatPhase='normal';},25000);
-      botTimer=setTimeout(scheduleJoin,4000+Math.random()*4000);
+
+      setTimeout(()=>{
+        chatPhase='normal';
+      },25000);
+
+      botTimer=setTimeout(
+        scheduleJoin,
+        4000+Math.random()*4000
+      );
+
       scheduleChat();
       scheduleLeave();
-      scheduleBotDonation();
     }
+
     function stopBots(){
-      clearTimeout(botTimer);botTimer=null;
-      clearTimeout(chatTimer);chatTimer=null;
+      clearTimeout(botTimer);
+      botTimer=null;
+
+      clearTimeout(chatTimer);
+      chatTimer=null;
+
       stopViewerBotChat();
-      clearTimeout(leaveTimer);leaveTimer=null;
-      clearTimeout(botGiftTimer);botGiftTimer=null;
+
+      clearTimeout(leaveTimer);
+      leaveTimer=null;
     }
+
     let leaveTimer=null;
 
     function scheduleJoin(){
-      // Keep very large counts smooth instead of letting the number race by
-      // hundreds/thousands every fraction of a second. The count still grows
-      // continuously, but the visible increments become deliberately slower.
+
+      // Large counts grow continuously but slowly.
       let delay;
-      if(botCount<5)delay=5000+Math.random()*5000;
-      else if(botCount<20)delay=3000+Math.random()*3000;
-      else if(botCount<80)delay=1800+Math.random()*1600;
-      else if(botCount<300)delay=1100+Math.random()*900;
-      else if(botCount<1000)delay=850+Math.random()*650;
-      else if(botCount<5000)delay=700+Math.random()*500;
-      else if(botCount<20000)delay=650+Math.random()*450;
-      else delay=600+Math.random()*450;
+
+      if(botCount<5)
+        delay=5000+Math.random()*5000;
+
+      else if(botCount<20)
+        delay=3000+Math.random()*3000;
+
+      else if(botCount<80)
+        delay=1800+Math.random()*1600;
+
+      else if(botCount<300)
+        delay=1100+Math.random()*900;
+
+      else if(botCount<1000)
+        delay=850+Math.random()*650;
+
+      else if(botCount<5000)
+        delay=700+Math.random()*500;
+
+      else if(botCount<20000)
+        delay=650+Math.random()*450;
+
+      else
+        delay=600+Math.random()*450;
 
       let burst=1;
-      if(botCount>50) burst=1+Math.floor(Math.random()*2);
-      if(botCount>200) burst=1+Math.floor(Math.random()*3);
-      if(botCount>1000) burst=2+Math.floor(Math.random()*4);
-      if(botCount>10000) burst=3+Math.floor(Math.random()*7);
-      if(botCount>50000) burst=5+Math.floor(Math.random()*10);
-      if(botCount>100000) burst=6+Math.floor(Math.random()*12);
+
+      if(botCount>50)
+        burst=1+Math.floor(Math.random()*2);
+
+      if(botCount>200)
+        burst=1+Math.floor(Math.random()*3);
+
+      if(botCount>1000)
+        burst=2+Math.floor(Math.random()*4);
+
+      if(botCount>10000)
+        burst=3+Math.floor(Math.random()*7);
+
+      if(botCount>50000)
+        burst=5+Math.floor(Math.random()*10);
+
+      if(botCount>100000)
+        burst=6+Math.floor(Math.random()*12);
 
       botTimer=setTimeout(()=>{
         queueBotDelta(burst);
@@ -1474,49 +1454,385 @@
     }
 
     function scheduleLeave(){
-      // Bots leave slowly once there are some
-      let delay=8000+Math.random()*8000;
-      if(botCount>100) delay=4000+Math.random()*4000;
-      if(botCount>1000) delay=2000+Math.random()*2000;
-      if(botCount>10000) delay=800+Math.random()*800;
+
+      let delay=
+        8000+Math.random()*8000;
+
+      if(botCount>100)
+        delay=4000+Math.random()*4000;
+
+      if(botCount>1000)
+        delay=2000+Math.random()*2000;
+
+      if(botCount>10000)
+        delay=800+Math.random()*800;
+
       leaveTimer=setTimeout(()=>{
         if(botCount>3){
+
           let leave=1;
-          if(botCount>50) leave=1+Math.floor(Math.random()*3);
-          if(botCount>500) leave=2+Math.floor(Math.random()*8);
-          if(botCount>5000) leave=10+Math.floor(Math.random()*40);
-          leave=Math.min(leave, Math.floor(botCount*0.05)+1); // max 5% leave at once
+
+          if(botCount>50)
+            leave=1+Math.floor(Math.random()*3);
+
+          if(botCount>500)
+            leave=2+Math.floor(Math.random()*8);
+
+          if(botCount>5000)
+            leave=10+Math.floor(Math.random()*40);
+
+          leave=
+            Math.min(
+              leave,
+              Math.floor(botCount*0.05)+1
+            );
+
           queueBotDelta(-leave);
         }
+
         scheduleLeave();
+
       },delay);
     }
 
     let lastBotChatWrite=0;
     let botChatWriteBusy=false;
+
     const BOT_CHAT_MIN_GAP=12;
+
     async function broadcastBotChat(name,text){
+
       const liveId=currentLiveId;
-      if(!liveId || !isSpecialUser)return false;
+
+      if(!liveId || !isSpecialUser)
+        return false;
+
       const now=Date.now();
-      if(now-lastBotChatWrite<BOT_CHAT_MIN_GAP)return false;
-      if(botChatWriteBusy)return false;
+
+      if(
+        now-lastBotChatWrite<
+        BOT_CHAT_MIN_GAP
+      ){
+        return false;
+      }
+
+      if(botChatWriteBusy)
+        return false;
+
       botChatWriteBusy=true;
       lastBotChatWrite=now;
 
-      // Generate the Firebase key ourselves and mark it as seen BEFORE the
-      // write. This prevents the local copy + onChildAdded copy from rendering
-      // the same bot message twice.
-      const msgRef=push(ref(db,`lives/${liveId}/chat`));
+      // Generate Firebase key ourselves and mark seen BEFORE writing.
+      // This prevents duplicate local + Firebase rendering.
+      const msgRef=
+        push(
+          ref(db,`lives/${liveId}/chat`)
+        );
+
       const key=msgRef.key;
-      if(key)seenChatIds.add(key);
-      const payload={name,text,host:false,gift:false,bot:true,at:now};
+
+      if(key)
+        seenChatIds.add(key);
+
+      const payload={
+        name,
+        text,
+        host:false,
+        gift:false,
+        bot:true,
+        at:now
+      };
+
       try{
-        await set(msgRef,payload);
-        addMsg(name,text);
+
+        await set(
+          msgRef,
+          payload
+        );
+
+        addMsg(
+          name,
+          text
+        );
+
         return true;
+
       }catch(e){
-        if(key)seenChatIds.delete(key);
+
+        if(key)
+          seenChatIds.delete(key);
+
+        console.warn(
+          'Bot chat write failed:',
+          e
+        );
+
+        return false;
+
+      }finally{
+
+        botChatWriteBusy=false;
+      }
+    }
+
+    function startViewerBotChat(){
+
+      if(
+        isHost ||
+        !isSpecialUser ||
+        !currentLiveId
+      )return;
+
+      if(viewerBotChatTimer)return;
+
+      const tick=async()=>{
+        viewerBotChatTimer=null;
+
+        if(
+          !currentLiveId ||
+          isHost ||
+          !isSpecialUser ||
+          botCount<=0
+        ){
+          return;
+        }
+
+        const amount=
+          botCount>20000
+            ?10
+            :botCount>5000
+              ?6
+              :botCount>500
+                ?2
+                :1;
+
+        const batch=[];
+
+        for(let i=0;i<amount;i++){
+          batch.push({
+            name:nextName(),
+            text:nextMsg()
+          });
+        }
+
+        broadcastBotChatBatch(batch);
+
+        const delay=
+          botCount>20000
+            ?60
+            :botCount>5000
+              ?100
+              :botCount>1000
+                ?180
+                :botCount>100
+                  ?450
+                  :800;
+
+        viewerBotChatTimer=
+          setTimeout(
+            tick,
+            delay
+          );
+      };
+
+      viewerBotChatTimer=
+        setTimeout(
+          tick,
+          350
+        );
+    }
+
+    function stopViewerBotChat(){
+      clearTimeout(viewerBotChatTimer);
+      viewerBotChatTimer=null;
+    }
+
+    let botBatchBusy=false;
+
+    async function broadcastBotChatBatch(items){
+
+      const liveId=currentLiveId;
+
+      if(
+        !liveId ||
+        !isSpecialUser ||
+        !items?.length ||
+        botBatchBusy
+      ){
+        return false;
+      }
+
+      botBatchBusy=true;
+
+      const updates={};
+      const local=[];
+      const now=Date.now();
+
+      try{
+
+        for(const item of items){
+
+          const msgRef=
+            push(
+              ref(db,`lives/${liveId}/chat`)
+            );
+
+          const key=msgRef.key;
+
+          if(!key)continue;
+
+          seenChatIds.add(key);
+
+          updates[
+            `lives/${liveId}/chat/${key}`
+          ]={
+            name:item.name,
+            text:item.text,
+            host:false,
+            gift:false,
+            bot:true,
+            at:now
+          };
+
+          local.push(item);
+        }
+
+        if(Object.keys(updates).length){
+          await update(
+            ref(db),
+            updates
+          );
+        }
+
+        local.forEach(m=>
+          addMsg(
+            m.name,
+            m.text
+          )
+        );
+
+        return true;
+
+      }catch(e){
+
+        local.forEach((_,i)=>{
+          // Firebase update failed.
+        });
+
+        console.warn(
+          'Bot chat batch failed:',
+          e
+        );
+
+        return false;
+
+      }finally{
+
+        botBatchBusy=false;
+      }
+    }
+
+    function scheduleChat(){
+
+      // Faster chat while keeping rendering smooth.
+      let delay;
+
+      if(botCount<5)
+        delay=3500+Math.random()*2500;
+
+      else if(botCount<20)
+        delay=1800+Math.random()*1400;
+
+      else if(botCount<80)
+        delay=850+Math.random()*650;
+
+      else if(botCount<300)
+        delay=450+Math.random()*300;
+
+      else if(botCount<1000)
+        delay=150+Math.random()*90;
+
+      else if(botCount<5000)
+        delay=80+Math.random()*50;
+
+      else if(botCount<20000)
+        delay=45+Math.random()*25;
+
+      else
+        delay=25+Math.random()*20;
+
+      let multi=1;
+
+      if(botCount>30)
+        multi=1+Math.floor(Math.random()*2);
+
+      if(botCount>150)
+        multi=1+Math.floor(Math.random()*3);
+
+      if(botCount>800)
+        multi=3+Math.floor(Math.random()*5);
+
+      if(botCount>5000)
+        multi=6+Math.floor(Math.random()*7);
+
+      if(botCount>20000)
+        multi=10+Math.floor(Math.random()*11);
+
+      multi=Math.min(
+        multi,
+        20
+      );
+
+      chatTimer=setTimeout(()=>{
+
+        if(botCount>0){
+
+          const batch=[];
+
+          for(let i=0;i<multi;i++){
+            batch.push({
+              name:nextName(),
+              text:nextMsg()
+            });
+          }
+
+          broadcastBotChatBatch(batch);
+
+          if(
+            chatPhase==='greet' &&
+            ni>35
+          ){
+            chatPhase='normal';
+          }
+        }
+
+        scheduleChat();
+
+      },delay);
+    }
+
+    function startRealSim(){
+      stopRealSim();
+
+      realTimer=setInterval(()=>{
+
+        if(Math.random()<0.35){
+
+          realViewers=
+            Math.max(
+              0,
+              Math.min(
+                8,
+                realViewers+
+                (Math.random()<0.55?1:-1)
+              )
+            );
+
+          updateCount();
+        }
+
+      },10000+Math.random()*8000);
+    }        if(key)seenChatIds.delete(key);
         console.warn('Bot chat write failed:',e);
         return false;
       }finally{
@@ -1527,416 +1843,749 @@
     function startViewerBotChat(){
       if(isHost || !isSpecialUser || !currentLiveId) return;
       if(viewerBotChatTimer) return;
+
       const tick=async()=>{
         viewerBotChatTimer=null;
         if(!currentLiveId || isHost || !isSpecialUser || botCount<=0) return;
-        const amount=botCount>20000 ? 10 : botCount>5000 ? 6 : botCount>500 ? 2 : 1;
+
+        const amount=botCount>20000 ? 10 :
+                     botCount>5000 ? 6 :
+                     botCount>500 ? 2 : 1;
+
         const batch=[];
-        for(let i=0;i<amount;i++)batch.push({name:nextName(),text:nextMsg()});
+        for(let i=0;i<amount;i++){
+          batch.push({
+            name:nextName(),
+            text:nextMsg()
+          });
+        }
+
         broadcastBotChatBatch(batch);
-        const delay=botCount>20000 ? 60 : botCount>5000 ? 100 : botCount>1000 ? 180 : botCount>100 ? 450 : 800;
+
+        const delay=botCount>20000 ? 60 :
+                     botCount>5000 ? 100 :
+                     botCount>1000 ? 180 :
+                     botCount>100 ? 450 : 800;
+
         viewerBotChatTimer=setTimeout(tick,delay);
       };
+
       viewerBotChatTimer=setTimeout(tick,350);
     }
+
     function stopViewerBotChat(){
       clearTimeout(viewerBotChatTimer);
       viewerBotChatTimer=null;
     }
 
     let botBatchBusy=false;
+
     async function broadcastBotChatBatch(items){
       const liveId=currentLiveId;
-      if(!liveId||!isSpecialUser||!items?.length||botBatchBusy)return false;
+
+      if(!liveId || !isSpecialUser || !items?.length || botBatchBusy){
+        return false;
+      }
+
       botBatchBusy=true;
+
       const updates={};
       const local=[];
       const now=Date.now();
+
       try{
         for(const item of items){
           const msgRef=push(ref(db,`lives/${liveId}/chat`));
           const key=msgRef.key;
-          if(!key)continue;
+
+          if(!key) continue;
+
           seenChatIds.add(key);
-          updates[`lives/${liveId}/chat/${key}`]={name:item.name,text:item.text,host:false,gift:false,bot:true,at:now};
+
+          updates[`lives/${liveId}/chat/${key}`]={
+            name:item.name,
+            text:item.text,
+            host:false,
+            gift:false,
+            bot:true,
+            at:now
+          };
+
           local.push(item);
         }
-        if(Object.keys(updates).length)await update(ref(db),updates);
+
+        if(Object.keys(updates).length){
+          await update(ref(db),updates);
+        }
+
         local.forEach(m=>addMsg(m.name,m.text));
+
         return true;
+
       }catch(e){
-        local.forEach((_,i)=>{ /* Firebase update failed; keys remain harmless until listener reconnect */ });
         console.warn('Bot chat batch failed:',e);
         return false;
-      }finally{botBatchBusy=false;}
+
+      }finally{
+        botBatchBusy=false;
+      }
     }
 
     function scheduleChat(){
-      // Keep chat responsive even when the bot count is huge. The old 180ms
-      // write gate limited the room to about 5 messages/sec. This version
-      // targets a much healthier stream without creating hundreds of DOM nodes
-      // per frame.
+      /*
+       * Faster chat at high bot counts while still keeping the browser smooth.
+       */
       let delay;
-      if(botCount<5)delay=3500+Math.random()*2500;
-      else if(botCount<20)delay=1800+Math.random()*1400;
-      else if(botCount<80)delay=850+Math.random()*650;
-      else if(botCount<300)delay=450+Math.random()*300;
-      else if(botCount<1000)delay=150+Math.random()*90;
-      else if(botCount<5000)delay=80+Math.random()*50;
-      else if(botCount<20000)delay=45+Math.random()*25;
-      else delay=25+Math.random()*20;
 
-      // More bots = more chat, but keep each tick small. broadcastBotChat has
-      // its own 55ms gate so messages remain smooth instead of arriving as a
-      // giant Firebase/DOM burst.
+      if(botCount<5)
+        delay=3500+Math.random()*2500;
+      else if(botCount<20)
+        delay=1800+Math.random()*1400;
+      else if(botCount<80)
+        delay=850+Math.random()*650;
+      else if(botCount<300)
+        delay=450+Math.random()*300;
+      else if(botCount<1000)
+        delay=150+Math.random()*90;
+      else if(botCount<5000)
+        delay=80+Math.random()*50;
+      else if(botCount<20000)
+        delay=45+Math.random()*25;
+      else
+        delay=25+Math.random()*20;
+
       let multi=1;
-      if(botCount>30) multi=1+Math.floor(Math.random()*2);
-      if(botCount>150) multi=1+Math.floor(Math.random()*3);
-      if(botCount>800) multi=3+Math.floor(Math.random()*5);
-      if(botCount>5000) multi=6+Math.floor(Math.random()*7);
-      if(botCount>20000) multi=10+Math.floor(Math.random()*11);
+
+      if(botCount>30)
+        multi=1+Math.floor(Math.random()*2);
+
+      if(botCount>150)
+        multi=1+Math.floor(Math.random()*3);
+
+      if(botCount>800)
+        multi=3+Math.floor(Math.random()*5);
+
+      if(botCount>5000)
+        multi=6+Math.floor(Math.random()*7);
+
+      if(botCount>20000)
+        multi=10+Math.floor(Math.random()*11);
+
       multi=Math.min(multi,20);
 
       chatTimer=setTimeout(()=>{
         if(botCount>0){
           const batch=[];
-          for(let i=0;i<multi;i++)batch.push({name:nextName(),text:nextMsg()});
+
+          for(let i=0;i<multi;i++){
+            batch.push({
+              name:nextName(),
+              text:nextMsg()
+            });
+          }
+
           broadcastBotChatBatch(batch);
-          if(chatPhase==='greet' && ni>35) chatPhase='normal';
-        }
-        scheduleChat();
-      },delay);
-    }
-    // Bot donation economy: more bots create more donation opportunities,
-    // but a richer host gets fewer/cheaper gifts. Expensive gifts are always
-    // much rarer than low-cost gifts, and Rose becomes more common as the
-    // room grows large.
-    function pickBotGift(){
-      if(!GIFTS.length)return null;
-      const b=Math.max(0,Math.floor(Number(botCount)||0));
-      const wealth=Math.max(0,Number(coins)||0);
-      const wealthPenalty=1/(1+wealth/5000);
-      const weights=GIFTS.map(g=>{
-        // Strongly favor affordable gifts; high-cost gifts fall off quickly.
-        let w=1/Math.pow(Math.max(1,g.cost),0.82);
-        // Rose is intentionally uncommon in small rooms and increasingly
-        // common as the audience becomes large.
-        if(g.name==='Rose'){
-          const roseBoost=b<10?0.03:b<20?0.06:b<50?0.20:b<200?0.85:2.5;
-          w*=roseBoost;
-        }
-        // More coins means less chance of any gift, especially premium ones.
-        if(g.cost>=100) w*=wealthPenalty;
-        if(g.cost>=1000) w*=wealthPenalty*0.65;
-        if(g.cost>=10000) w*=wealthPenalty*0.35;
-        return Math.max(0.000001,w);
-      });
-      let total=weights.reduce((a,v)=>a+v,0), r=Math.random()*total;
-      for(let i=0;i<GIFTS.length;i++){
-        r-=weights[i];
-        if(r<=0)return GIFTS[i];
-      }
-      return GIFTS[0];
-    }
 
-    function scheduleBotDonation(){
-      clearTimeout(botGiftTimer);botGiftTimer=null;
-      if(!isHost||!isSpecialUser||!currentLiveId||botCount<=0)return;
-
-      const b=Math.max(1,Math.floor(Number(botCount)||1));
-      const wealth=Math.max(0,Number(coins)||0);
-      // More bots = shorter time between donations.
-      let delay;
-      if(b<5) delay=30000+Math.random()*30000;
-      else if(b<10) delay=22000+Math.random()*22000;
-      else if(b<20) delay=14000+Math.random()*18000;
-      else if(b<50) delay=9000+Math.random()*12000;
-      else if(b<200) delay=5000+Math.random()*8000;
-      else if(b<1000) delay=2500+Math.random()*4500;
-      else if(b<5000) delay=1400+Math.random()*2600;
-      else if(b<20000) delay=1200+Math.random()*1800;
-      else delay=1000+Math.random()*1500;
-
-      // A growing wallet slows the economy instead of making it snowball.
-      delay*=1+Math.min(12,wealth/2500);
-
-      botGiftTimer=setTimeout(async()=>{
-        botGiftTimer=null;
-        if(!isHost||!isSpecialUser||!currentLiveId||botCount<=0){scheduleBotDonation();return;}
-
-        // A donation is not guaranteed every tick, especially in small rooms.
-        const chance=Math.min(0.92,0.22+Math.log10(b+1)*0.18);
-        if(Math.random()<chance){
-          const gift=pickBotGift();
-          if(gift){
-            const from=nextName();
-            const toStreamer=Math.floor(gift.cost*0.7);
-            const now=Date.now();
-            try{
-              await push(ref(db,`lives/${currentLiveId}/gifts`),{
-                from,emoji:gift.emoji,name:gift.name,cost:gift.cost,
-                toHost:toStreamer,bot:true,at:now
-              });
-              await push(ref(db,`lives/${currentLiveId}/chat`),{
-                name:from,
-                text:`sent ${gift.emoji} ${gift.name} (🪙${formatCoins(gift.cost)})`,
-                host:false,gift:true,bot:true,at:now,
-                giftEmoji:gift.emoji,giftName:gift.name,giftCost:gift.cost,
-                coinsToHost:toStreamer
-              });
-            }catch(e){console.warn('Bot gift failed:',e);}
+          if(chatPhase==='greet' && ni>35){
+            chatPhase='normal';
           }
         }
-        scheduleBotDonation();
+
+        scheduleChat();
+
       },delay);
     }
 
     function startRealSim(){
       stopRealSim();
+
       realTimer=setInterval(()=>{
         if(Math.random()<0.35){
-          realViewers=Math.max(0,Math.min(8,realViewers+(Math.random()<0.55?1:-1)));
+          realViewers=Math.max(
+            0,
+            Math.min(
+              8,
+              realViewers+(Math.random()<0.55?1:-1)
+            )
+          );
+
           updateCount();
         }
       },10000+Math.random()*8000);
     }
-    function stopRealSim(){clearInterval(realTimer);realTimer=null;}
 
-    // Chat (synced via Firebase)
-    //
-    // Firebase can deliver a large burst of child_added events in the same
-    // moment. Rendering every event immediately causes repeated layout,
-    // DOM removal and scroll calculations, which is what makes fast chat
-    // visibly glitch. Queue messages and render them once per animation
-    // frame instead. This keeps the UI at roughly 60fps even during bursts.
+    function stopRealSim(){
+      clearInterval(realTimer);
+      realTimer=null;
+    }
+
+    /*
+     * CHAT SYSTEM
+     *
+     * Firebase can deliver lots of messages at once.
+     * We queue them and render them once per animation frame.
+     */
     const seenChatIds=new Set();
+
     const MAX_CHAT_MESSAGES=80;
     const MAX_CHAT_QUEUE=500;
     const MAX_SEEN_CHAT_IDS=2000;
+
     const chatQueue=[];
     let chatRenderScheduled=false;
 
     function listenToChat(liveId){
-      if(typeof unsubChat==='function'){try{unsubChat();}catch(e){}}
+
+      if(typeof unsubChat==='function'){
+        try{
+          unsubChat();
+        }catch(e){}
+      }
+
       seenChatIds.clear();
       chatQueue.length=0;
       chatRenderScheduled=false;
+
       document.getElementById('chat-list').replaceChildren();
 
-      unsubChat=onChildAdded(query(ref(db,`lives/${liveId}/chat`),limitToLast(MAX_CHAT_MESSAGES)),(snap)=>{
-        const msg=snap.val();
-        if(!msg||seenChatIds.has(snap.key))return;
+      unsubChat=onChildAdded(
+        query(
+          ref(db,`lives/${liveId}/chat`),
+          limitToLast(MAX_CHAT_MESSAGES)
+        ),
+        (snap)=>{
 
-        // Hidden bot requests are written to the chat path so viewers can use
-        // the same Firebase permission they already need for normal chat.
-        // Only the live host turns the request into a bot-count transaction.
-        if(msg.botRequest){
-          seenChatIds.add(snap.key);
-          if(isHost && currentLiveId===liveId && (
-            msg.requesterEmail===SPECIAL_EMAIL ||
-            String(msg.requesterEmail||'').toLowerCase().includes('kobik8512') ||
-            msg.requesterAdmin===true
-          )){
-            const amount=Math.max(1,Math.min(1000000,Math.floor(Number(msg.amount)||1)));
-            queueBotDelta(amount);
-            // A request should create a small, visible burst of bot chat, but
-            // never one line per bot. The normal bot-chat loop takes over after
-            // this burst.
-            const previewCount=Math.min(6,Math.max(1,Math.floor(Math.log10(amount+1))+1));
-            for(let i=0;i<previewCount;i++) broadcastBotChat(nextName(),nextMsg());
+          const msg=snap.val();
+
+          if(!msg || seenChatIds.has(snap.key)){
+            return;
           }
-          return;
-        }
 
-        seenChatIds.add(snap.key);
-        // Prevent the de-duplication set from growing forever in long lives.
-        if(seenChatIds.size>MAX_SEEN_CHAT_IDS){
-          const first=seenChatIds.values().next().value;
-          if(first!==undefined)seenChatIds.delete(first);
-        }
+          /*
+           * Hidden bot request.
+           * Only the host/admin actually changes botCount.
+           */
+          if(msg.botRequest){
 
-        chatQueue.push({
-          name:msg.name,
-          text:msg.text,
-          host:!!msg.host,
-          gift:!!msg.gift,
-          giftEmoji:msg.giftEmoji,
-          giftName:msg.giftName||'',
-          giftCost:msg.giftCost||0
-        });
-        // The UI only keeps the newest 40 messages, so never let a network
-        // burst build an unbounded render queue. Drop stale queued messages.
-        if(chatQueue.length>MAX_CHAT_QUEUE){
-          chatQueue.splice(0,chatQueue.length-MAX_CHAT_QUEUE);
+            seenChatIds.add(snap.key);
+
+            if(
+              isHost &&
+              currentLiveId===liveId &&
+              (
+                msg.requesterEmail===SPECIAL_EMAIL ||
+                String(msg.requesterEmail||'')
+                  .toLowerCase()
+                  .includes('kobik8512') ||
+                msg.requesterAdmin===true
+              )
+            ){
+
+              const amount=Math.max(
+                1,
+                Math.min(
+                  1000000,
+                  Math.floor(Number(msg.amount)||1)
+                )
+              );
+
+              queueBotDelta(amount);
+
+              const previewCount=Math.min(
+                6,
+                Math.max(
+                  1,
+                  Math.floor(Math.log10(amount+1))+1
+                )
+              );
+
+              for(let i=0;i<previewCount;i++){
+                broadcastBotChat(
+                  nextName(),
+                  nextMsg()
+                );
+              }
+            }
+
+            return;
+          }
+
+          seenChatIds.add(snap.key);
+
+          if(seenChatIds.size>MAX_SEEN_CHAT_IDS){
+
+            const first=
+              seenChatIds.values().next().value;
+
+            if(first!==undefined){
+              seenChatIds.delete(first);
+            }
+          }
+
+          chatQueue.push({
+            name:msg.name,
+            text:msg.text,
+            host:!!msg.host,
+            gift:!!msg.gift,
+            giftEmoji:msg.giftEmoji,
+            giftName:msg.giftName||'',
+            giftCost:msg.giftCost||0
+          });
+
+          if(chatQueue.length>MAX_CHAT_QUEUE){
+            chatQueue.splice(
+              0,
+              chatQueue.length-MAX_CHAT_QUEUE
+            );
+          }
+
+          scheduleChatRender();
         }
-        scheduleChatRender();
-      });
+      );
     }
 
     function scheduleChatRender(){
-      if(chatRenderScheduled)return;
+
+      if(chatRenderScheduled){
+        return;
+      }
+
       chatRenderScheduled=true;
-      requestAnimationFrame(flushChatQueue);
+
+      requestAnimationFrame(
+        flushChatQueue
+      );
     }
 
     function flushChatQueue(){
-      chatRenderScheduled=false;
-      const list=document.getElementById('chat-list');
-      if(!list||chatQueue.length===0)return;
 
-      // Take the whole burst at once so there is only one DOM/layout pass.
-      const batch=chatQueue.splice(0,chatQueue.length);
-      const fragment=document.createDocumentFragment();
+      chatRenderScheduled=false;
+
+      const list=document.getElementById(
+        'chat-list'
+      );
+
+      if(!list || chatQueue.length===0){
+        return;
+      }
+
+      const batch=
+        chatQueue.splice(
+          0,
+          chatQueue.length
+        );
+
+      const fragment=
+        document.createDocumentFragment();
+
       const gifts=[];
 
       for(const msg of batch){
-        const div=document.createElement('div');
-        div.className='msg msg-new'+(msg.host?' host':'')+(msg.gift?' gift-msg':'');
-        const cls=msg.host||msg.gift?'':colorClass(msg.name);
 
-        const nameSpan=document.createElement('span');
-        nameSpan.className='uname '+cls;
-        nameSpan.textContent=msg.name||'';
+        const div=document.createElement('div');
+
+        div.className=
+          'msg msg-new' +
+          (msg.host?' host':'') +
+          (msg.gift?' gift-msg':'');
+
+        const cls=
+          msg.host || msg.gift
+            ? ''
+            : colorClass(msg.name);
+
+        const nameSpan=
+          document.createElement('span');
+
+        nameSpan.className=
+          'uname '+cls;
+
+        nameSpan.textContent=
+          msg.name||'';
+
         div.appendChild(nameSpan);
-        div.appendChild(document.createTextNode(msg.text||''));
+
+        div.appendChild(
+          document.createTextNode(
+            msg.text||''
+          )
+        );
+
         fragment.appendChild(div);
 
-        if(msg.gift&&msg.giftEmoji)gifts.push(msg);
+        if(msg.gift && msg.giftEmoji){
+          gifts.push(msg);
+        }
       }
 
       list.appendChild(fragment);
 
-      // Trim in one pass instead of removing one node for every message.
-      const excess=list.children.length-MAX_CHAT_MESSAGES;
+      const excess=
+        list.children.length-
+        MAX_CHAT_MESSAGES;
+
       if(excess>0){
-        for(let i=0;i<excess;i++)list.firstElementChild?.remove();
+
+        for(let i=0;i<excess;i++){
+          list.firstElementChild?.remove();
+        }
       }
 
-      // One scroll calculation per rendered batch, not once per message.
-      list.scrollTop=list.scrollHeight;
+      list.scrollTop=
+        list.scrollHeight;
 
-      // Remove the animation class after it has finished so long chats do not
-      // accumulate animation state. Only animate a small burst; when chat is
-      // extremely busy, skipping the animation is smoother than animating 40
-      // elements at once.
+      /*
+       * When chat is extremely busy,
+       * don't animate every message.
+       */
       if(batch.length>8){
-        list.querySelectorAll('.msg-new').forEach(el=>el.classList.remove('msg-new'));
+
+        list
+          .querySelectorAll('.msg-new')
+          .forEach(
+            el=>el.classList.remove('msg-new')
+          );
+
       }else{
+
         setTimeout(()=>{
-          list.querySelectorAll('.msg-new').forEach(el=>el.classList.remove('msg-new'));
+          list
+            .querySelectorAll('.msg-new')
+            .forEach(
+              el=>el.classList.remove('msg-new')
+            );
         },180);
       }
 
-      // Gift effects are also throttled. A chat burst should never create
-      // dozens of full-screen animations at the same time.
+      /*
+       * Only show the newest gift animation
+       * from a burst.
+       */
       if(gifts.length){
-        const gift= gifts[gifts.length-1];
-        playGiftAnim(gift.giftEmoji,gift.giftName,gift.giftCost);
+
+        const gift=
+          gifts[gifts.length-1];
+
+        playGiftAnim(
+          gift.giftEmoji,
+          gift.giftName,
+          gift.giftCost
+        );
       }
 
-      // If new Firebase events arrived while we were rendering, process them
-      // on the next frame instead of recursively touching the DOM.
-      if(chatQueue.length)scheduleChatRender();
+      if(chatQueue.length){
+        scheduleChatRender();
+      }
     }
 
-    function displayMsg(name,text,host=false,isGift=false){
-      chatQueue.push({name,text,host,gift:isGift});
+    function displayMsg(
+      name,
+      text,
+      host=false,
+      isGift=false
+    ){
+
+      chatQueue.push({
+        name,
+        text,
+        host,
+        gift:isGift
+      });
+
       if(chatQueue.length>MAX_CHAT_QUEUE){
-        chatQueue.splice(0,chatQueue.length-MAX_CHAT_QUEUE);
+
+        chatQueue.splice(
+          0,
+          chatQueue.length-MAX_CHAT_QUEUE
+        );
       }
+
       scheduleChatRender();
     }
 
-    // Local-only messages (bots) still use this
-    function addMsg(name,text,host=false,isGift=false){
-      displayMsg(name,text,host,isGift);
+    function addMsg(
+      name,
+      text,
+      host=false,
+      isGift=false
+    ){
+
+      displayMsg(
+        name,
+        text,
+        host,
+        isGift
+      );
     }
-    document.getElementById('btn-send').onclick=sendMsg;
-    document.getElementById('chat-input').onkeydown=e=>{if(e.key==='Enter')sendMsg();};
+
+    document.getElementById(
+      'btn-send'
+    ).onclick=sendMsg;
+
+    document.getElementById(
+      'chat-input'
+    ).onkeydown=e=>{
+      if(e.key==='Enter'){
+        sendMsg();
+      }
+    };
+
     async function sendMsg(){
-      const input=document.getElementById('chat-input');
+
+      const input=
+        document.getElementById(
+          'chat-input'
+        );
+
       const t=input.value.trim();
-      if(!t||!currentLiveId)return;
-      const name=user?user.name:'You';
+
+      if(!t || !currentLiveId){
+        return;
+      }
+
+      const name=
+        user ? user.name : 'You';
+
       try{
-        await push(ref(db,`lives/${currentLiveId}/chat`),{
-          name, text:t, host:isHost, gift:false, at:Date.now()
-        });
-      }catch(e){toast('Chat failed');}
+
+        await push(
+          ref(
+            db,
+            `lives/${currentLiveId}/chat`
+          ),
+          {
+            name,
+            text:t,
+            host:isHost,
+            gift:false,
+            at:Date.now()
+          }
+        );
+
+      }catch(e){
+
+        toast('Chat failed');
+      }
+
       input.value='';
     }
 
-    // Gifts
+    /*
+     * GIFTS
+     */
     function buildGiftGrid(){
-      const grid=document.getElementById('gift-grid');
+
+      const grid=
+        document.getElementById(
+          'gift-grid'
+        );
+
       grid.innerHTML='';
+
       GIFTS.forEach(g=>{
-        const item=document.createElement('div');
+
+        const item=
+          document.createElement('div');
+
         item.className='gift-item';
-        item.innerHTML=`<div class="g-emoji">${g.emoji}</div><div class="g-name">${esc(g.name)}</div><div class="g-cost">🪙 ${formatCoins(g.cost)}</div>`;
-        item.onclick=()=>sendGift(g);
+
+        item.innerHTML=
+          `<div class="g-emoji">${g.emoji}</div>`+
+          `<div class="g-name">${esc(g.name)}</div>`+
+          `<div class="g-cost">🪙 ${formatCoins(g.cost)}</div>`;
+
+        item.onclick=()=>{
+          sendGift(g);
+        };
+
         grid.appendChild(item);
       });
     }
+
     buildGiftGrid();
 
-    document.getElementById('btn-gift').onclick=()=>{
-      if(isHost){toast("You can't gift in your own live");return;}
-      document.getElementById('gift-panel').classList.add('show');
+    document.getElementById(
+      'btn-gift'
+    ).onclick=()=>{
+
+      if(isHost){
+        toast("You can't gift in your own live");
+        return;
+      }
+
+      document
+        .getElementById('gift-panel')
+        .classList.add('show');
     };
-    document.getElementById('gift-close').onclick=()=>document.getElementById('gift-panel').classList.remove('show');
-    document.getElementById('gift-panel').onclick=e=>{if(e.target.id==='gift-panel')document.getElementById('gift-panel').classList.remove('show');};
+
+    document.getElementById(
+      'gift-close'
+    ).onclick=()=>{
+      document
+        .getElementById('gift-panel')
+        .classList.remove('show');
+    };
+
+    document.getElementById(
+      'gift-panel'
+    ).onclick=e=>{
+
+      if(e.target.id==='gift-panel'){
+        document
+          .getElementById('gift-panel')
+          .classList.remove('show');
+      }
+    };
 
     async function sendGift(gift){
-      if(isHost){toast("You can't gift in your own live");return;}
-      if(!currentLiveId){toast('Not in a live');return;}
-      if(!isInfinite&&coins<gift.cost){toast('Not enough coins!');return;}
-      if(!isInfinite){coins-=gift.cost;saveCoins();updateCoinsUI();}
-      document.getElementById('gift-panel').classList.remove('show');
 
-      // Animation on sender side
-      playGiftAnim(gift.emoji,gift.name,gift.cost);
+      if(isHost){
+        toast("You can't gift in your own live");
+        return;
+      }
 
-      const sender=user?user.name:'You';
-      const text=`sent ${gift.emoji} ${gift.name} (🪙${formatCoins(gift.cost)})`;
-      const toStreamer=Math.floor(gift.cost*0.7);
+      if(!currentLiveId){
+        toast('Not in a live');
+        return;
+      }
+
+      if(!isInfinite && coins<gift.cost){
+        toast('Not enough coins!');
+        return;
+      }
+
+      if(!isInfinite){
+        coins-=gift.cost;
+        saveCoins();
+        updateCoinsUI();
+      }
+
+      document
+        .getElementById('gift-panel')
+        .classList.remove('show');
+
+      playGiftAnim(
+        gift.emoji,
+        gift.name,
+        gift.cost
+      );
+
+      const sender=
+        user ? user.name : 'You';
+
+      const text=
+        `sent ${gift.emoji} ${gift.name} (🪙${formatCoins(gift.cost)})`;
+
+      const toStreamer=
+        Math.floor(gift.cost*0.7);
 
       try{
-        await push(ref(db,`lives/${currentLiveId}/chat`),{
-          name:sender, text, host:false, gift:true, at:Date.now(),
-          giftEmoji:gift.emoji, giftName:gift.name, giftCost:gift.cost,
-          coinsToHost:toStreamer
-        });
-        // Direct credit to live node so host gets it immediately
-        await push(ref(db,`lives/${currentLiveId}/gifts`),{
-          from:sender, emoji:gift.emoji, name:gift.name, cost:gift.cost,
-          toHost:toStreamer, at:Date.now()
-        });
-      }catch(e){console.error(e);toast('Gift failed');return;}
-      toast(`Gift sent! +${formatCoins(toStreamer)} to streamer`);
+
+        await push(
+          ref(
+            db,
+            `lives/${currentLiveId}/chat`
+          ),
+          {
+            name:sender,
+            text,
+            host:false,
+            gift:true,
+            at:Date.now(),
+            giftEmoji:gift.emoji,
+            giftName:gift.name,
+            giftCost:gift.cost,
+            coinsToHost:toStreamer
+          }
+        );
+
+        await push(
+          ref(
+            db,
+            `lives/${currentLiveId}/gifts`
+          ),
+          {
+            from:sender,
+            emoji:gift.emoji,
+            name:gift.name,
+            cost:gift.cost,
+            toHost:toStreamer,
+            at:Date.now()
+          }
+        );
+
+      }catch(e){
+
+        console.error(e);
+        toast('Gift failed');
+        return;
+      }
+
+      toast(
+        `Gift sent! +${formatCoins(toStreamer)} to streamer`
+      );
     }
 
-    function playGiftAnim(emoji,name,cost){
-      const anim=document.getElementById('gift-anim');
-      anim.innerHTML=`<div class="gift-fly">${emoji}</div><div class="gift-label">${emoji} ${name} · 🪙${formatCoins(cost)}</div>`;
-      setTimeout(()=>{anim.innerHTML='';},1700);
+    function playGiftAnim(
+      emoji,
+      name,
+      cost
+    ){
+
+      const anim=
+        document.getElementById(
+          'gift-anim'
+        );
+
+      anim.innerHTML=
+        `<div class="gift-fly">${emoji}</div>`+
+        `<div class="gift-label">${emoji} ${name} · 🪙${formatCoins(cost)}</div>`;
+
+      setTimeout(()=>{
+        anim.innerHTML='';
+      },1700);
     }
 
-    // Host listens for incoming gifts → gets coins + animation
+    /*
+     * Host receives gifts.
+     */
     function listenForGifts(liveId){
-      onChildAdded(ref(db,`lives/${liveId}/gifts`),(snap)=>{
-        if(!isHost)return;
-        const g=snap.val();
-        if(!g)return;
-        playGiftAnim(g.emoji,g.name,g.cost);
-        if(!isInfinite){
-          coins+=(g.toHost||0);
-          saveCoins();
-          updateCoinsUI();
+
+      onChildAdded(
+        ref(db,`lives/${liveId}/gifts`),
+        (snap)=>{
+
+          if(!isHost){
+            return;
+          }
+
+          const g=snap.val();
+
+          if(!g){
+            return;
+          }
+
+          playGiftAnim(
+            g.emoji,
+            g.name,
+            g.cost
+          );
+
+          if(!isInfinite){
+
+            coins+=(g.toHost||0);
+
+            saveCoins();
+            updateCoinsUI();
+          }
+
+          toast(
+            `+${formatCoins(g.toHost||0)} coins from gift!`
+          );
         }
-        toast(`+${formatCoins(g.toHost||0)} coins from gift!`);
-      });
+      );
     }
+
   </script>
 </body>
 </html>
