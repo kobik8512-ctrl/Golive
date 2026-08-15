@@ -314,7 +314,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
-    import { getDatabase, ref, set, onValue, remove, update, push, onChildAdded, onChildRemoved } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js";
+    import { getDatabase, ref, set, onValue, remove, update, push, onChildAdded, onChildRemoved, runTransaction } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDaQ06E5Zvj6M9XnqOpWgmUsbe5T_EnaPo",
@@ -348,11 +348,12 @@
     let liveTitle = '', currentLiveId = null, viewerId = null;
     let stream = null, facingMode = 'user', isMuted = false;
     let botCount = 0, realViewers = 0;
+    let botSyncTimer = null, botSyncPending = false;
     let botTimer = null, chatTimer = null, realTimer = null;
     let activeLives = [], coins = 0;
     let peerConnections = {};   // host: viewerId -> PC
     let viewerPC = null;        // viewer side PC
-    let unsubViewers = null, unsubLiveEnd = null, unsubChat = null;
+    let unsubLives = null, unsubViewers = null, unsubViewerRemoved = null, unsubLiveEnd = null, unsubLiveCount = null, unsubChat = null, unsubLiveMeta = null;
     let offerHandled = false;
 
     // Gifts
@@ -510,14 +511,32 @@
 
     // Lives list
     function listenToLives(){
-      onValue(ref(db,'lives'),(snap)=>{
+      if(unsubLives)unsubLives();
+      unsubLives=onValue(ref(db,'lives'),(snap)=>{
+        // Do not rebuild the menu while a live room is open. The lives tree
+        // also contains chat/signaling data, so rebuilding from it on every
+        // message wastes work and can compete with WebRTC on mobile.
+        if(document.getElementById('live-room').classList.contains('active'))return;
         activeLives=[];
         const val=snap.val()||{};
-        Object.keys(val).forEach(id=>activeLives.push({id,...val[id]}));
+        Object.keys(val).forEach(id=>{
+          const live=val[id]||{};
+          activeLives.push({
+            id,title:live.title,host:live.host,hostEmail:live.hostEmail,
+            viewers:live.viewers||0,startedAt:live.startedAt||0
+          });
+        });
         activeLives.sort((a,b)=>(b.startedAt||0)-(a.startedAt||0));
         renderLives();
       });
     }
+    function pauseLivesListener(){
+      if(typeof unsubLives==='function'){
+        try{unsubLives();}catch(e){}
+        unsubLives=null;
+      }
+    }
+
     function renderLives(){
       const list=document.getElementById('lives-list');
       const empty=document.getElementById('empty-state');
@@ -533,7 +552,7 @@
             <div class="live-name">${esc(live.title)}</div>
             <div class="live-meta"><span class="dot"></span>${esc(live.host)} · ${format(live.viewers)} watching</div>
           </div>
-          ${isMine||isSpecialUser?`<button class="btn-x-small" data-remove="${live.id}">✕</button>`:''}
+          ${isMine?`<button class="btn-x-small" data-remove="${live.id}" title="End live">✕</button>`:''}
           <button class="btn-join" data-join="${live.id}">Join</button>`;
         list.appendChild(card);
       });
@@ -564,22 +583,24 @@
     async function startLive(){
       liveTitle=document.getElementById('title-input').value.trim()||(user.name+"'s Live");
       document.getElementById('title-modal').classList.remove('show');
-      isHost=true;botCount=0;realViewers=0;ni=0;mi=0;chatPhase='greet';botsPerClick=botsPerClick||1;updateCount();
+      isHost=true;botCount=0;realViewers=0;ni=0;mi=0;chatPhase='greet';botsPerClick=botsPerClick||1;
       peerConnections={};
 
       currentLiveId='l'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
       try{
         await set(ref(db,'lives/'+currentLiveId),{
-          title:liveTitle,host:user.name,hostEmail:user.email,viewers:0,startedAt:Date.now()
+          title:liveTitle,host:user.name,hostEmail:user.email,viewers:0,botCount:0,startedAt:Date.now()
         });
       }catch(e){console.error(e);toast('Could not publish live');}
 
       document.getElementById('btn-b').style.display=isSpecialUser?'flex':'none';
+      updateCount();
       document.getElementById('live-title-text').textContent=liveTitle;
       document.getElementById('chat-list').innerHTML='';
       document.getElementById('mic-status').textContent='Mic: listening...';
       document.getElementById('mic-status').style.color='var(--green)';
       document.getElementById('remote-video').style.display='none';
+      pauseLivesListener();
       show('live-room');
       await startCam();
       if(isSpecialUser)startBots();
@@ -623,21 +644,42 @@
       document.getElementById('local-video').srcObject=null;
     }
 
-    // Host: listen for new viewers and create peer connections
+    // Host: listen for real viewers and create peer connections.
+    // Bot counts live in /botCount, while real viewers are represented by
+    // /viewers. Keeping those separate prevents a viewer adding bots from
+    // being overwritten by the host's local counter.
     function listenForViewers(){
       if(unsubViewers)unsubViewers();
       const viewersRef=ref(db,'lives/'+currentLiveId+'/viewers');
+      realViewers=0;
       unsubViewers=onChildAdded(viewersRef,async(snap)=>{
+        realViewers++;
+        scheduleViewerCountSync();
         const vid=snap.key;
         if(peerConnections[vid])return;
         await createHostPeer(vid);
       });
-      onChildRemoved(viewersRef,(snap)=>{
+      unsubViewerRemoved=onChildRemoved(viewersRef,(snap)=>{
+        realViewers=Math.max(0,realViewers-1);
+        scheduleViewerCountSync();
         const vid=snap.key;
         if(peerConnections[vid]){
           peerConnections[vid].close();
           delete peerConnections[vid];
         }
+      });
+
+      // Watch botCount changes made by other users/admins.
+      if(unsubLiveMeta)unsubLiveMeta();
+      unsubLiveMeta=onValue(ref(db,'lives/'+currentLiveId+'/botCount'),(snap)=>{
+        const data=snap.val();
+        if(!isHost || currentLiveId===null)return;
+        const remoteBots=Math.max(0,Math.floor(Number(data)||0));
+        if(remoteBots!==botCount){
+          botCount=remoteBots;
+          scheduleViewerCountSync();
+        }
+        updateCountDisplay(botCount+realViewers);
       });
     }
 
@@ -703,6 +745,7 @@
       document.getElementById('mic-status').textContent='Connecting...';
       document.getElementById('mic-status').style.color='var(--muted)';
       updateCountDisplay(Number(live.viewers)||1);
+      pauseLivesListener();
       show('live-room');
       toast('Joining '+live.title+'...');
 
@@ -714,16 +757,20 @@
         });
       }catch(e){}
 
-      // Kick when host ends live + keep viewer count in sync
-      const liveRef=ref(db,'lives/'+live.id);
-      unsubLiveEnd=onValue(liveRef,(snap)=>{
+      // Keep the WebRTC connection isolated from chat/gifts/signaling data.
+      // Listening to the whole live node makes Firebase resend the entire
+      // subtree on every chat message, which can overload mobile clients and
+      // make the camera appear to disappear. Watch only tiny scalar paths.
+      const liveTitleRef=ref(db,`lives/${live.id}/title`);
+      const liveCountRef=ref(db,`lives/${live.id}/viewers`);
+      unsubLiveEnd=onValue(liveTitleRef,(snap)=>{
         if(!snap.exists() && currentLiveId===live.id && !isHost){
           forceLeaveLive('Live ended by host');
-          return;
         }
-        const data=snap.val();
-        if(data&&currentLiveId===live.id){
-          updateCountDisplay(Number(data.viewers)||0);
+      });
+      unsubLiveCount=onValue(liveCountRef,(snap)=>{
+        if(currentLiveId===live.id && !isHost){
+          updateCountDisplay(Number(snap.val())||0);
         }
       });
 
@@ -734,7 +781,11 @@
 
       viewerPC.ontrack=async(e)=>{
         const remoteVid=document.getElementById('remote-video');
-        remoteVid.srcObject=e.streams[0];
+        // Some browsers omit e.streams[0]. Build a stable MediaStream so a
+        // second track (for example audio) never replaces the camera stream.
+        if(!remoteVid.srcObject)remoteVid.srcObject=new MediaStream();
+        const targetStream=remoteVid.srcObject;
+        if(e.track&&!targetStream.getTracks().some(t=>t.id===e.track.id))targetStream.addTrack(e.track);
         remoteVid.style.display='block';
         document.getElementById('cam-off').style.display='none';
         document.getElementById('mic-status').textContent='Connected';
@@ -743,11 +794,23 @@
       };
       viewerPC.onconnectionstatechange=()=>{
         if(viewerPC.connectionState==='connected'){
+          document.getElementById('remote-video').style.display='block';
+          document.getElementById('cam-off').style.display='none';
           document.getElementById('mic-status').textContent='Connected';
           document.getElementById('mic-status').style.color='var(--green)';
         } else if(viewerPC.connectionState==='failed'){
-          document.getElementById('mic-status').textContent='Connection failed';
-          document.getElementById('mic-status').style.color='var(--danger)';
+          // Do not hide the last good camera frame just because Firebase chat
+          // or bot-count traffic is busy. The connection can recover.
+          document.getElementById('mic-status').textContent='Reconnecting...';
+          document.getElementById('mic-status').style.color='var(--muted)';
+          setTimeout(()=>{
+            if(viewerPC&&viewerPC.connectionState==='failed'){
+              viewerPC.restartIce?.();
+            }
+          },1000);
+        } else if(viewerPC.connectionState==='disconnected'){
+          document.getElementById('mic-status').textContent='Reconnecting...';
+          document.getElementById('mic-status').style.color='var(--muted)';
         }
       };
 
@@ -790,11 +853,17 @@
 
     function cleanupViewerListeners(){
       if(typeof unsubLiveEnd==='function'){try{unsubLiveEnd();}catch(e){} unsubLiveEnd=null;}
+      if(typeof unsubLiveCount==='function'){try{unsubLiveCount();}catch(e){} unsubLiveCount=null;}
       if(typeof unsubChat==='function'){try{unsubChat();}catch(e){} unsubChat=null;}
+      if(typeof unsubViewers==='function'){try{unsubViewers();}catch(e){} unsubViewers=null;}
+      if(typeof unsubViewerRemoved==='function'){try{unsubViewerRemoved();}catch(e){} unsubViewerRemoved=null;}
+      if(typeof unsubLiveMeta==='function'){try{unsubLiveMeta();}catch(e){} unsubLiveMeta=null;}
     }
 
     function forceLeaveLive(msg){
       cleanupViewerListeners();
+      clearTimeout(viewerCountSyncTimer);viewerCountSyncTimer=null;
+      clearTimeout(botDeltaTimer);botDeltaTimer=null;pendingBotDelta=0;
       stopCam();stopBots();stopRealSim();
       if(viewerPC){try{viewerPC.close();}catch(e){} viewerPC=null;}
       Object.values(peerConnections).forEach(pc=>{try{pc.close();}catch(e){}});
@@ -807,6 +876,8 @@
         remove(ref(db,`lives/${leftId}/viewers/${leftViewer}`)).catch(()=>{});
       }
       show('menu');
+      pauseLivesListener();
+      listenToLives();
       toast(msg||'Live ended');
     }
 
@@ -832,6 +903,8 @@
 
     async function stopLive(){
       cleanupViewerListeners();
+      clearTimeout(viewerCountSyncTimer);viewerCountSyncTimer=null;
+      clearTimeout(botDeltaTimer);botDeltaTimer=null;pendingBotDelta=0;
       stopCam();stopBots();stopRealSim();
       Object.values(peerConnections).forEach(pc=>{try{pc.close();}catch(e){}});
       peerConnections={};
@@ -843,16 +916,30 @@
       isHost=false;botCount=0;realViewers=0;viewerId=null;currentLiveId=null;offerHandled=false;
       document.getElementById('remote-video').srcObject=null;
       document.getElementById('remote-video').style.display='none';
-      show('menu');toast('Live ended');
+      show('menu');
+      pauseLivesListener();
+      listenToLives();
+      toast('Live ended');
     }
 
-    // Viewers count
+    // Viewers count. The displayed/published count is derived from the
+    // shared botCount plus actual viewer connections. Writes are throttled so
+    // rapid bot joins/leaves cannot hammer Firebase or interfere with WebRTC.
     function updateCount(){
-      const total=Math.floor(Number(botCount)+Number(realViewers))||0;
+      const total=Math.max(0,Math.floor(Number(botCount)+Number(realViewers))||0);
       updateCountDisplay(total);
-      if(isHost&&currentLiveId){
-        update(ref(db,'lives/'+currentLiveId),{viewers:total}).catch(()=>{});
-      }
+      if(isHost&&currentLiveId)scheduleViewerCountSync();
+    }
+
+    let viewerCountSyncTimer=null;
+    function scheduleViewerCountSync(){
+      if(!isHost||!currentLiveId)return;
+      clearTimeout(viewerCountSyncTimer);
+      viewerCountSyncTimer=setTimeout(()=>{
+        viewerCountSyncTimer=null;
+        const total=Math.max(0,Math.floor(Number(botCount)+Number(realViewers))||0);
+        update(ref(db,'lives/'+currentLiveId),{viewers:total,botCount:Math.max(0,Math.floor(Number(botCount)||0))}).catch(()=>{});
+      },250);
     }
     function updateCountDisplay(n){
       document.getElementById('watchers-text').textContent=format(n)+' watching';
@@ -899,26 +986,73 @@
       if(!bMenu.contains(e.target)&&e.target!==btnB) bMenu.classList.remove('show');
     });
 
+    let pendingBotDelta=0;
+    let botDeltaTimer=null;
+
+    // Queue host-side bot changes and commit them in small batches. This keeps
+    // the bot counter shared between host/viewers without flooding Firebase.
+    function queueBotDelta(delta){
+      if(!isHost||!currentLiveId)return;
+      delta=Math.trunc(Number(delta)||0);
+      if(!delta)return;
+      botCount=Math.max(0,botCount+delta);
+      pendingBotDelta+=delta;
+      updateCount();
+      if(botDeltaTimer)return;
+      botDeltaTimer=setTimeout(flushBotDelta,300);
+    }
+
+    async function flushBotDelta(){
+      botDeltaTimer=null;
+      if(!isHost||!currentLiveId||!pendingBotDelta)return;
+      const liveId=currentLiveId;
+      const delta=pendingBotDelta;
+      pendingBotDelta=0;
+      try{
+        const result=await runTransaction(ref(db,`lives/${liveId}/botCount`),current=>{
+          const value=Math.max(0,Math.floor(Number(current)||0));
+          return Math.max(0,value+delta);
+        });
+        if(liveId===currentLiveId){
+          botCount=Math.max(0,Math.floor(Number(result.snapshot.val())||0));
+          updateCount();
+        }
+      }catch(e){
+        // Re-read the shared value rather than leaving the UI permanently out
+        // of sync if a transaction is interrupted.
+        try{
+          const snap=await new Promise(resolve=>onValue(ref(db,`lives/${liveId}/botCount`),resolve,{onlyOnce:true}));
+          if(liveId===currentLiveId)botCount=Math.max(0,Math.floor(Number(snap.val())||0));
+          updateCount();
+        }catch(_e){}
+      }
+      if(pendingBotDelta&&!botDeltaTimer)botDeltaTimer=setTimeout(flushBotDelta,300);
+    }
+
     async function addBotsBatch(n){
       n=Math.floor(Number(n))||1;
       if(isHost){
-        // Add in chunks so UI stays smooth
-        const chunk=Math.min(n,5000);
-        botCount+=chunk;
-        // Extra if n was huge — count fully
-        if(n>chunk) botCount+= (n-chunk);
-        updateCount();
-        // A few chat lines, not n lines (keeps chat clean)
+        queueBotDelta(n);
+        // A few chat lines, not n lines (keeps chat clean).
         const msgs=Math.min(8, Math.max(1, Math.floor(Math.log10(n+1))+1));
-        for(let i=0;i<msgs;i++) addMsg(nextName(),nextMsg());
+        for(let i=0;i<msgs;i++){
+          const botName=nextName();
+          const botText=nextMsg();
+          addMsg(botName,botText);
+          broadcastBotChat(botName,botText);
+        }
         toast('+'+format(n)+' bots');
       } else if(currentLiveId){
         try{
-          const liveRef=ref(db,'lives/'+currentLiveId);
-          const snap=await new Promise(r=>onValue(liveRef,s=>r(s),{onlyOnce:true}));
-          const cur=Math.floor(Number(snap.val()?.viewers))||0;
-          await update(liveRef,{viewers:cur+n});
-          updateCountDisplay(cur+n);
+          const result=await runTransaction(ref(db,`lives/${currentLiveId}/botCount`),current=>{
+            const value=Math.max(0,Math.floor(Number(current)||0));
+            return value+n;
+          });
+          const sharedBots=Math.max(0,Math.floor(Number(result.snapshot.val())||0));
+          // Do not use the old total viewers value here: it mixes real viewers
+          // and bots and caused bot additions to disappear when the host wrote
+          // its own count back.
+          updateCountDisplay(Math.max(sharedBots,Math.floor(Number(result.snapshot.val())||0)));
           await push(ref(db,`lives/${currentLiveId}/chat`),{
             name:nextName(), text:nextMsg(), host:false, gift:false, at:Date.now()
           });
@@ -961,8 +1095,7 @@
       if(botCount>1000) burst=5+Math.floor(Math.random()*15);
       if(botCount>10000) burst=20+Math.floor(Math.random()*80);
       botTimer=setTimeout(()=>{
-        botCount+=burst;
-        updateCount();
+        queueBotDelta(burst);
         scheduleJoin();
       },delay);
     }
@@ -987,6 +1120,19 @@
       },delay);
     }
 
+    let lastBotChatWrite=0;
+    function broadcastBotChat(name,text){
+      if(!isHost||!currentLiveId)return;
+      // Keep bot chat shared with viewers, but never let a huge bot count
+      // generate thousands of Firebase writes per second.
+      const now=Date.now();
+      if(now-lastBotChatWrite<180)return;
+      lastBotChatWrite=now;
+      push(ref(db,`lives/${currentLiveId}/chat`),{
+        name,text,host:false,gift:false,bot:true,at:now
+      }).catch(()=>{});
+    }
+
     function scheduleChat(){
       // Faster chat when more bots — but keep UI clean (limited msgs per tick)
       let delay;
@@ -1009,7 +1155,13 @@
 
       chatTimer=setTimeout(()=>{
         if(botCount>0){
-          for(let i=0;i<multi;i++) addMsg(nextName(),nextMsg());
+          for(let i=0;i<multi;i++){
+            const botName=nextName();
+            const botText=nextMsg();
+            addMsg(botName,botText);
+            // Also publish the bot message so every viewer sees the same chat.
+            broadcastBotChat(botName,botText);
+          }
           // After enough greetings, switch phase
           if(chatPhase==='greet' && ni>35) chatPhase='normal';
         }
