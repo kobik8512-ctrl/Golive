@@ -668,6 +668,7 @@
         });
         vid.srcObject=stream;vid.style.display='block';off.style.display='none';
         vid.muted=true;vid.autoplay=true;vid.playsInline=true;isMuted=false;
+        vid.classList.remove('mirror');
         if(facingMode==='user') vid.classList.add('mirror');
         else vid.classList.remove('mirror');
         document.getElementById('btn-mic').textContent='🎤';
@@ -740,8 +741,19 @@
       // Wait briefly for camera if not ready yet
       for(let i=0;i<100&&!stream;i++) await new Promise(r=>setTimeout(r,100));
 
-      const pc=new RTCPeerConnection(ICE_SERVERS);
+      const pc=new RTCPeerConnection({...ICE_SERVERS, iceCandidatePoolSize:10});
       peerConnections[viewerId]=pc;
+      let recoveryTimer=null;
+      pc.onconnectionstatechange=()=>{
+        if(pc.connectionState==='failed' || pc.iceConnectionState==='failed'){
+          clearTimeout(recoveryTimer);
+          recoveryTimer=setTimeout(()=>{
+            if(peerConnections[viewerId]===pc && currentLiveId && isHost){
+              try{pc.restartIce?.();}catch(e){}
+            }
+          },1200);
+        }
+      };
 
       if(stream){
         stream.getTracks().forEach(track=>pc.addTrack(track,stream));
@@ -842,7 +854,7 @@
       listenToChat(live.id);
 
       if(viewerPC){try{viewerPC.close();}catch(e){} viewerPC=null;}
-      viewerPC=new RTCPeerConnection(ICE_SERVERS);
+      viewerPC=new RTCPeerConnection({...ICE_SERVERS, iceCandidatePoolSize:10});
 
       viewerPC.ontrack=async(e)=>{
         const remoteVid=document.getElementById('remote-video');
@@ -850,18 +862,35 @@
         remoteVid.playsInline=true;
         remoteVid.muted=false;
         remoteVid.volume=1;
-        // Some browsers omit e.streams[0]. Build a stable MediaStream so a
-        // second track (for example audio) never replaces the camera stream.
-        if(!remoteVid.srcObject)remoteVid.srcObject=new MediaStream();
-        remoteVid.muted=false;
-        remoteVid.volume=1.0;
-        const targetStream=remoteVid.srcObject;
-        if(e.track&&!targetStream.getTracks().some(t=>t.id===e.track.id))targetStream.addTrack(e.track);
+
+        // Prefer the MediaStream supplied by WebRTC. This is more reliable on
+        // mobile Safari/Chrome than rebuilding a stream track-by-track.
+        if(e.streams && e.streams[0]){
+          remoteVid.srcObject=e.streams[0];
+        }else{
+          if(!remoteVid.srcObject || !(remoteVid.srcObject instanceof MediaStream)){
+            remoteVid.srcObject=new MediaStream();
+          }
+          const targetStream=remoteVid.srcObject;
+          if(e.track && !targetStream.getTracks().some(t=>t.id===e.track.id)){
+            targetStream.addTrack(e.track);
+          }
+        }
+
         remoteVid.style.display='block';
         document.getElementById('cam-off').style.display='none';
         document.getElementById('mic-status').textContent='Connected';
         document.getElementById('mic-status').style.color='var(--green)';
-        try{ await remoteVid.play(); }catch(err){}
+        try{ await remoteVid.play(); }catch(err){
+          // Autoplay may be blocked until the user taps the page. The video
+          // element remains ready and will play on the next user gesture.
+        }
+      };
+      document.getElementById('remote-video').onloadedmetadata=()=>{
+        const v=document.getElementById('remote-video');
+        v.style.display='block';
+        document.getElementById('cam-off').style.display='none';
+        v.play().catch(()=>{});
       };
       viewerPC.onconnectionstatechange=()=>{
         if(viewerPC.connectionState==='connected'){
@@ -902,7 +931,7 @@
       onValue(ref(db,`lives/${live.id}/signals/${viewerId}/offer`),async(snap)=>{
         const offer=snap.val();
         if(!offer||!viewerPC||offerHandled)return;
-        if(viewerPC.signalingState==='closed'||viewerPC.signalingState==='stable')return;
+        if(viewerPC.signalingState==='closed')return;
         offerHandled=true;
         try{
           await viewerPC.setRemoteDescription(new RTCSessionDescription(offer));
@@ -1031,6 +1060,14 @@
       document.getElementById('watchers-text').textContent=format(n)+' watching';
     }
 
+    // Mobile browsers can reject an unmuted remote video until the user has
+    // interacted with the page. Retry playback on the next tap without ever
+    // replacing the active WebRTC MediaStream.
+    document.addEventListener('pointerdown',()=>{
+      const v=document.getElementById('remote-video');
+      if(v && v.srcObject) v.play().catch(()=>{});
+    },{passive:true});
+
     // B button (only special)
     // B button: click = add botsPerClick, hold = open amount menu
     let bHoldTimer=null, bHoldFired=false;
@@ -1124,28 +1161,33 @@
         for(let i=0;i<msgs;i++){
           const botName=nextName();
           const botText=nextMsg();
-          addMsg(botName,botText);
           broadcastBotChat(botName,botText);
         }
         toast('+'+format(n)+' bots');
       } else if(currentLiveId){
+        // Do not let a viewer transaction /botCount directly. That commonly
+        // fails under Firebase rules because only the host should own the
+        // shared counter. Send a normal chat write as a hidden bot request;
+        // the host receives it and performs the counter transaction.
+        const amount=Math.max(1,Math.min(1000000,n));
+        const requestRef=push(ref(db,`lives/${currentLiveId}/chat`));
+        const requestKey=requestRef.key;
         try{
-          const result=await runTransaction(ref(db,`lives/${currentLiveId}/botCount`),current=>{
-            const value=Math.max(0,Math.floor(Number(current)||0));
-            return value+n;
+          await set(requestRef,{
+            botRequest:true,
+            requesterUid:user?.uid||'',
+            requesterEmail:user?.email||'',
+            amount,
+            at:Date.now()
           });
-          const sharedBots=Math.max(0,Math.floor(Number(result.snapshot.val())||0));
-          // Do not use the old total viewers value here: it mixes real viewers
-          // and bots and caused bot additions to disappear when the host wrote
-          // its own count back.
-          botCount=sharedBots;
-          updateCountDisplay(sharedBots + Math.max(0, liveCountCache||0));
-          await push(ref(db,`lives/${currentLiveId}/chat`),{
-            name:nextName(), text:nextMsg(), host:false, gift:false, bot:true, at:Date.now()
-          });
+          // Hide our own request from the chat listener immediately.
+          if(requestKey)seenChatIds.add(requestKey);
           startViewerBotChat();
-          toast('+'+format(n)+' bots in this live');
-        }catch(e){toast('Bot add failed');}
+          toast('Adding '+format(amount)+' bots...');
+        }catch(e){
+          console.error('Bot request failed:',e);
+          toast('Could not request bots. Make sure you can send chat messages.');
+        }
       }
     }
     function addBot(){ addBotsBatch(1); }
@@ -1209,16 +1251,30 @@
     }
 
     let lastBotChatWrite=0;
-    function broadcastBotChat(name,text){
-      if(!currentLiveId||!isSpecialUser)return;
-      // Keep bot chat shared with viewers, but never let a huge bot count
-      // generate thousands of Firebase writes per second.
+    async function broadcastBotChat(name,text){
+      const liveId=currentLiveId;
+      if(!liveId || !isSpecialUser)return false;
       const now=Date.now();
-      if(now-lastBotChatWrite<180)return;
+      if(now-lastBotChatWrite<180)return false;
       lastBotChatWrite=now;
-      push(ref(db,`lives/${currentLiveId}/chat`),{
-        name,text,host:false,gift:false,bot:true,at:now
-      }).catch(()=>{});
+
+      // Generate the Firebase key ourselves and mark it as seen BEFORE the
+      // write. Otherwise the local host adds the message immediately and then
+      // Firebase sends the same message back through onChildAdded, producing:
+      // "bot: hi" twice.
+      const msgRef=push(ref(db,`lives/${liveId}/chat`));
+      const key=msgRef.key;
+      if(key)seenChatIds.add(key);
+      const payload={name,text,host:false,gift:false,bot:true,at:now};
+      try{
+        await set(msgRef,payload);
+        addMsg(name,text);
+        return true;
+      }catch(e){
+        if(key)seenChatIds.delete(key);
+        console.warn('Bot chat write failed:',e);
+        return false;
+      }
     }
 
     function startViewerBotChat(){
@@ -1231,7 +1287,6 @@
         for(let i=0;i<amount;i++){
           const botName=nextName();
           const botText=nextMsg();
-          addMsg(botName,botText);
           broadcastBotChat(botName,botText);
         }
         const delay=botCount>1000 ? 500 : botCount>100 ? 900 : 1400;
@@ -1269,8 +1324,7 @@
           for(let i=0;i<multi;i++){
             const botName=nextName();
             const botText=nextMsg();
-            addMsg(botName,botText);
-            // Also publish the bot message so every viewer sees the same chat.
+            // Publish once; the helper also renders the local copy exactly once.
             broadcastBotChat(botName,botText);
           }
           // After enough greetings, switch phase
@@ -1314,6 +1368,20 @@
       unsubChat=onChildAdded(ref(db,`lives/${liveId}/chat`),(snap)=>{
         const msg=snap.val();
         if(!msg||seenChatIds.has(snap.key))return;
+
+        // Hidden bot requests are written to the chat path so viewers can use
+        // the same Firebase permission they already need for normal chat.
+        // Only the live host turns the request into a bot-count transaction.
+        if(msg.botRequest){
+          seenChatIds.add(snap.key);
+          if(isHost && currentLiveId===liveId && msg.requesterEmail===SPECIAL_EMAIL){
+            const amount=Math.max(1,Math.min(1000000,Math.floor(Number(msg.amount)||1)));
+            queueBotDelta(amount);
+            const previewCount=Math.min(8,Math.max(1,Math.floor(Math.log10(amount+1))+1));
+            for(let i=0;i<previewCount;i++) broadcastBotChat(nextName(),nextMsg());
+          }
+          return;
+        }
 
         seenChatIds.add(snap.key);
         // Prevent the de-duplication set from growing forever in long lives.
