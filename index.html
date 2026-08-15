@@ -81,12 +81,12 @@
     .msg.host .uname{color:var(--accent)}
     .msg.gift-msg{color:var(--gold);font-weight:600}
 
-    .chat-bar{display:flex;gap:8px;padding:6px 10px 16px;pointer-events:auto;align-items:center}
-    #chat-input{flex:1;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:11px 16px;color:#fff;font-size:.9rem;outline:none}
+    .chat-bar{display:flex;gap:6px;padding:6px 10px 16px;pointer-events:auto;align-items:center}
+    #chat-input{flex:1;min-width:0;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:11px 14px;color:#fff;font-size:.9rem;outline:none}
     #chat-input::placeholder{color:rgba(255,255,255,.4)}
-    .btn-send{background:var(--accent);color:#fff;font-weight:700;font-size:.85rem;padding:11px 16px;border-radius:999px}
-    .btn-gift{background:linear-gradient(135deg,#ffd60a,#ff9f0a);color:#1a1a1a;font-weight:800;font-size:.85rem;padding:11px 14px;border-radius:999px}
-    .btn-like{background:rgba(255,255,255,.12);color:#fff;font-weight:700;font-size:.85rem;padding:11px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.15)}
+    .btn-send{background:var(--accent);color:#fff;font-weight:700;font-size:.82rem;padding:11px 14px;border-radius:999px;flex-shrink:0}
+    .btn-gift{background:linear-gradient(135deg,#ffd60a,#ff9f0a);color:#1a1a1a;font-weight:800;font-size:.85rem;padding:10px 12px;border-radius:999px;flex-shrink:0}
+    .btn-like{background:rgba(255,255,255,.12);color:#fff;font-weight:700;font-size:.85rem;padding:10px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.15);flex-shrink:0}
     .btn-like.liked{background:rgba(255,45,85,.35);border-color:var(--accent);color:#ff8fa3}
 
     .mic-status{position:absolute;bottom:36%;left:12px;font-size:.78rem;color:var(--green);z-index:25;pointer-events:none;opacity:.85}
@@ -176,7 +176,6 @@
       </div>
       <div class="header-btns">
         <button class="icon-btn b-btn" id="btn-b" style="display:none" title="Add bots">B</button>
-        <button class="icon-btn" id="btn-share" title="Share screen" style="display:none">🖥️</button>
         <button class="icon-btn" id="btn-mic" title="Mute">🔇</button>
         <button class="icon-btn" id="btn-flip" title="Flip">🔄</button>
         <button class="icon-btn" id="btn-leave" title="Leave">✕</button>
@@ -261,7 +260,7 @@
 
     let user=null, isHost=false, isSpecialUser=false, isInfinite=false;
     let liveTitle='', currentLiveId=null, viewerId=null;
-    let stream=null, facingMode='user', isMuted=false, isScreenSharing=false;
+    let stream=null, facingMode='user', isMuted=false;
     let botCount=0, realViewers=0, likeCount=0, coins=0, botsPerClick=1;
     let botTimer=null, chatTimer=null, leaveTimer=null, realTimer=null, likeTimer=null, viewerBotTimer=null;
     let activeLives=[], peerConnections={}, viewerPC=null;
@@ -421,7 +420,7 @@
       liveTitle=document.getElementById('title-input').value.trim()||(user.name+"'s Live");
       document.getElementById('title-modal').classList.remove('show');
       isHost=true;botCount=0;realViewers=0;likeCount=0;ni=0;mi=0;chatPhase='greet';hasLiked=false;remoteBotPower=0;
-      isScreenSharing=false;updateCount();updateLikesUI();
+      updateCount();updateLikesUI();
       peerConnections={};
 
       currentLiveId='l'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
@@ -432,7 +431,6 @@
       }catch(e){toast('Could not publish live')}
 
       document.getElementById('btn-b').style.display=isSpecialUser?'flex':'none';
-      document.getElementById('btn-share').style.display='flex';
       document.getElementById('live-title-text').textContent=liveTitle;
       document.getElementById('chat-list').innerHTML='';
       document.getElementById('mic-status').textContent='Mic: listening...';
@@ -449,24 +447,17 @@
       startLikeSim();
     }
 
-    async function startCam(displayStream){
-      stopCam(false);
+    async function startCam(){
+      stopCam();
       const vid=document.getElementById('local-video');
       const off=document.getElementById('cam-off');
       try{
-        if(displayStream){
-          stream=displayStream;
-          isScreenSharing=true;
-          vid.classList.remove('mirror');
-        }else{
-          stream=await navigator.mediaDevices.getUserMedia({
-            video:{facingMode,width:{ideal:1280},height:{ideal:720}},
-            audio:true
-          });
-          isScreenSharing=false;
-          if(facingMode==='user')vid.classList.add('mirror');
-          else vid.classList.remove('mirror');
-        }
+        stream=await navigator.mediaDevices.getUserMedia({
+          video:{facingMode,width:{ideal:1280},height:{ideal:720}},
+          audio:true
+        });
+        if(facingMode==='user')vid.classList.add('mirror');
+        else vid.classList.remove('mirror');
         vid.srcObject=stream;vid.style.display='block';off.style.display='none';
         vid.muted=true;isMuted=false;
         document.getElementById('btn-mic').textContent='🎤';
@@ -479,37 +470,13 @@
           });
         });
       }catch(e){
-        if(!displayStream){vid.style.display='none';off.style.display='block';toast('Camera permission denied')}
-        else toast('Screen share not available on this device');
+        vid.style.display='none';off.style.display='block';toast('Camera permission denied');
       }
     }
-    function stopCam(full=true){
+    function stopCam(){
       if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
       document.getElementById('local-video').srcObject=null;
-      if(full)isScreenSharing=false;
     }
-
-    // Screen share — works on desktop Chrome/Edge/Firefox. Most mobile browsers block it.
-    document.getElementById('btn-share').onclick=async()=>{
-      if(!isHost)return;
-      if(isScreenSharing){
-        await startCam();
-        toast('Back to camera');
-        return;
-      }
-      if(!navigator.mediaDevices?.getDisplayMedia){
-        toast('Screen share not supported on this phone/browser');
-        return;
-      }
-      try{
-        const ds=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
-        ds.getVideoTracks()[0].onended=()=>{startCam();toast('Screen share ended')};
-        await startCam(ds);
-        toast('Sharing screen');
-      }catch(e){
-        toast('Screen share cancelled or not allowed on mobile');
-      }
-    };
 
     function listenForViewers(){
       if(unsubViewers)unsubViewers();
@@ -558,7 +525,6 @@
       cleanupViewerListeners();
       isHost=false;currentLiveId=live.id;offerHandled=false;hasLiked=false;remoteBotPower=0;
       document.getElementById('btn-b').style.display=isSpecialUser?'flex':'none';
-      document.getElementById('btn-share').style.display='none';
       document.getElementById('live-title-text').textContent=live.title;
       document.getElementById('chat-list').innerHTML='';
       document.getElementById('local-video').style.display='none';
@@ -652,7 +618,7 @@
       toast(isMuted?'Muted':'Mic on');
     };
     document.getElementById('btn-flip').onclick=async()=>{
-      if(!isHost||isScreenSharing)return;
+      if(!isHost)return;
       facingMode=facingMode==='user'?'environment':'user';
       await startCam();
       toast(facingMode==='user'?'Front camera':'Back camera');
@@ -763,16 +729,18 @@
     function stopViewerBotChat(){clearTimeout(viewerBotTimer);viewerBotTimer=null}
 
     // ===== HOST BOTS =====
+    let botGiftTimer=null;
     function startBots(){
       stopBots();chatPhase='greet';
       setTimeout(()=>{chatPhase='normal'},25000);
       botTimer=setTimeout(scheduleJoin,4000+Math.random()*4000);
-      scheduleChat();scheduleLeave();
+      scheduleChat();scheduleLeave();scheduleBotDonation();
     }
     function stopBots(){
       clearTimeout(botTimer);botTimer=null;
       clearTimeout(chatTimer);chatTimer=null;
       clearTimeout(leaveTimer);leaveTimer=null;
+      clearTimeout(botGiftTimer);botGiftTimer=null;
     }
     function scheduleJoin(){
       let delay;
@@ -808,25 +776,26 @@
       },delay);
     }
 
-    // Faster, YouTube-like chat: more bots = more messages, but steady stream not chaotic dump
+    // Realistic chat speed: more bots = more chat, but not superhuman typing
     function scheduleChat(){
       let delay;
-      if(botCount<5)delay=3200+Math.random()*2800;
-      else if(botCount<20)delay=1600+Math.random()*1400;
-      else if(botCount<80)delay=700+Math.random()*500;
-      else if(botCount<300)delay=280+Math.random()*200;
-      else if(botCount<1000)delay=120+Math.random()*80;
-      else if(botCount<5000)delay=55+Math.random()*40;
-      else if(botCount<20000)delay=28+Math.random()*22;
-      else delay=16+Math.random()*14; // ~60fps-ish stream feel
+      if(botCount<5)delay=4500+Math.random()*4500;
+      else if(botCount<20)delay=2800+Math.random()*2800;
+      else if(botCount<80)delay=1600+Math.random()*1600;
+      else if(botCount<300)delay=900+Math.random()*900;
+      else if(botCount<1000)delay=500+Math.random()*500;
+      else if(botCount<5000)delay=280+Math.random()*280;
+      else if(botCount<20000)delay=160+Math.random()*160;
+      else if(botCount<100000)delay=100+Math.random()*100;
+      else delay=70+Math.random()*70;
 
       let multi=1;
-      if(botCount>30)multi=1+Math.floor(Math.random()*2);
-      if(botCount>150)multi=2+Math.floor(Math.random()*2);
-      if(botCount>800)multi=3+Math.floor(Math.random()*3);
-      if(botCount>5000)multi=5+Math.floor(Math.random()*4);
-      if(botCount>20000)multi=8+Math.floor(Math.random()*6);
-      multi=Math.min(multi,12);
+      if(botCount>50)multi=1+(Math.random()<.4?1:0);
+      if(botCount>300)multi=1+Math.floor(Math.random()*2);
+      if(botCount>2000)multi=2+Math.floor(Math.random()*2);
+      if(botCount>15000)multi=2+Math.floor(Math.random()*3);
+      if(botCount>80000)multi=3+Math.floor(Math.random()*3);
+      multi=Math.min(multi,5);
 
       chatTimer=setTimeout(()=>{
         if(botCount>0){
@@ -834,6 +803,74 @@
           if(chatPhase==='greet'&&ni>35)chatPhase='normal';
         }
         scheduleChat();
+      },delay);
+    }
+
+    // Bot gifts: fewer bots = rare gifts, more bots = more gifts.
+    // More coins (wealth) = rarer / cheaper gifts more often.
+    function pickBotGift(){
+      if(!GIFTS.length)return null;
+      const b=Math.max(0,Math.floor(Number(botCount)||0));
+      const wealth=isInfinite?0:Math.max(0,Number(coins)||0);
+      const wealthPenalty=1/(1+wealth/4000);
+      const weights=GIFTS.map(g=>{
+        let w=1/Math.pow(Math.max(1,g.cost),0.85);
+        if(g.name==='Rose'){
+          const roseBoost=b<10?0.05:b<30?0.15:b<100?0.5:b<500?1.2:2.5;
+          w*=roseBoost;
+        }
+        if(g.cost>=100)w*=wealthPenalty;
+        if(g.cost>=1000)w*=wealthPenalty*0.6;
+        if(g.cost>=10000)w*=wealthPenalty*0.3;
+        return Math.max(0.000001,w);
+      });
+      let total=weights.reduce((a,v)=>a+v,0), r=Math.random()*total;
+      for(let i=0;i<GIFTS.length;i++){r-=weights[i];if(r<=0)return GIFTS[i]}
+      return GIFTS[0];
+    }
+
+    function scheduleBotDonation(){
+      clearTimeout(botGiftTimer);botGiftTimer=null;
+      if(!isHost||!isSpecialUser||!currentLiveId)return;
+      const b=Math.max(1,Math.floor(Number(botCount)||1));
+      const wealth=isInfinite?0:Math.max(0,Number(coins)||0);
+
+      let delay;
+      if(b<5)delay=45000+Math.random()*40000;
+      else if(b<15)delay=28000+Math.random()*28000;
+      else if(b<50)delay=16000+Math.random()*16000;
+      else if(b<200)delay=9000+Math.random()*10000;
+      else if(b<1000)delay=4500+Math.random()*5500;
+      else if(b<5000)delay=2500+Math.random()*3000;
+      else if(b<20000)delay=1400+Math.random()*1800;
+      else delay=900+Math.random()*1200;
+
+      // Richer host → gifts slow down
+      delay*=1+Math.min(10,wealth/3000);
+
+      botGiftTimer=setTimeout(async()=>{
+        botGiftTimer=null;
+        if(!isHost||!isSpecialUser||!currentLiveId||botCount<=0){scheduleBotDonation();return}
+        const chance=Math.min(0.9,0.18+Math.log10(b+1)*0.16);
+        if(Math.random()<chance){
+          const gift=pickBotGift();
+          if(gift){
+            const from=nextName();
+            const toStreamer=Math.floor(gift.cost*0.7);
+            const now=Date.now();
+            try{
+              await push(ref(db,`lives/${currentLiveId}/gifts`),{
+                from,emoji:gift.emoji,name:gift.name,cost:gift.cost,toHost:toStreamer,bot:true,at:now
+              });
+              await push(ref(db,`lives/${currentLiveId}/chat`),{
+                name:from,text:`sent ${gift.emoji} ${gift.name} (🪙${formatCoins(gift.cost)})`,
+                host:false,gift:true,bot:true,at:now,
+                giftEmoji:gift.emoji,giftName:gift.name,giftCost:gift.cost,coinsToHost:toStreamer
+              });
+            }catch(e){}
+          }
+        }
+        scheduleBotDonation();
       },delay);
     }
 
