@@ -349,7 +349,7 @@
     let stream = null, facingMode = 'user', isMuted = false;
     let botCount = 0, realViewers = 0;
     let botSyncTimer = null, botSyncPending = false;
-    let botTimer = null, chatTimer = null, realTimer = null;
+    let botTimer = null, chatTimer = null, realTimer = null, viewerBotChatTimer = null;
     let activeLives = [], coins = 0;
     let peerConnections = {};   // host: viewerId -> PC
     let viewerPC = null;        // viewer side PC
@@ -523,7 +523,7 @@
           const live=val[id]||{};
           activeLives.push({
             id,title:live.title,host:live.host,hostEmail:live.hostEmail,
-            viewers:live.viewers||0,startedAt:live.startedAt||0
+            viewers:live.viewerCount||0,botCount:live.botCount||0,hostUid:live.hostUid||'' ,startedAt:live.startedAt||0
           });
         });
         activeLives.sort((a,b)=>(b.startedAt||0)-(a.startedAt||0));
@@ -544,7 +544,7 @@
       if(!activeLives.length){empty.style.display='block';return;}
       empty.style.display='none';
       activeLives.forEach(live=>{
-        const isMine=user&&live.hostEmail===user.email;
+        const isMine=!!(user&&live.hostUid&&live.hostUid===user.uid);
         const card=document.createElement('div');
         card.className='live-card';
         card.innerHTML=`
@@ -589,7 +589,7 @@
       currentLiveId='l'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
       try{
         await set(ref(db,'lives/'+currentLiveId),{
-          title:liveTitle,host:user.name,hostEmail:user.email,viewers:0,botCount:0,startedAt:Date.now()
+          title:liveTitle,host:user.name,hostEmail:user.email,hostUid:user.uid,viewerCount:0,botCount:0,startedAt:Date.now()
         });
       }catch(e){console.error(e);toast('Could not publish live');}
 
@@ -604,7 +604,7 @@
       show('live-room');
       await startCam();
       if(isSpecialUser)startBots();
-      startRealSim();
+      stopRealSim();
       listenForViewers();  // host listens for people joining
       listenToChat(currentLiveId);  // shared chat
       listenForGifts(currentLiveId); // receive gift coins
@@ -696,7 +696,7 @@
         console.warn('No stream when creating peer');
       }
 
-      let iceQ=[], iceT=null;
+      let iceQ=[], iceT=null, hostRemoteReady=false, pendingViewerCandidates=[];
       pc.onicecandidate=e=>{
         if(!e.candidate)return;
         iceQ.push(e.candidate.toJSON());
@@ -714,13 +714,19 @@
         const answer=snap.val();
         if(!answer||answerDone||pc.signalingState==='closed')return;
         answerDone=true;
-        pc.setRemoteDescription(new RTCSessionDescription(answer)).catch(()=>{answerDone=false;});
+        pc.setRemoteDescription(new RTCSessionDescription(answer)).then(()=>{
+          hostRemoteReady=true;
+          const pending=pendingViewerCandidates.splice(0);
+          pending.forEach(c=>pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{}));
+        }).catch(()=>{answerDone=false;});
       });
 
       // Listen for ICE from viewer
       onChildAdded(ref(db,`lives/${currentLiveId}/signals/${viewerId}/viewerCandidates`),(snap)=>{
         const c=snap.val();
-        if(c)pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
+        if(!c)return;
+        if(hostRemoteReady) pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
+        else pendingViewerCandidates.push(c);
       });
 
       try{
@@ -744,7 +750,7 @@
       document.getElementById('cam-off').style.display='block';
       document.getElementById('mic-status').textContent='Connecting...';
       document.getElementById('mic-status').style.color='var(--muted)';
-      updateCountDisplay(Number(live.viewers)||1);
+      updateCountDisplay((Number(live.viewers)||0)+(Number(live.botCount)||0));
       pauseLivesListener();
       show('live-room');
       toast('Joining '+live.title+'...');
@@ -762,7 +768,11 @@
       // subtree on every chat message, which can overload mobile clients and
       // make the camera appear to disappear. Watch only tiny scalar paths.
       const liveTitleRef=ref(db,`lives/${live.id}/title`);
-      const liveCountRef=ref(db,`lives/${live.id}/viewers`);
+      const liveCountRef=ref(db,`lives/${live.id}/viewerCount`);
+      const liveBotCountRef=ref(db,`lives/${live.id}/botCount`);
+      let liveCountCache=Number(live.viewers)||0;
+      let liveBotCountCache=Number(live.botCount)||0;
+
       unsubLiveEnd=onValue(liveTitleRef,(snap)=>{
         if(!snap.exists() && currentLiveId===live.id && !isHost){
           forceLeaveLive('Live ended by host');
@@ -770,10 +780,18 @@
       });
       unsubLiveCount=onValue(liveCountRef,(snap)=>{
         if(currentLiveId===live.id && !isHost){
-          updateCountDisplay(Number(snap.val())||0);
+          liveCountCache=Number(snap.val())||0;
+          updateCountDisplay(liveCountCache+liveBotCountCache);
         }
       });
-
+      if(unsubLiveMeta)try{unsubLiveMeta();}catch(e){}
+      unsubLiveMeta=onValue(liveBotCountRef,(snap)=>{
+        if(currentLiveId===live.id && !isHost){
+          liveBotCountCache=Number(snap.val())||0;
+          botCount=liveBotCountCache;
+          updateCountDisplay(liveCountCache+liveBotCountCache);
+        }
+      });
       listenToChat(live.id);
 
       if(viewerPC){try{viewerPC.close();}catch(e){} viewerPC=null;}
@@ -781,9 +799,15 @@
 
       viewerPC.ontrack=async(e)=>{
         const remoteVid=document.getElementById('remote-video');
+        remoteVid.autoplay=true;
+        remoteVid.playsInline=true;
+        remoteVid.muted=false;
+        remoteVid.volume=1;
         // Some browsers omit e.streams[0]. Build a stable MediaStream so a
         // second track (for example audio) never replaces the camera stream.
         if(!remoteVid.srcObject)remoteVid.srcObject=new MediaStream();
+        remoteVid.muted=false;
+        remoteVid.volume=1.0;
         const targetStream=remoteVid.srcObject;
         if(e.track&&!targetStream.getTracks().some(t=>t.id===e.track.id))targetStream.addTrack(e.track);
         remoteVid.style.display='block';
@@ -815,7 +839,7 @@
       };
 
       // Throttle ICE writes to avoid flooding Firebase (causes freeze)
-      let iceQueue=[], iceTimer=null;
+      let iceQueue=[], iceTimer=null, viewerRemoteReady=false, pendingHostCandidates=[];
       viewerPC.onicecandidate=e=>{
         if(!e.candidate)return;
         iceQueue.push(e.candidate.toJSON());
@@ -835,6 +859,9 @@
         offerHandled=true;
         try{
           await viewerPC.setRemoteDescription(new RTCSessionDescription(offer));
+          viewerRemoteReady=true;
+          const pending=pendingHostCandidates.splice(0);
+          pending.forEach(c=>viewerPC.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{}));
           const answer=await viewerPC.createAnswer();
           await viewerPC.setLocalDescription(answer);
           await set(ref(db,`lives/${live.id}/signals/${viewerId}/answer`),{
@@ -845,9 +872,9 @@
 
       onChildAdded(ref(db,`lives/${live.id}/signals/${viewerId}/hostCandidates`),(snap)=>{
         const c=snap.val();
-        if(c&&viewerPC&&viewerPC.signalingState!=='closed'){
-          viewerPC.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
-        }
+        if(!c||!viewerPC)return;
+        if(viewerRemoteReady) viewerPC.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
+        else pendingHostCandidates.push(c);
       });
     }
 
@@ -933,12 +960,12 @@
 
     let viewerCountSyncTimer=null;
     function scheduleViewerCountSync(){
-      if(!isHost||!currentLiveId)return;
+      if(!currentLiveId||!isSpecialUser)return;
       clearTimeout(viewerCountSyncTimer);
       viewerCountSyncTimer=setTimeout(()=>{
         viewerCountSyncTimer=null;
         const total=Math.max(0,Math.floor(Number(botCount)+Number(realViewers))||0);
-        update(ref(db,'lives/'+currentLiveId),{viewers:total,botCount:Math.max(0,Math.floor(Number(botCount)||0))}).catch(()=>{});
+        update(ref(db,'lives/'+currentLiveId),{viewerCount:Math.max(0,Math.floor(Number(realViewers)||0)),botCount:Math.max(0,Math.floor(Number(botCount)||0))}).catch(()=>{});
       },250);
     }
     function updateCountDisplay(n){
@@ -1052,10 +1079,12 @@
           // Do not use the old total viewers value here: it mixes real viewers
           // and bots and caused bot additions to disappear when the host wrote
           // its own count back.
-          updateCountDisplay(Math.max(sharedBots,Math.floor(Number(result.snapshot.val())||0)));
+          botCount=sharedBots;
+          updateCountDisplay(sharedBots + Math.max(0, liveCountCache||0));
           await push(ref(db,`lives/${currentLiveId}/chat`),{
-            name:nextName(), text:nextMsg(), host:false, gift:false, at:Date.now()
+            name:nextName(), text:nextMsg(), host:false, gift:false, bot:true, at:Date.now()
           });
+          startViewerBotChat();
           toast('+'+format(n)+' bots in this live');
         }catch(e){toast('Bot add failed');}
       }
@@ -1075,6 +1104,7 @@
     function stopBots(){
       clearTimeout(botTimer);botTimer=null;
       clearTimeout(chatTimer);chatTimer=null;
+      stopViewerBotChat();
       clearTimeout(leaveTimer);leaveTimer=null;
     }
     let leaveTimer=null;
@@ -1113,8 +1143,7 @@
           if(botCount>500) leave=2+Math.floor(Math.random()*8);
           if(botCount>5000) leave=10+Math.floor(Math.random()*40);
           leave=Math.min(leave, Math.floor(botCount*0.05)+1); // max 5% leave at once
-          botCount=Math.max(0, botCount-leave);
-          updateCount();
+          queueBotDelta(-leave);
         }
         scheduleLeave();
       },delay);
@@ -1122,7 +1151,7 @@
 
     let lastBotChatWrite=0;
     function broadcastBotChat(name,text){
-      if(!isHost||!currentLiveId)return;
+      if(!currentLiveId||!isSpecialUser)return;
       // Keep bot chat shared with viewers, but never let a huge bot count
       // generate thousands of Firebase writes per second.
       const now=Date.now();
@@ -1131,6 +1160,29 @@
       push(ref(db,`lives/${currentLiveId}/chat`),{
         name,text,host:false,gift:false,bot:true,at:now
       }).catch(()=>{});
+    }
+
+    function startViewerBotChat(){
+      if(isHost || !isSpecialUser || !currentLiveId) return;
+      if(viewerBotChatTimer) return;
+      const tick=async()=>{
+        viewerBotChatTimer=null;
+        if(!currentLiveId || isHost || !isSpecialUser || botCount<=0) return;
+        const amount=botCount>500 ? 2 : 1;
+        for(let i=0;i<amount;i++){
+          const botName=nextName();
+          const botText=nextMsg();
+          addMsg(botName,botText);
+          broadcastBotChat(botName,botText);
+        }
+        const delay=botCount>1000 ? 500 : botCount>100 ? 900 : 1400;
+        viewerBotChatTimer=setTimeout(tick,delay);
+      };
+      viewerBotChatTimer=setTimeout(tick,350);
+    }
+    function stopViewerBotChat(){
+      clearTimeout(viewerBotChatTimer);
+      viewerBotChatTimer=null;
     }
 
     function scheduleChat(){
