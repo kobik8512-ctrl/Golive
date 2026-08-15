@@ -597,17 +597,42 @@
     document.getElementById('title-input').onkeydown=e=>{if(e.key==='Enter')startLive();};
 
     async function startLive(){
+      if(!user?.uid){toast('Please sign in again');return;}
       liveTitle=document.getElementById('title-input').value.trim()||(user.name+"'s Live");
       document.getElementById('title-modal').classList.remove('show');
       isHost=true;botCount=0;realViewers=0;ni=0;mi=0;chatPhase='greet';botsPerClick=botsPerClick||1;
       peerConnections={};
 
+      // IMPORTANT: get the camera/mic BEFORE publishing the live. Previously the
+      // live appeared in the list while the camera was still starting. A viewer
+      // could join in that small window and the host would create an offer with
+      // no tracks, leaving the viewer with a black camera forever.
+      const camOk=await startCam();
+      if(!camOk){
+        isHost=false;
+        currentLiveId=null;
+        toast('Camera/mic could not start. Allow camera and microphone, then try again.');
+        return;
+      }
+
       currentLiveId='l'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
       try{
         await set(ref(db,'lives/'+currentLiveId),{
-          title:liveTitle,host:user.name,hostEmail:user.email,hostUid:user.uid,viewerCount:0,botCount:0,startedAt:Date.now()
+          title:liveTitle,host:user.name,hostEmail:user.email,hostUid:user.uid,
+          viewerCount:0,botCount:0,startedAt:Date.now()
         });
-      }catch(e){console.error(e);toast('Could not publish live');}
+      }catch(e){
+        console.error('Could not publish live:',e);
+        stopCam();
+        isHost=false;
+        const code=e?.code||'';
+        const msg=String(e?.message||'').replace(/^FirebaseError:\s*/,'');
+        toast(code==='PERMISSION_DENIED'||/permission_denied/i.test(msg)
+          ? 'Live publish blocked by Firebase rules for this account.'
+          : 'Could not publish live'+(msg?' ('+msg+')':''));
+        currentLiveId=null;
+        return;
+      }
 
       document.getElementById('btn-b').style.display=isSpecialUser?'flex':'none';
       updateCount();
@@ -616,14 +641,14 @@
       document.getElementById('mic-status').textContent='Mic: listening...';
       document.getElementById('mic-status').style.color='var(--green)';
       document.getElementById('remote-video').style.display='none';
+      document.getElementById('cam-off').style.display='none';
       pauseLivesListener();
       show('live-room');
-      await startCam();
       if(isSpecialUser)startBots();
       stopRealSim();
-      listenForViewers();  // host listens for people joining
-      listenToChat(currentLiveId);  // shared chat
-      listenForGifts(currentLiveId); // receive gift coins
+      listenForViewers();
+      listenToChat(currentLiveId);
+      listenForGifts(currentLiveId);
     }
 
     // ============ WEBRTC ============
@@ -631,28 +656,40 @@
       stopCam();
       const vid=document.getElementById('local-video');
       const off=document.getElementById('cam-off');
+      if(!navigator.mediaDevices?.getUserMedia){
+        vid.style.display='none';off.style.display='block';
+        toast('Camera requires HTTPS and browser camera support.');
+        return false;
+      }
       try{
         stream=await navigator.mediaDevices.getUserMedia({
-          video:{facingMode,width:{ideal:1280},height:{ideal:720}},
-          audio:true
+          video:{facingMode:{ideal:facingMode},width:{ideal:1280},height:{ideal:720}},
+          audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}
         });
         vid.srcObject=stream;vid.style.display='block';off.style.display='none';
-        vid.muted=true;isMuted=false;
-        // Fix mirror: front camera should match your real movement
+        vid.muted=true;vid.autoplay=true;vid.playsInline=true;isMuted=false;
         if(facingMode==='user') vid.classList.add('mirror');
         else vid.classList.remove('mirror');
         document.getElementById('btn-mic').textContent='🎤';
         document.getElementById('btn-mic').classList.remove('muted');
-        // If already connected to viewers, replace tracks
-        Object.values(peerConnections).forEach(pc=>{
+        try{await vid.play();}catch(e){}
+
+        // If a viewer somehow connected while the camera was restarting,
+        // replace/add the fresh tracks instead of leaving the old connection
+        // without video/audio.
+        Object.entries(peerConnections).forEach(([viewerKey,pc])=>{
+          if(pc.signalingState==='closed')return;
           stream.getTracks().forEach(track=>{
             const sender=pc.getSenders().find(s=>s.track&&s.track.kind===track.kind);
-            if(sender)sender.replaceTrack(track);
+            if(sender) sender.replaceTrack(track).catch(()=>{});
+            else pc.addTrack(track,stream);
           });
         });
+        return true;
       }catch(e){
+        console.error('getUserMedia failed:',e);
         vid.style.display='none';off.style.display='block';
-        toast('Camera permission denied');
+        return false;
       }
     }
     function stopCam(){
@@ -701,7 +738,7 @@
 
     async function createHostPeer(viewerId){
       // Wait briefly for camera if not ready yet
-      for(let i=0;i<20&&!stream;i++) await new Promise(r=>setTimeout(r,100));
+      for(let i=0;i<100&&!stream;i++) await new Promise(r=>setTimeout(r,100));
 
       const pc=new RTCPeerConnection(ICE_SERVERS);
       peerConnections[viewerId]=pc;
@@ -772,12 +809,6 @@
       toast('Joining '+live.title+'...');
 
       viewerId='v'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
-
-      try{
-        await set(ref(db,`lives/${live.id}/viewers/${viewerId}`),{
-          name:user?.name||'Viewer',joinedAt:Date.now()
-        });
-      }catch(e){}
 
       // Keep the WebRTC connection isolated from chat/gifts/signaling data.
       // Listening to the whole live node makes Firebase resend the entire
@@ -892,6 +923,18 @@
         if(viewerRemoteReady) viewerPC.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
         else pendingHostCandidates.push(c);
       });
+
+      // Register the viewer only AFTER the offer listener exists. This removes
+      // the small signaling race where the host could publish an offer before
+      // this phone started listening for it.
+      try{
+        await set(ref(db,`lives/${live.id}/viewers/${viewerId}`),{
+          name:user?.name||'Viewer',joinedAt:Date.now()
+        });
+      }catch(e){
+        console.error('Viewer registration failed:',e);
+        toast('Could not join this live (Firebase permission).');
+      }
     }
 
     function cleanupViewerListeners(){
