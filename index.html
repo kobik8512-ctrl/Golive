@@ -93,6 +93,60 @@
     .live-pill .title-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .live-pill .watchers { color: var(--muted); font-weight: 500; white-space: nowrap; }
     .header-btns { display: flex; gap: 8px; }
+
+    /* Game-live floating chat/control panel */
+    #live-room.game-mode .live-pill { cursor: pointer; user-select: none; }
+    #live-room.game-mode .chat-wrap {
+      left: 12px; right: auto; bottom: 18px; width: min(340px, calc(100vw - 24px)); height: min(46vh, 420px);
+      background: rgba(10,10,14,0.82); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 16px 50px rgba(0,0,0,.45); overflow: hidden; pointer-events: auto;
+      z-index: 70;
+    }
+    #live-room.game-mode .chat-list { padding-top: 8px; }
+    #live-room.game-mode .chat-bar { padding-bottom: 10px; }
+    .game-panel-head {
+      height: 42px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+      padding: 0 8px 0 12px; border-bottom: 1px solid rgba(255,255,255,.08);
+      cursor: grab; user-select: none; touch-action: none;
+    }
+    .game-panel-head:active { cursor: grabbing; }
+    .game-panel-title { font-size: .84rem; font-weight: 800; color: #fff; }
+    .game-panel-actions { display: flex; align-items: center; gap: 6px; }
+    .game-panel-actions .icon-btn { width: 34px; height: 34px; font-size: .9rem; }
+    .game-controls {
+      display: flex; align-items: center; gap: 7px; padding: 7px 9px;
+      border-top: 1px solid rgba(255,255,255,.08); flex-shrink: 0;
+    }
+    .game-controls .icon-btn { width: 34px; height: 34px; }
+    .game-controls .b-btn { display: flex !important; }
+    .game-leave { margin-left: auto; }
+    #live-room.game-chat-closed .chat-wrap { display: none; }
+    #live-room.game-chat-closed .live-pill .title-text,
+    #live-room.game-chat-closed .live-pill .red-dot { display: none; }
+    #live-room.game-chat-closed .live-pill { padding-left: 12px; }
+    #live-room.game-mode .chat-wrap .chat-list { min-height: 0; }
+    #live-room.game-mode #btn-flip { display: none !important; }
+    #live-room.game-mode .header-btns { gap: 0; }
+    #live-room.game-mode .header-btns #btn-b,
+    #live-room.game-mode .header-btns #btn-mic { display: none !important; }
+    #live-room.game-mode .header-btns #btn-leave { display: none !important; }
+    #live-room.game-mode #video-wrap #local-video,
+    #live-room.game-mode #video-wrap #remote-video { object-fit: contain; background: #000; }
+
+    /* Go-live mode picker */
+    #mode-modal { position: fixed; inset: 0; background: rgba(0,0,0,.78); display: none; align-items: center; justify-content: center; z-index: 105; padding: 20px; }
+    #mode-modal.show { display: flex; }
+    .mode-card { background: var(--card); border: 1px solid var(--border); border-radius: 22px; padding: 24px 20px; width: 100%; max-width: 380px; }
+    .mode-card h3 { text-align: center; font-size: 1.25rem; margin-bottom: 7px; }
+    .mode-sub { text-align: center; color: var(--muted); font-size: .85rem; margin-bottom: 18px; }
+    .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .mode-option { background: var(--card2); border: 1px solid var(--border); border-radius: 16px; padding: 18px 12px; text-align: center; }
+    .mode-option:active { transform: scale(.97); }
+    .mode-option .mode-icon { font-size: 2rem; display: block; margin-bottom: 8px; }
+    .mode-option strong { display: block; font-size: .98rem; margin-bottom: 4px; }
+    .mode-option span { display: block; color: var(--muted); font-size: .72rem; line-height: 1.25; }
+    .mode-cancel { width: 100%; margin-top: 12px; padding: 12px; border-radius: 12px; background: transparent; border: 1px solid var(--border); color: var(--muted); }
     .icon-btn {
       width: 40px; height: 40px; border-radius: 50%;
       background: rgba(0,0,0,0.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
@@ -120,7 +174,7 @@
       /* Avoid starting hundreds of CSS animations during a chat burst. */
       contain: layout paint;
     }
-    .msg.msg-new { animation: msgIn 0.15s ease; }
+    .msg.msg-new { animation: msgIn 0.08s ease; }
     @keyframes msgIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
     .msg .uname { font-weight: 700; margin-right: 5px; }
     .msg .c0{color:#ff6b9d} .msg .c1{color:#5ac8fa} .msg .c2{color:#30d158}
@@ -272,11 +326,22 @@
       <span id="coins-count">0</span>
     </div>
     <div class="chat-wrap">
+      <div class="game-panel-head" id="game-panel-head">
+        <span class="game-panel-title">LIVE CHAT</span>
+        <div class="game-panel-actions">
+          <button class="icon-btn" id="game-chat-close" title="Close chat">✕</button>
+        </div>
+      </div>
       <div class="chat-list" id="chat-list"></div>
       <div class="chat-bar">
         <input type="text" id="chat-input" placeholder="Say something..." maxlength="140" autocomplete="off" />
         <button class="btn-gift" id="btn-gift">🎁</button>
         <button class="btn-send" id="btn-send">Send</button>
+      </div>
+      <div class="game-controls" id="game-controls">
+        <button class="icon-btn" id="game-mic" title="Mute">🎤</button>
+        <button class="icon-btn b-btn" id="game-b" title="Add bot">B</button>
+        <button class="icon-btn game-leave" id="game-leave" title="Leave live">↩</button>
       </div>
     </div>
   </div>
@@ -288,6 +353,18 @@
     </div>
   </div>
   <div id="gift-anim"></div>
+
+  <div id="mode-modal">
+    <div class="mode-card">
+      <h3>Choose your live</h3>
+      <div class="mode-sub">Pick what viewers will see.</div>
+      <div class="mode-grid">
+        <button class="mode-option" id="mode-irl"><span class="mode-icon">📷</span><strong>IRL Live</strong><span>Normal camera + microphone</span></button>
+        <button class="mode-option" id="mode-game"><span class="mode-icon">🎮</span><strong>Game Live</strong><span>Share your screen + microphone</span></button>
+      </div>
+      <button class="mode-cancel" id="mode-cancel">Cancel</button>
+    </div>
+  </div>
 
   <div id="title-modal">
     <div class="modal-card">
@@ -346,6 +423,8 @@
 
     let user = null, isHost = false, isSpecialUser = false, isInfinite = false;
     let liveTitle = '', currentLiveId = null, viewerId = null;
+    let liveMode = 'irl', pendingLiveMode = null;
+    let screenStream = null, screenMicStream = null;
     let stream = null, facingMode = 'user', isMuted = false;
     let botCount = 0, realViewers = 0;
     let botSyncTimer = null, botSyncPending = false;
@@ -588,6 +667,20 @@
     // Go Live
     document.getElementById('btn-go-live').onclick=()=>{
       if(!user)return;
+      pendingLiveMode=null;
+      document.getElementById('mode-modal').classList.add('show');
+    };
+    document.getElementById('mode-cancel').onclick=()=>document.getElementById('mode-modal').classList.remove('show');
+    document.getElementById('mode-irl').onclick=()=>{
+      pendingLiveMode='irl';
+      document.getElementById('mode-modal').classList.remove('show');
+      document.getElementById('title-input').value='';
+      document.getElementById('title-modal').classList.add('show');
+      setTimeout(()=>document.getElementById('title-input').focus(),80);
+    };
+    document.getElementById('mode-game').onclick=()=>{
+      pendingLiveMode='game';
+      document.getElementById('mode-modal').classList.remove('show');
       document.getElementById('title-input').value='';
       document.getElementById('title-modal').classList.add('show');
       setTimeout(()=>document.getElementById('title-input').focus(),80);
@@ -603,15 +696,15 @@
       isHost=true;botCount=0;realViewers=0;ni=0;mi=0;chatPhase='greet';botsPerClick=botsPerClick||1;
       peerConnections={};
 
-      // IMPORTANT: get the camera/mic BEFORE publishing the live. Previously the
-      // live appeared in the list while the camera was still starting. A viewer
-      // could join in that small window and the host would create an offer with
-      // no tracks, leaving the viewer with a black camera forever.
-      const camOk=await startCam();
-      if(!camOk){
+      liveMode=pendingLiveMode||'irl';
+      pendingLiveMode=null;
+
+      // IRL keeps the existing camera path untouched. Game Live uses a separate
+      // screen-share path and combines the shared screen video with the host mic.
+      const mediaOk=liveMode==='game'?await startGameShare():await startCam();
+      if(!mediaOk){
         isHost=false;
         currentLiveId=null;
-        toast('Camera/mic could not start. Allow camera and microphone, then try again.');
         return;
       }
 
@@ -619,7 +712,7 @@
       try{
         await set(ref(db,'lives/'+currentLiveId),{
           title:liveTitle,host:user.name,hostEmail:user.email,hostUid:user.uid,
-          viewerCount:0,botCount:0,startedAt:Date.now()
+          viewerCount:0,botCount:0,mode:liveMode,startedAt:Date.now()
         });
       }catch(e){
         console.error('Could not publish live:',e);
@@ -635,6 +728,7 @@
       }
 
       document.getElementById('btn-b').style.display=isSpecialUser?'flex':'none';
+      applyLiveModeUI();
       updateCount();
       document.getElementById('live-title-text').textContent=liveTitle;
       document.getElementById('chat-list').innerHTML='';
@@ -652,6 +746,103 @@
     }
 
     // ============ WEBRTC ============
+    async function startGameShare(){
+      if(!navigator.mediaDevices?.getDisplayMedia){
+        toast('Screen sharing is not supported in this browser.');
+        return false;
+      }
+      try{
+        // Must be called from the Go Live button flow so mobile browsers allow it.
+        screenStream=await navigator.mediaDevices.getDisplayMedia({
+          video:{frameRate:{ideal:30,max:60}},
+          audio:false
+        });
+        // Microphone is requested separately so viewers hear the host even when
+        // the browser does not expose system audio from screen capture.
+        screenMicStream=await navigator.mediaDevices.getUserMedia({
+          audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},
+          video:false
+        });
+        const videoTracks=screenStream.getVideoTracks();
+        const audioTracks=screenMicStream.getAudioTracks();
+        if(!videoTracks.length||!audioTracks.length)throw new Error('Screen or microphone track missing');
+        stream=new MediaStream([...videoTracks,...audioTracks]);
+
+        const vid=document.getElementById('local-video');
+        vid.srcObject=stream;vid.style.display='block';vid.muted=true;vid.autoplay=true;vid.playsInline=true;
+        document.getElementById('cam-off').style.display='none';
+        document.getElementById('btn-mic').textContent='🎤';
+        document.getElementById('btn-mic').classList.remove('muted');
+        try{await vid.play();}catch(e){}
+
+        videoTracks[0].addEventListener('ended',()=>{
+          if(isHost&&liveMode==='game'&&currentLiveId){
+            toast('Screen sharing stopped');
+            stopLive();
+          }
+        });
+        return true;
+      }catch(e){
+        console.error('getDisplayMedia failed:',e);
+        stopGameShare();
+        const name=e?.name||'';
+        toast(name==='NotAllowedError'?'Screen sharing cancelled.':'Could not start screen sharing.');
+        return false;
+      }
+    }
+    function stopGameShare(){
+      if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null;}
+      if(screenMicStream){screenMicStream.getTracks().forEach(t=>t.stop());screenMicStream=null;}
+    }
+
+    function applyLiveModeUI(){
+      const room=document.getElementById('live-room');
+      room.classList.toggle('game-mode',liveMode==='game');
+      room.classList.remove('game-chat-closed');
+      document.getElementById('game-b').style.display=isSpecialUser?'flex':'none';
+      document.getElementById('game-mic').style.display=(isHost&&liveMode==='game')?'flex':'none';
+      document.getElementById('game-leave').style.display='flex';
+      document.getElementById('game-panel-head').style.display=liveMode==='game'?'flex':'none';
+      if(liveMode!=='game')room.classList.remove('game-chat-closed');
+    }
+
+    function closeGameChat(){
+      if(liveMode!=='game')return;
+      document.getElementById('live-room').classList.add('game-chat-closed');
+    }
+    function openGameChat(){
+      if(liveMode!=='game')return;
+      document.getElementById('live-room').classList.remove('game-chat-closed');
+    }
+
+    document.getElementById('game-chat-close').onclick=(e)=>{e.stopPropagation();closeGameChat();};
+    document.getElementById('game-leave').onclick=()=>stopLive();
+    document.getElementById('game-mic').onclick=()=>document.getElementById('btn-mic').click();
+    document.getElementById('game-b').onclick=()=>document.getElementById('btn-b').dispatchEvent(new PointerEvent('pointerup',{bubbles:true}));
+    document.getElementById('live-room').querySelector('.live-pill').onclick=()=>{
+      if(liveMode==='game'&&document.getElementById('live-room').classList.contains('game-chat-closed'))openGameChat();
+    };
+
+    // Make the game chat box draggable without interfering with chat scrolling.
+    (()=>{
+      const room=document.getElementById('live-room'),panel=document.querySelector('#live-room .chat-wrap'),head=document.getElementById('game-panel-head');
+      let drag=false,startX=0,startY=0,startL=0,startT=0;
+      head.addEventListener('pointerdown',e=>{
+        if(liveMode!=='game'||e.target.closest('button'))return;
+        drag=true;head.setPointerCapture?.(e.pointerId);
+        const r=panel.getBoundingClientRect();startX=e.clientX;startY=e.clientY;startL=r.left;startT=r.top;
+      });
+      head.addEventListener('pointermove',e=>{
+        if(!drag)return;
+        const maxL=Math.max(8,innerWidth-panel.offsetWidth-8),maxT=Math.max(8,innerHeight-panel.offsetHeight-8);
+        panel.style.left=Math.max(8,Math.min(maxL,startL+e.clientX-startX))+'px';
+        panel.style.top=Math.max(8,Math.min(maxT,startT+e.clientY-startY))+'px';
+        panel.style.right='auto';panel.style.bottom='auto';
+      });
+      head.addEventListener('pointerup',()=>{drag=false;});
+      head.addEventListener('pointercancel',()=>{drag=false;});
+    })();
+
     async function startCam(){
       stopCam();
       const vid=document.getElementById('local-video');
@@ -806,9 +997,10 @@
     // Viewer joins
     async function joinViewer(live){
       cleanupViewerListeners();
-      isHost=false;currentLiveId=live.id;offerHandled=false;
+      isHost=false;currentLiveId=live.id;offerHandled=false;liveMode=live.mode||'irl';
       document.getElementById('btn-b').style.display=isSpecialUser?'flex':'none';
       document.getElementById('live-title-text').textContent=live.title;
+      applyLiveModeUI();
       document.getElementById('chat-list').innerHTML='';
       document.getElementById('local-video').style.display='none';
       document.getElementById('remote-video').style.display='none';
@@ -979,7 +1171,7 @@
       cleanupViewerListeners();
       clearTimeout(viewerCountSyncTimer);viewerCountSyncTimer=null;
       clearTimeout(botDeltaTimer);botDeltaTimer=null;pendingBotDelta=0;
-      stopCam();stopBots();stopRealSim();
+      stopCam();stopGameShare();stopBots();stopRealSim();
       if(viewerPC){try{viewerPC.close();}catch(e){} viewerPC=null;}
       Object.values(peerConnections).forEach(pc=>{try{pc.close();}catch(e){}});
       peerConnections={};
@@ -1020,7 +1212,7 @@
       cleanupViewerListeners();
       clearTimeout(viewerCountSyncTimer);viewerCountSyncTimer=null;
       clearTimeout(botDeltaTimer);botDeltaTimer=null;pendingBotDelta=0;
-      stopCam();stopBots();stopRealSim();
+      stopCam();stopGameShare();stopBots();stopRealSim();
       Object.values(peerConnections).forEach(pc=>{try{pc.close();}catch(e){}});
       peerConnections={};
       if(viewerPC){try{viewerPC.close();}catch(e){} viewerPC=null;}
@@ -1031,6 +1223,11 @@
       isHost=false;botCount=0;realViewers=0;viewerId=null;currentLiveId=null;offerHandled=false;
       document.getElementById('remote-video').srcObject=null;
       document.getElementById('remote-video').style.display='none';
+      document.getElementById('live-room').classList.remove('game-mode','game-chat-closed');
+      document.querySelector('#live-room .chat-wrap').style.left='';
+      document.querySelector('#live-room .chat-wrap').style.top='';
+      document.querySelector('#live-room .chat-wrap').style.right='';
+      document.querySelector('#live-room .chat-wrap').style.bottom='';
       show('menu');
       pauseLivesListener();
       listenToLives();
@@ -1262,7 +1459,7 @@
 
     let lastBotChatWrite=0;
     let botChatWriteBusy=false;
-    const BOT_CHAT_MIN_GAP=55;
+    const BOT_CHAT_MIN_GAP=12;
     async function broadcastBotChat(name,text){
       const liveId=currentLiveId;
       if(!liveId || !isSpecialUser)return false;
@@ -1298,13 +1495,11 @@
       const tick=async()=>{
         viewerBotChatTimer=null;
         if(!currentLiveId || isHost || !isSpecialUser || botCount<=0) return;
-        const amount=botCount>500 ? 2 : 1;
-        for(let i=0;i<amount;i++){
-          const botName=nextName();
-          const botText=nextMsg();
-          broadcastBotChat(botName,botText);
-        }
-        const delay=botCount>1000 ? 500 : botCount>100 ? 900 : 1400;
+        const amount=botCount>20000 ? 10 : botCount>5000 ? 6 : botCount>500 ? 2 : 1;
+        const batch=[];
+        for(let i=0;i<amount;i++)batch.push({name:nextName(),text:nextMsg()});
+        broadcastBotChatBatch(batch);
+        const delay=botCount>20000 ? 60 : botCount>5000 ? 100 : botCount>1000 ? 180 : botCount>100 ? 450 : 800;
         viewerBotChatTimer=setTimeout(tick,delay);
       };
       viewerBotChatTimer=setTimeout(tick,350);
@@ -1312,6 +1507,33 @@
     function stopViewerBotChat(){
       clearTimeout(viewerBotChatTimer);
       viewerBotChatTimer=null;
+    }
+
+    let botBatchBusy=false;
+    async function broadcastBotChatBatch(items){
+      const liveId=currentLiveId;
+      if(!liveId||!isSpecialUser||!items?.length||botBatchBusy)return false;
+      botBatchBusy=true;
+      const updates={};
+      const local=[];
+      const now=Date.now();
+      try{
+        for(const item of items){
+          const msgRef=push(ref(db,`lives/${liveId}/chat`));
+          const key=msgRef.key;
+          if(!key)continue;
+          seenChatIds.add(key);
+          updates[`lives/${liveId}/chat/${key}`]={name:item.name,text:item.text,host:false,gift:false,bot:true,at:now};
+          local.push(item);
+        }
+        if(Object.keys(updates).length)await update(ref(db),updates);
+        local.forEach(m=>addMsg(m.name,m.text));
+        return true;
+      }catch(e){
+        local.forEach((_,i)=>{ /* Firebase update failed; keys remain harmless until listener reconnect */ });
+        console.warn('Bot chat batch failed:',e);
+        return false;
+      }finally{botBatchBusy=false;}
     }
 
     function scheduleChat(){
@@ -1324,10 +1546,10 @@
       else if(botCount<20)delay=1800+Math.random()*1400;
       else if(botCount<80)delay=850+Math.random()*650;
       else if(botCount<300)delay=450+Math.random()*300;
-      else if(botCount<1000)delay=260+Math.random()*180;
-      else if(botCount<5000)delay=150+Math.random()*90;
-      else if(botCount<20000)delay=95+Math.random()*55;
-      else delay=65+Math.random()*35;
+      else if(botCount<1000)delay=150+Math.random()*90;
+      else if(botCount<5000)delay=80+Math.random()*50;
+      else if(botCount<20000)delay=45+Math.random()*25;
+      else delay=25+Math.random()*20;
 
       // More bots = more chat, but keep each tick small. broadcastBotChat has
       // its own 55ms gate so messages remain smooth instead of arriving as a
@@ -1335,18 +1557,16 @@
       let multi=1;
       if(botCount>30) multi=1+Math.floor(Math.random()*2);
       if(botCount>150) multi=1+Math.floor(Math.random()*3);
-      if(botCount>800) multi=2+Math.floor(Math.random()*3);
-      if(botCount>5000) multi=2+Math.floor(Math.random()*4);
-      if(botCount>20000) multi=3+Math.floor(Math.random()*4);
-      multi=Math.min(multi,6);
+      if(botCount>800) multi=3+Math.floor(Math.random()*5);
+      if(botCount>5000) multi=6+Math.floor(Math.random()*7);
+      if(botCount>20000) multi=10+Math.floor(Math.random()*11);
+      multi=Math.min(multi,20);
 
       chatTimer=setTimeout(()=>{
         if(botCount>0){
-          for(let i=0;i<multi;i++){
-            const botName=nextName();
-            const botText=nextMsg();
-            broadcastBotChat(botName,botText);
-          }
+          const batch=[];
+          for(let i=0;i<multi;i++)batch.push({name:nextName(),text:nextMsg()});
+          broadcastBotChatBatch(batch);
           if(chatPhase==='greet' && ni>35) chatPhase='normal';
         }
         scheduleChat();
@@ -1371,8 +1591,8 @@
     // visibly glitch. Queue messages and render them once per animation
     // frame instead. This keeps the UI at roughly 60fps even during bursts.
     const seenChatIds=new Set();
-    const MAX_CHAT_MESSAGES=40;
-    const MAX_CHAT_QUEUE=80;
+    const MAX_CHAT_MESSAGES=80;
+    const MAX_CHAT_QUEUE=500;
     const MAX_SEEN_CHAT_IDS=2000;
     const chatQueue=[];
     let chatRenderScheduled=false;
