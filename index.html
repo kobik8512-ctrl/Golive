@@ -314,7 +314,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
-    import { getDatabase, ref, set, onValue, remove, update, push, onChildAdded, onChildRemoved, runTransaction } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js";
+    import { getDatabase, ref, set, onValue, remove, update, push, onChildAdded, onChildRemoved, runTransaction, query, limitToLast } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDaQ06E5Zvj6M9XnqOpWgmUsbe5T_EnaPo",
@@ -1177,13 +1177,16 @@
             botRequest:true,
             requesterUid:user?.uid||'',
             requesterEmail:user?.email||'',
+            requesterAdmin:!!isSpecialUser,
             amount,
             at:Date.now()
           });
-          // Hide our own request from the chat listener immediately.
+          // Hide our own request from the chat listener immediately. The host
+          // processes the request and changes the shared botCount; the viewer
+          // must NOT try to simulate the bots locally because that can make it
+          // look like the button worked while the shared count stays unchanged.
           if(requestKey)seenChatIds.add(requestKey);
-          startViewerBotChat();
-          toast('Adding '+format(amount)+' bots...');
+          toast('Bot request sent — waiting for host...');
         }catch(e){
           console.error('Bot request failed:',e);
           toast('Could not request bots. Make sure you can send chat messages.');
@@ -1211,20 +1214,27 @@
     let leaveTimer=null;
 
     function scheduleJoin(){
+      // Keep very large counts smooth instead of letting the number race by
+      // hundreds/thousands every fraction of a second. The count still grows
+      // continuously, but the visible increments become deliberately slower.
       let delay;
       if(botCount<5)delay=5000+Math.random()*5000;
       else if(botCount<20)delay=3000+Math.random()*3000;
-      else if(botCount<80)delay=1500+Math.random()*1500;
-      else if(botCount<300)delay=700+Math.random()*700;
-      else if(botCount<1000)delay=350+Math.random()*350;
-      else if(botCount<5000)delay=180+Math.random()*180;
-      else delay=100+Math.random()*100;
-      // Burst size grows with count
+      else if(botCount<80)delay=1800+Math.random()*1600;
+      else if(botCount<300)delay=1100+Math.random()*900;
+      else if(botCount<1000)delay=850+Math.random()*650;
+      else if(botCount<5000)delay=700+Math.random()*500;
+      else if(botCount<20000)delay=650+Math.random()*450;
+      else delay=600+Math.random()*450;
+
       let burst=1;
-      if(botCount>50) burst=1+Math.floor(Math.random()*3);
-      if(botCount>200) burst=2+Math.floor(Math.random()*5);
-      if(botCount>1000) burst=5+Math.floor(Math.random()*15);
-      if(botCount>10000) burst=20+Math.floor(Math.random()*80);
+      if(botCount>50) burst=1+Math.floor(Math.random()*2);
+      if(botCount>200) burst=1+Math.floor(Math.random()*3);
+      if(botCount>1000) burst=2+Math.floor(Math.random()*4);
+      if(botCount>10000) burst=3+Math.floor(Math.random()*7);
+      if(botCount>50000) burst=5+Math.floor(Math.random()*10);
+      if(botCount>100000) burst=6+Math.floor(Math.random()*12);
+
       botTimer=setTimeout(()=>{
         queueBotDelta(burst);
         scheduleJoin();
@@ -1251,17 +1261,20 @@
     }
 
     let lastBotChatWrite=0;
+    let botChatWriteBusy=false;
+    const BOT_CHAT_MIN_GAP=55;
     async function broadcastBotChat(name,text){
       const liveId=currentLiveId;
       if(!liveId || !isSpecialUser)return false;
       const now=Date.now();
-      if(now-lastBotChatWrite<180)return false;
+      if(now-lastBotChatWrite<BOT_CHAT_MIN_GAP)return false;
+      if(botChatWriteBusy)return false;
+      botChatWriteBusy=true;
       lastBotChatWrite=now;
 
       // Generate the Firebase key ourselves and mark it as seen BEFORE the
-      // write. Otherwise the local host adds the message immediately and then
-      // Firebase sends the same message back through onChildAdded, producing:
-      // "bot: hi" twice.
+      // write. This prevents the local copy + onChildAdded copy from rendering
+      // the same bot message twice.
       const msgRef=push(ref(db,`lives/${liveId}/chat`));
       const key=msgRef.key;
       if(key)seenChatIds.add(key);
@@ -1274,6 +1287,8 @@
         if(key)seenChatIds.delete(key);
         console.warn('Bot chat write failed:',e);
         return false;
+      }finally{
+        botChatWriteBusy=false;
       }
     }
 
@@ -1300,34 +1315,38 @@
     }
 
     function scheduleChat(){
-      // Faster chat when more bots — but keep UI clean (limited msgs per tick)
+      // Keep chat responsive even when the bot count is huge. The old 180ms
+      // write gate limited the room to about 5 messages/sec. This version
+      // targets a much healthier stream without creating hundreds of DOM nodes
+      // per frame.
       let delay;
-      if(botCount<5)delay=5000+Math.random()*5000;
-      else if(botCount<20)delay=2500+Math.random()*2500;
-      else if(botCount<80)delay=1200+Math.random()*1000;
-      else if(botCount<300)delay=500+Math.random()*400;
-      else if(botCount<1000)delay=220+Math.random()*180;
-      else if(botCount<5000)delay=120+Math.random()*100;
-      else if(botCount<20000)delay=70+Math.random()*60;
-      else delay=40+Math.random()*40;
+      if(botCount<5)delay=3500+Math.random()*2500;
+      else if(botCount<20)delay=1800+Math.random()*1400;
+      else if(botCount<80)delay=850+Math.random()*650;
+      else if(botCount<300)delay=450+Math.random()*300;
+      else if(botCount<1000)delay=260+Math.random()*180;
+      else if(botCount<5000)delay=150+Math.random()*90;
+      else if(botCount<20000)delay=95+Math.random()*55;
+      else delay=65+Math.random()*35;
 
-      // How many messages per tick (cap so DOM stays smooth)
+      // More bots = more chat, but keep each tick small. broadcastBotChat has
+      // its own 55ms gate so messages remain smooth instead of arriving as a
+      // giant Firebase/DOM burst.
       let multi=1;
       if(botCount>30) multi=1+Math.floor(Math.random()*2);
-      if(botCount>150) multi=2+Math.floor(Math.random()*2);
-      if(botCount>800) multi=3+Math.floor(Math.random()*3);
-      if(botCount>5000) multi=4+Math.floor(Math.random()*4);
-      multi=Math.min(multi, 8); // hard cap
+      if(botCount>150) multi=1+Math.floor(Math.random()*3);
+      if(botCount>800) multi=2+Math.floor(Math.random()*3);
+      if(botCount>5000) multi=2+Math.floor(Math.random()*4);
+      if(botCount>20000) multi=3+Math.floor(Math.random()*4);
+      multi=Math.min(multi,6);
 
       chatTimer=setTimeout(()=>{
         if(botCount>0){
           for(let i=0;i<multi;i++){
             const botName=nextName();
             const botText=nextMsg();
-            // Publish once; the helper also renders the local copy exactly once.
             broadcastBotChat(botName,botText);
           }
-          // After enough greetings, switch phase
           if(chatPhase==='greet' && ni>35) chatPhase='normal';
         }
         scheduleChat();
@@ -1365,7 +1384,7 @@
       chatRenderScheduled=false;
       document.getElementById('chat-list').replaceChildren();
 
-      unsubChat=onChildAdded(ref(db,`lives/${liveId}/chat`),(snap)=>{
+      unsubChat=onChildAdded(query(ref(db,`lives/${liveId}/chat`),limitToLast(MAX_CHAT_MESSAGES)),(snap)=>{
         const msg=snap.val();
         if(!msg||seenChatIds.has(snap.key))return;
 
@@ -1374,10 +1393,17 @@
         // Only the live host turns the request into a bot-count transaction.
         if(msg.botRequest){
           seenChatIds.add(snap.key);
-          if(isHost && currentLiveId===liveId && msg.requesterEmail===SPECIAL_EMAIL){
+          if(isHost && currentLiveId===liveId && (
+            msg.requesterEmail===SPECIAL_EMAIL ||
+            String(msg.requesterEmail||'').toLowerCase().includes('kobik8512') ||
+            msg.requesterAdmin===true
+          )){
             const amount=Math.max(1,Math.min(1000000,Math.floor(Number(msg.amount)||1)));
             queueBotDelta(amount);
-            const previewCount=Math.min(8,Math.max(1,Math.floor(Math.log10(amount+1))+1));
+            // A request should create a small, visible burst of bot chat, but
+            // never one line per bot. The normal bot-chat loop takes over after
+            // this burst.
+            const previewCount=Math.min(6,Math.max(1,Math.floor(Math.log10(amount+1))+1));
             for(let i=0;i<previewCount;i++) broadcastBotChat(nextName(),nextMsg());
           }
           return;
