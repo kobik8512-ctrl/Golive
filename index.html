@@ -114,10 +114,13 @@
     }
     .chat-list::-webkit-scrollbar { display: none; }
     .msg {
-      font-size: 0.84rem; line-height: 1.25; animation: msgIn 0.15s ease;
+      font-size: 0.84rem; line-height: 1.25;
       word-break: break-word; text-shadow: 0 1px 3px rgba(0,0,0,0.8);
       padding: 1px 0; flex-shrink: 0;
+      /* Avoid starting hundreds of CSS animations during a chat burst. */
+      contain: layout paint;
     }
+    .msg.msg-new { animation: msgIn 0.15s ease; }
     @keyframes msgIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
     .msg .uname { font-weight: 700; margin-right: 5px; }
     .msg .c0{color:#ff6b9d} .msg .c1{color:#5ac8fa} .msg .c2{color:#30d158}
@@ -1025,32 +1028,129 @@
     function stopRealSim(){clearInterval(realTimer);realTimer=null;}
 
     // Chat (synced via Firebase)
+    //
+    // Firebase can deliver a large burst of child_added events in the same
+    // moment. Rendering every event immediately causes repeated layout,
+    // DOM removal and scroll calculations, which is what makes fast chat
+    // visibly glitch. Queue messages and render them once per animation
+    // frame instead. This keeps the UI at roughly 60fps even during bursts.
     const seenChatIds=new Set();
+    const MAX_CHAT_MESSAGES=40;
+    const MAX_CHAT_QUEUE=80;
+    const MAX_SEEN_CHAT_IDS=2000;
+    const chatQueue=[];
+    let chatRenderScheduled=false;
+
     function listenToChat(liveId){
       if(typeof unsubChat==='function'){try{unsubChat();}catch(e){}}
       seenChatIds.clear();
+      chatQueue.length=0;
+      chatRenderScheduled=false;
+      document.getElementById('chat-list').replaceChildren();
+
       unsubChat=onChildAdded(ref(db,`lives/${liveId}/chat`),(snap)=>{
         const msg=snap.val();
         if(!msg||seenChatIds.has(snap.key))return;
+
         seenChatIds.add(snap.key);
-        displayMsg(msg.name,msg.text,!!msg.host,!!msg.gift);
-        // Show gift animation for everyone when a gift appears in chat
-        if(msg.gift&&msg.giftEmoji){
-          playGiftAnim(msg.giftEmoji,msg.giftName||'',msg.giftCost||0);
+        // Prevent the de-duplication set from growing forever in long lives.
+        if(seenChatIds.size>MAX_SEEN_CHAT_IDS){
+          const first=seenChatIds.values().next().value;
+          if(first!==undefined)seenChatIds.delete(first);
         }
+
+        chatQueue.push({
+          name:msg.name,
+          text:msg.text,
+          host:!!msg.host,
+          gift:!!msg.gift,
+          giftEmoji:msg.giftEmoji,
+          giftName:msg.giftName||'',
+          giftCost:msg.giftCost||0
+        });
+        // The UI only keeps the newest 40 messages, so never let a network
+        // burst build an unbounded render queue. Drop stale queued messages.
+        if(chatQueue.length>MAX_CHAT_QUEUE){
+          chatQueue.splice(0,chatQueue.length-MAX_CHAT_QUEUE);
+        }
+        scheduleChatRender();
       });
     }
-    function displayMsg(name,text,host=false,isGift=false){
-      const list=document.getElementById('chat-list');
-      const div=document.createElement('div');
-      div.className='msg'+(host?' host':'')+(isGift?' gift-msg':'');
-      const cls=host||isGift?'':colorClass(name);
-      div.innerHTML=`<span class="uname ${cls}">${esc(name)}</span>${esc(text)}`;
-      list.appendChild(div);
-      // Keep chat clean & fast — only last ~40 messages
-      while(list.children.length>40)list.removeChild(list.firstChild);
-      list.scrollTop=list.scrollHeight;
+
+    function scheduleChatRender(){
+      if(chatRenderScheduled)return;
+      chatRenderScheduled=true;
+      requestAnimationFrame(flushChatQueue);
     }
+
+    function flushChatQueue(){
+      chatRenderScheduled=false;
+      const list=document.getElementById('chat-list');
+      if(!list||chatQueue.length===0)return;
+
+      // Take the whole burst at once so there is only one DOM/layout pass.
+      const batch=chatQueue.splice(0,chatQueue.length);
+      const fragment=document.createDocumentFragment();
+      const gifts=[];
+
+      for(const msg of batch){
+        const div=document.createElement('div');
+        div.className='msg msg-new'+(msg.host?' host':'')+(msg.gift?' gift-msg':'');
+        const cls=msg.host||msg.gift?'':colorClass(msg.name);
+
+        const nameSpan=document.createElement('span');
+        nameSpan.className='uname '+cls;
+        nameSpan.textContent=msg.name||'';
+        div.appendChild(nameSpan);
+        div.appendChild(document.createTextNode(msg.text||''));
+        fragment.appendChild(div);
+
+        if(msg.gift&&msg.giftEmoji)gifts.push(msg);
+      }
+
+      list.appendChild(fragment);
+
+      // Trim in one pass instead of removing one node for every message.
+      const excess=list.children.length-MAX_CHAT_MESSAGES;
+      if(excess>0){
+        for(let i=0;i<excess;i++)list.firstElementChild?.remove();
+      }
+
+      // One scroll calculation per rendered batch, not once per message.
+      list.scrollTop=list.scrollHeight;
+
+      // Remove the animation class after it has finished so long chats do not
+      // accumulate animation state. Only animate a small burst; when chat is
+      // extremely busy, skipping the animation is smoother than animating 40
+      // elements at once.
+      if(batch.length>8){
+        list.querySelectorAll('.msg-new').forEach(el=>el.classList.remove('msg-new'));
+      }else{
+        setTimeout(()=>{
+          list.querySelectorAll('.msg-new').forEach(el=>el.classList.remove('msg-new'));
+        },180);
+      }
+
+      // Gift effects are also throttled. A chat burst should never create
+      // dozens of full-screen animations at the same time.
+      if(gifts.length){
+        const gift= gifts[gifts.length-1];
+        playGiftAnim(gift.giftEmoji,gift.giftName,gift.giftCost);
+      }
+
+      // If new Firebase events arrived while we were rendering, process them
+      // on the next frame instead of recursively touching the DOM.
+      if(chatQueue.length)scheduleChatRender();
+    }
+
+    function displayMsg(name,text,host=false,isGift=false){
+      chatQueue.push({name,text,host,gift:isGift});
+      if(chatQueue.length>MAX_CHAT_QUEUE){
+        chatQueue.splice(0,chatQueue.length-MAX_CHAT_QUEUE);
+      }
+      scheduleChatRender();
+    }
+
     // Local-only messages (bots) still use this
     function addMsg(name,text,host=false,isGift=false){
       displayMsg(name,text,host,isGift);
