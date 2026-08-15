@@ -469,7 +469,12 @@
 
     onAuthStateChanged(auth,(fu)=>{
       if(fu){
-        user={name:fu.displayName||(fu.email?fu.email.split('@')[0]:'User'),email:fu.email||'',picture:fu.photoURL};
+        user={
+          uid:fu.uid,
+          name:fu.displayName||(fu.email?fu.email.split('@')[0]:'User'),
+          email:fu.email||'',
+          picture:fu.photoURL
+        };
         isSpecialUser=checkAdmin();
         isInfinite=isSpecialUser;
         document.getElementById('display-name').textContent=user.name+(isSpecialUser?' 🔑':'');
@@ -544,7 +549,9 @@
       if(!activeLives.length){empty.style.display='block';return;}
       empty.style.display='none';
       activeLives.forEach(live=>{
-        const isMine=!!(user&&live.hostUid&&live.hostUid===user.uid);
+        // Ownership must use the Firebase Auth UID.  Keep this check strict so
+        // only the actual host gets the X/end-live button after a refresh.
+        const isMine=!!(user?.uid && live?.hostUid && live.hostUid===user.uid);
         const card=document.createElement('div');
         card.className='live-card';
         card.innerHTML=`
@@ -560,7 +567,16 @@
         btn.onclick=()=>{const live=activeLives.find(l=>l.id===btn.dataset.join);if(live)joinViewer(live);};
       });
       list.querySelectorAll('[data-remove]').forEach(btn=>{
-        btn.onclick=async()=>{try{await remove(ref(db,'lives/'+btn.dataset.remove));}catch(e){toast('Remove failed');}};
+        btn.onclick=async()=>{
+          const live=activeLives.find(l=>l.id===btn.dataset.remove);
+          if(!live || !user?.uid || live.hostUid!==user.uid){
+            toast('Only the host can end this live');
+            return;
+          }
+          try{
+            await remove(ref(db,'lives/'+btn.dataset.remove));
+          }catch(e){toast('Remove failed');}
+        };
       });
     }
     async function endLiveInDb(){
