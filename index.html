@@ -488,37 +488,63 @@
       });
       onChildRemoved(viewersRef,(snap)=>{
         const vid=snap.key;
-        if(peerConnections[vid]){peerConnections[vid].close();delete peerConnections[vid]}
+        if(peerConnections[vid]){try{peerConnections[vid].close()}catch(e){}delete peerConnections[vid]}
       });
     }
 
     async function createHostPeer(viewerId){
-      for(let i=0;i<20&&!stream;i++)await new Promise(r=>setTimeout(r,100));
+      // Wait up to ~3s for camera
+      for(let i=0;i<30&&!stream;i++)await new Promise(r=>setTimeout(r,100));
+      if(!stream){console.warn('Host has no stream for viewer',viewerId);return}
+
+      // Clean old signal path for this viewer
+      try{await remove(ref(db,`lives/${currentLiveId}/signals/${viewerId}`))}catch(e){}
+
       const pc=new RTCPeerConnection(ICE_SERVERS);
       peerConnections[viewerId]=pc;
-      if(stream)stream.getTracks().forEach(track=>pc.addTrack(track,stream));
-      let iceQ=[],iceT=null;
+
+      stream.getTracks().forEach(track=>{
+        try{pc.addTrack(track,stream)}catch(e){}
+      });
+
+      const pendingViewerIce=[];
+      let remoteSet=false;
       pc.onicecandidate=e=>{
-        if(!e.candidate)return;
-        iceQ.push(e.candidate.toJSON());
-        if(!iceT){iceT=setTimeout(()=>{iceQ.forEach(c=>push(ref(db,`lives/${currentLiveId}/signals/${viewerId}/hostCandidates`),c).catch(()=>{}));iceQ=[];iceT=null},250)}
+        if(!e.candidate||!currentLiveId)return;
+        push(ref(db,`lives/${currentLiveId}/signals/${viewerId}/hostCandidates`),e.candidate.toJSON()).catch(()=>{});
       };
+      pc.onconnectionstatechange=()=>{
+        if(pc.connectionState==='failed'){
+          try{pc.restartIce()}catch(e){}
+        }
+      };
+
       let answerDone=false;
-      onValue(ref(db,`lives/${currentLiveId}/signals/${viewerId}/answer`),(snap)=>{
+      onValue(ref(db,`lives/${currentLiveId}/signals/${viewerId}/answer`),async(snap)=>{
         const answer=snap.val();
         if(!answer||answerDone||pc.signalingState==='closed')return;
-        answerDone=true;
-        pc.setRemoteDescription(new RTCSessionDescription(answer)).catch(()=>{answerDone=false});
+        try{
+          await pc.setRemoteDescription(new RTCSessionDescription(answer));
+          answerDone=true;remoteSet=true;
+          while(pendingViewerIce.length){
+            const c=pendingViewerIce.shift();
+            try{await pc.addIceCandidate(new RTCIceCandidate(c))}catch(e){}
+          }
+        }catch(e){console.warn('Host setRemoteDescription failed',e)}
       });
       onChildAdded(ref(db,`lives/${currentLiveId}/signals/${viewerId}/viewerCandidates`),(snap)=>{
-        const c=snap.val();
-        if(c)pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
+        const c=snap.val();if(!c)return;
+        if(!remoteSet){pendingViewerIce.push(c);return}
+        pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
       });
+
       try{
-        const offer=await pc.createOffer();
+        const offer=await pc.createOffer({offerToReceiveAudio:false,offerToReceiveVideo:false});
         await pc.setLocalDescription(offer);
-        await set(ref(db,`lives/${currentLiveId}/signals/${viewerId}/offer`),{type:offer.type,sdp:offer.sdp});
-      }catch(e){console.error(e)}
+        await set(ref(db,`lives/${currentLiveId}/signals/${viewerId}/offer`),{
+          type:pc.localDescription.type,sdp:pc.localDescription.sdp
+        });
+      }catch(e){console.error('Host offer failed',e)}
     }
 
     async function joinViewer(live){
@@ -529,6 +555,7 @@
       document.getElementById('chat-list').innerHTML='';
       document.getElementById('local-video').style.display='none';
       document.getElementById('remote-video').style.display='none';
+      document.getElementById('remote-video').srcObject=null;
       document.getElementById('cam-off').style.display='block';
       document.getElementById('mic-status').textContent='Connecting...';
       document.getElementById('mic-status').style.color='var(--muted)';
@@ -539,6 +566,56 @@
       toast('Joining '+live.title+'...');
 
       viewerId='v'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+
+      // Create PC FIRST so we are ready before host sends offer
+      if(viewerPC){try{viewerPC.close()}catch(e){}viewerPC=null}
+      viewerPC=new RTCPeerConnection(ICE_SERVERS);
+      try{
+        viewerPC.addTransceiver('video',{direction:'recvonly'});
+        viewerPC.addTransceiver('audio',{direction:'recvonly'});
+      }catch(e){}
+
+      const pendingHostIce=[];
+      let remoteSet=false;
+
+      const showRemoteStream=(mediaStream)=>{
+        const remoteVid=document.getElementById('remote-video');
+        if(!remoteVid||!mediaStream)return;
+        remoteVid.srcObject=mediaStream;
+        remoteVid.style.display='block';
+        remoteVid.setAttribute('playsinline','');
+        remoteVid.setAttribute('autoplay','');
+        document.getElementById('cam-off').style.display='none';
+        document.getElementById('mic-status').textContent='Connected';
+        document.getElementById('mic-status').style.color='var(--green)';
+        const tryPlay=()=>remoteVid.play().catch(()=>{});
+        tryPlay();
+        remoteVid.onloadedmetadata=tryPlay;
+      };
+
+      viewerPC.ontrack=e=>{
+        if(e.streams&&e.streams[0])showRemoteStream(e.streams[0]);
+        else if(e.track){
+          const ms=new MediaStream([e.track]);
+          showRemoteStream(ms);
+        }
+      };
+      viewerPC.onconnectionstatechange=()=>{
+        if(!viewerPC)return;
+        if(viewerPC.connectionState==='connected'){
+          document.getElementById('mic-status').textContent='Connected';
+          document.getElementById('mic-status').style.color='var(--green)';
+        }else if(viewerPC.connectionState==='failed'){
+          document.getElementById('mic-status').textContent='Retrying...';
+          try{viewerPC.restartIce()}catch(e){}
+        }
+      };
+      viewerPC.onicecandidate=e=>{
+        if(!e.candidate||!currentLiveId)return;
+        push(ref(db,`lives/${live.id}/signals/${viewerId}/viewerCandidates`),e.candidate.toJSON()).catch(()=>{});
+      };
+
+      // Announce presence AFTER PC is ready so host offer is handled
       try{await set(ref(db,`lives/${live.id}/viewers/${viewerId}`),{name:user?.name||'Viewer',joinedAt:Date.now()})}catch(e){}
 
       const liveRef=ref(db,'lives/'+live.id);
@@ -553,38 +630,32 @@
 
       listenToChat(live.id);
 
-      if(viewerPC){try{viewerPC.close()}catch(e){}viewerPC=null}
-      viewerPC=new RTCPeerConnection(ICE_SERVERS);
-      viewerPC.ontrack=async(e)=>{
-        const remoteVid=document.getElementById('remote-video');
-        remoteVid.srcObject=e.streams[0];
-        remoteVid.style.display='block';
-        document.getElementById('cam-off').style.display='none';
-        document.getElementById('mic-status').textContent='Connected';
-        document.getElementById('mic-status').style.color='var(--green)';
-        try{await remoteVid.play()}catch(err){}
-      };
-      let iceQ=[],iceT=null;
-      viewerPC.onicecandidate=e=>{
-        if(!e.candidate)return;
-        iceQ.push(e.candidate.toJSON());
-        if(!iceT){iceT=setTimeout(()=>{iceQ.forEach(c=>push(ref(db,`lives/${live.id}/signals/${viewerId}/viewerCandidates`),c).catch(()=>{}));iceQ=[];iceT=null},300)}
-      };
       onValue(ref(db,`lives/${live.id}/signals/${viewerId}/offer`),async(snap)=>{
         const offer=snap.val();
         if(!offer||!viewerPC||offerHandled)return;
-        if(viewerPC.signalingState==='closed'||viewerPC.signalingState==='stable')return;
+        if(viewerPC.signalingState==='closed')return;
         offerHandled=true;
         try{
           await viewerPC.setRemoteDescription(new RTCSessionDescription(offer));
+          remoteSet=true;
+          while(pendingHostIce.length){
+            const c=pendingHostIce.shift();
+            try{await viewerPC.addIceCandidate(new RTCIceCandidate(c))}catch(e){}
+          }
           const answer=await viewerPC.createAnswer();
           await viewerPC.setLocalDescription(answer);
-          await set(ref(db,`lives/${live.id}/signals/${viewerId}/answer`),{type:answer.type,sdp:answer.sdp});
-        }catch(e){offerHandled=false}
+          await set(ref(db,`lives/${live.id}/signals/${viewerId}/answer`),{
+            type:viewerPC.localDescription.type,sdp:viewerPC.localDescription.sdp
+          });
+        }catch(e){
+          console.warn('Viewer answer failed',e);
+          offerHandled=false;
+        }
       });
       onChildAdded(ref(db,`lives/${live.id}/signals/${viewerId}/hostCandidates`),(snap)=>{
-        const c=snap.val();
-        if(c&&viewerPC&&viewerPC.signalingState!=='closed')viewerPC.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
+        const c=snap.val();if(!c||!viewerPC)return;
+        if(!remoteSet){pendingHostIce.push(c);return}
+        viewerPC.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{});
       });
     }
 
@@ -672,6 +743,7 @@
         botCount+=n;updateCount();
         const msgs=Math.min(6,Math.max(1,Math.floor(Math.log10(n+1))+1));
         for(let i=0;i<msgs;i++)addMsg(nextName(),nextMsg());
+        scheduleBotDonation(); // refresh gift rate for new bot count
         toast('+'+format(n)+' bots');
       }else if(currentLiveId){
         // Inject bots into someone else's live — keeps chatting via Firebase
@@ -743,19 +815,21 @@
       clearTimeout(botGiftTimer);botGiftTimer=null;
     }
     function scheduleJoin(){
+      // Join slower — count grows over time, not in huge jumps
       let delay;
-      if(botCount<5)delay=5000+Math.random()*5000;
-      else if(botCount<20)delay=3000+Math.random()*3000;
-      else if(botCount<80)delay=1500+Math.random()*1500;
-      else if(botCount<300)delay=700+Math.random()*700;
-      else if(botCount<1000)delay=350+Math.random()*350;
-      else if(botCount<5000)delay=180+Math.random()*180;
-      else delay=90+Math.random()*90;
+      if(botCount<5)delay=7000+Math.random()*6000;
+      else if(botCount<20)delay=5000+Math.random()*5000;
+      else if(botCount<80)delay=3500+Math.random()*3500;
+      else if(botCount<300)delay=2200+Math.random()*2200;
+      else if(botCount<1000)delay=1400+Math.random()*1400;
+      else if(botCount<5000)delay=900+Math.random()*900;
+      else if(botCount<20000)delay=600+Math.random()*600;
+      else delay=400+Math.random()*400;
       let burst=1;
-      if(botCount>50)burst=1+Math.floor(Math.random()*3);
-      if(botCount>200)burst=2+Math.floor(Math.random()*5);
-      if(botCount>1000)burst=5+Math.floor(Math.random()*15);
-      if(botCount>10000)burst=20+Math.floor(Math.random()*80);
+      if(botCount>80)burst=1+Math.floor(Math.random()*2);
+      if(botCount>400)burst=1+Math.floor(Math.random()*3);
+      if(botCount>2000)burst=2+Math.floor(Math.random()*4);
+      if(botCount>10000)burst=3+Math.floor(Math.random()*8);
       botTimer=setTimeout(()=>{botCount+=burst;updateCount();scheduleJoin()},delay);
     }
     function scheduleLeave(){
@@ -776,26 +850,26 @@
       },delay);
     }
 
-    // Realistic chat speed: more bots = more chat, but not superhuman typing
+    // Balanced chat: lively with many bots, still readable
     function scheduleChat(){
       let delay;
-      if(botCount<5)delay=4500+Math.random()*4500;
-      else if(botCount<20)delay=2800+Math.random()*2800;
-      else if(botCount<80)delay=1600+Math.random()*1600;
-      else if(botCount<300)delay=900+Math.random()*900;
-      else if(botCount<1000)delay=500+Math.random()*500;
-      else if(botCount<5000)delay=280+Math.random()*280;
-      else if(botCount<20000)delay=160+Math.random()*160;
-      else if(botCount<100000)delay=100+Math.random()*100;
-      else delay=70+Math.random()*70;
+      if(botCount<5)delay=2800+Math.random()*2500;
+      else if(botCount<20)delay=1600+Math.random()*1400;
+      else if(botCount<80)delay=900+Math.random()*800;
+      else if(botCount<300)delay=450+Math.random()*400;
+      else if(botCount<1000)delay=250+Math.random()*200;
+      else if(botCount<5000)delay=140+Math.random()*120;
+      else if(botCount<20000)delay=90+Math.random()*70;
+      else if(botCount<100000)delay=60+Math.random()*50;
+      else delay=45+Math.random()*35;
 
       let multi=1;
-      if(botCount>50)multi=1+(Math.random()<.4?1:0);
-      if(botCount>300)multi=1+Math.floor(Math.random()*2);
-      if(botCount>2000)multi=2+Math.floor(Math.random()*2);
-      if(botCount>15000)multi=2+Math.floor(Math.random()*3);
-      if(botCount>80000)multi=3+Math.floor(Math.random()*3);
-      multi=Math.min(multi,5);
+      if(botCount>40)multi=1+(Math.random()<.5?1:0);
+      if(botCount>200)multi=1+Math.floor(Math.random()*2);
+      if(botCount>1000)multi=2+Math.floor(Math.random()*2);
+      if(botCount>8000)multi=2+Math.floor(Math.random()*3);
+      if(botCount>50000)multi=3+Math.floor(Math.random()*3);
+      multi=Math.min(multi,6);
 
       chatTimer=setTimeout(()=>{
         if(botCount>0){
@@ -831,33 +905,43 @@
 
     function scheduleBotDonation(){
       clearTimeout(botGiftTimer);botGiftTimer=null;
-      if(!isHost||!isSpecialUser||!currentLiveId)return;
+      if(!isHost||!currentLiveId)return;
       const b=Math.max(1,Math.floor(Number(botCount)||1));
       const wealth=isInfinite?0:Math.max(0,Number(coins)||0);
 
+      // More bots → gifts more often
       let delay;
-      if(b<5)delay=45000+Math.random()*40000;
-      else if(b<15)delay=28000+Math.random()*28000;
-      else if(b<50)delay=16000+Math.random()*16000;
-      else if(b<200)delay=9000+Math.random()*10000;
-      else if(b<1000)delay=4500+Math.random()*5500;
-      else if(b<5000)delay=2500+Math.random()*3000;
-      else if(b<20000)delay=1400+Math.random()*1800;
-      else delay=900+Math.random()*1200;
+      if(b<5)delay=20000+Math.random()*20000;
+      else if(b<15)delay=12000+Math.random()*12000;
+      else if(b<50)delay=7000+Math.random()*7000;
+      else if(b<200)delay=4000+Math.random()*4000;
+      else if(b<1000)delay=2200+Math.random()*2200;
+      else if(b<5000)delay=1200+Math.random()*1200;
+      else if(b<20000)delay=700+Math.random()*700;
+      else delay=400+Math.random()*500;
 
-      // Richer host → gifts slow down
-      delay*=1+Math.min(10,wealth/3000);
+      // More coins → slightly rarer gifts (doesn't apply to ∞ admin)
+      if(!isInfinite) delay*=1+Math.min(6,wealth/4000);
 
       botGiftTimer=setTimeout(async()=>{
         botGiftTimer=null;
-        if(!isHost||!isSpecialUser||!currentLiveId||botCount<=0){scheduleBotDonation();return}
-        const chance=Math.min(0.9,0.18+Math.log10(b+1)*0.16);
+        if(!isHost||!currentLiveId||botCount<=0){scheduleBotDonation();return}
+        const bb=Math.max(1,Math.floor(Number(botCount)||1));
+        // High chance once room is busy
+        const chance=Math.min(0.95,0.35+Math.log10(bb+1)*0.2);
         if(Math.random()<chance){
           const gift=pickBotGift();
           if(gift){
             const from=nextName();
             const toStreamer=Math.floor(gift.cost*0.7);
             const now=Date.now();
+            // Apply locally so host always sees gift even if Firebase is slow
+            playGiftAnim(gift.emoji,gift.name,gift.cost);
+            if(!isInfinite){
+              coins+=toStreamer;saveCoins();updateCoinsUI();
+            }
+            toast(`🎁 ${from} sent ${gift.emoji} +${formatCoins(toStreamer)}`);
+            addMsg(from,`sent ${gift.emoji} ${gift.name} (🪙${formatCoins(gift.cost)})`,false,true);
             try{
               await push(ref(db,`lives/${currentLiveId}/gifts`),{
                 from,emoji:gift.emoji,name:gift.name,cost:gift.cost,toHost:toStreamer,bot:true,at:now
@@ -1056,6 +1140,8 @@
       onChildAdded(ref(db,`lives/${liveId}/gifts`),(snap)=>{
         if(!isHost)return;
         const g=snap.val();if(!g)return;
+        // Bot gifts are already applied locally on host — skip double credit
+        if(g.bot)return;
         playGiftAnim(g.emoji,g.name,g.cost);
         if(!isInfinite){coins+=(g.toHost||0);saveCoins();updateCoinsUI()}
         toast(`+${formatCoins(g.toHost||0)} coins from gift!`);
