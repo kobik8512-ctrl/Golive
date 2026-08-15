@@ -209,6 +209,12 @@
     .btn-send:active, .btn-gift:active { transform: scale(0.96); }
 
     .mic-status { position: absolute; bottom: 34%; left: 12px; font-size: 0.78rem; color: var(--green); z-index: 25; pointer-events: none; opacity: 0.85; }
+    .likes-badge {
+      position: absolute; bottom: 34%; right: 112px; z-index: 25;
+      background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); border-radius: 999px;
+      padding: 6px 12px; font-size: 0.82rem; font-weight: 700;
+      border: 1px solid rgba(255,45,85,0.3); pointer-events: none;
+    }
     .coins-badge {
       position: absolute; bottom: 34%; right: 12px; z-index: 25;
       background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); border-radius: 999px;
@@ -321,6 +327,7 @@
       </div>
     </div>
     <div class="mic-status" id="mic-status">Mic: listening...</div>
+    <div class="likes-badge" id="likes-badge">❤️ <span id="likes-count">0</span></div>
     <div class="coins-badge" id="coins-badge">
       <span class="coin-icon">🪙</span>
       <span id="coins-count">0</span>
@@ -422,13 +429,16 @@
     };
 
     let user = null, isHost = false, isSpecialUser = false, isInfinite = false;
+    // Admins have 0 coins too. Admin status only unlocks B/tools; it never grants infinite coins.
+    isInfinite = false;
     // Admin keeps the B controls, but has a normal 0-coin balance.
     // Bots/gifts are virtual game events and can still award the host coins.
     let liveTitle = '', currentLiveId = null, viewerId = null;
     let liveMode = 'irl', pendingLiveMode = null;
     let screenStream = null, screenMicStream = null;
     let stream = null, facingMode = 'user', isMuted = false;
-    let botCount = 0, realViewers = 0;
+    let botCount = 0, realViewers = 0, likes = 0;
+    let likeTimer = null, botGiftTimer = null;
     let botSyncTimer = null, botSyncPending = false;
     let botTimer = null, chatTimer = null, realTimer = null, viewerBotChatTimer = null, botGiftTimer = null;
     let activeLives = [], coins = 0;
@@ -730,7 +740,7 @@
       try{
         await set(ref(db,'lives/'+currentLiveId),{
           title:liveTitle,host:user.name,hostEmail:user.email,hostUid:user.uid,
-          viewerCount:0,botCount:0,mode:liveMode,startedAt:Date.now()
+          viewerCount:0,botCount:0,likes:0,mode:liveMode,startedAt:Date.now()
         });
       }catch(e){
         console.error('Could not publish live:',e);
@@ -754,9 +764,12 @@
       document.getElementById('mic-status').style.color='var(--green)';
       document.getElementById('remote-video').style.display='none';
       document.getElementById('cam-off').style.display='none';
+      likes=0; updateLikesUI();
       pauseLivesListener();
       show('live-room');
       if(isSpecialUser)startBots();
+      startLikeSim();
+      startBotGiftSim();
       stopRealSim();
       listenForViewers();
       listenToChat(currentLiveId);
@@ -1043,8 +1056,10 @@
       const liveTitleRef=ref(db,`lives/${live.id}/title`);
       const liveCountRef=ref(db,`lives/${live.id}/viewerCount`);
       const liveBotCountRef=ref(db,`lives/${live.id}/botCount`);
+      const liveLikesRef=ref(db,`lives/${live.id}/likes`);
       let liveCountCache=Number(live.viewers)||0;
       let liveBotCountCache=Number(live.botCount)||0;
+      let liveLikesCache=Number(live.likes)||0;
 
       unsubLiveEnd=onValue(liveTitleRef,(snap)=>{
         if(!snap.exists() && currentLiveId===live.id && !isHost){
@@ -1065,7 +1080,15 @@
           updateCountDisplay(liveCountCache+liveBotCountCache);
         }
       });
+      if(unsubLiveLikes)try{unsubLiveLikes();}catch(e){}
+      unsubLiveLikes=onValue(liveLikesRef,(snap)=>{
+        if(currentLiveId===live.id && !isHost){
+          likes=Math.max(0,Math.floor(Number(snap.val())||0));
+          updateLikesUI();
+        }
+      });
       listenToChat(live.id);
+      startViewerBotChat();
 
       if(viewerPC){try{viewerPC.close();}catch(e){} viewerPC=null;}
       viewerPC=new RTCPeerConnection({...ICE_SERVERS, iceCandidatePoolSize:10});
@@ -1188,13 +1211,14 @@
       if(typeof unsubViewers==='function'){try{unsubViewers();}catch(e){} unsubViewers=null;}
       if(typeof unsubViewerRemoved==='function'){try{unsubViewerRemoved();}catch(e){} unsubViewerRemoved=null;}
       if(typeof unsubLiveMeta==='function'){try{unsubLiveMeta();}catch(e){} unsubLiveMeta=null;}
+      if(typeof unsubLiveLikes==='function'){try{unsubLiveLikes();}catch(e){} unsubLiveLikes=null;}
     }
 
     function forceLeaveLive(msg){
       cleanupViewerListeners();
       clearTimeout(viewerCountSyncTimer);viewerCountSyncTimer=null;
       clearTimeout(botDeltaTimer);botDeltaTimer=null;pendingBotDelta=0;
-      stopCam();stopGameShare();stopBots();stopRealSim();
+      stopCam();stopGameShare();stopBots();stopLikeSim();stopBotGiftSim();stopRealSim();
       if(viewerPC){try{viewerPC.close();}catch(e){} viewerPC=null;}
       Object.values(peerConnections).forEach(pc=>{try{pc.close();}catch(e){}});
       peerConnections={};
@@ -1236,7 +1260,7 @@
       if(typeof unsubGifts==='function'){try{unsubGifts();}catch(e){} unsubGifts=null;}
       clearTimeout(viewerCountSyncTimer);viewerCountSyncTimer=null;
       clearTimeout(botDeltaTimer);botDeltaTimer=null;pendingBotDelta=0;
-      stopCam();stopGameShare();stopBots();stopRealSim();
+      stopCam();stopGameShare();stopBots();stopLikeSim();stopBotGiftSim();stopRealSim();
       Object.values(peerConnections).forEach(pc=>{try{pc.close();}catch(e){}});
       peerConnections={};
       if(viewerPC){try{viewerPC.close();}catch(e){} viewerPC=null;}
@@ -1269,7 +1293,7 @@
 
     let viewerCountSyncTimer=null;
     function scheduleViewerCountSync(){
-      if(!currentLiveId||!isSpecialUser)return;
+      if(!currentLiveId)return;
       clearTimeout(viewerCountSyncTimer);
       viewerCountSyncTimer=setTimeout(()=>{
         viewerCountSyncTimer=null;
@@ -1288,6 +1312,67 @@
       const v=document.getElementById('remote-video');
       if(v && v.srcObject) v.play().catch(()=>{});
     },{passive:true});
+
+    // Likes
+    function updateLikesUI(){
+      const el=document.getElementById('likes-count');
+      if(el)el.textContent=format(likes);
+    }
+    async function addLike(amount=1){
+      if(!currentLiveId)return;
+      amount=Math.max(1,Math.floor(Number(amount)||1));
+      try{
+        await runTransaction(ref(db,`lives/${currentLiveId}/likes`),v=>Math.max(0,Math.floor(Number(v)||0))+amount);
+      }catch(e){console.warn('Like failed',e);}
+    }
+    function startLikeSim(){
+      stopLikeSim();
+      if(!isHost)return;
+      const tick=()=>{
+        if(!isHost||!currentLiveId)return;
+        // More bots/viewers -> faster likes, but keep writes batched.
+        const base=botCount>10000?20:botCount>5000?12:botCount>1000?6:botCount>100?2:1;
+        addLike(base);
+        likeTimer=setTimeout(tick,botCount>10000?900:botCount>1000?1200:1800);
+      };
+      likeTimer=setTimeout(tick,900);
+    }
+    function stopLikeSim(){clearTimeout(likeTimer);likeTimer=null;}
+
+    // Bots also send gifts. Gift frequency and value rise with bot count, but
+    // gifts are still real Firebase events so the host earns coins normally.
+    function startBotGiftSim(){
+      stopBotGiftSim();
+      if(!isHost)return;
+      const tick=async()=>{
+        if(!isHost||!currentLiveId)return;
+        if(botCount>0){
+          const pool=botCount<20?GIFTS.slice(0,2):botCount<100?GIFTS.slice(0,5):botCount<1000?GIFTS.slice(0,10):GIFTS.slice(0,18);
+          const gift=rand(pool);
+          const multiplier=botCount>10000?3:botCount>1000?2:1;
+          for(let i=0;i<multiplier;i++){
+            const from=nextName();
+            const toHost=Math.floor(gift.cost*0.7);
+            const giftRef=push(ref(db,`lives/${currentLiveId}/gifts`));
+            const key=giftRef.key;
+            const payload={from,emoji:gift.emoji,name:gift.name,cost:gift.cost,toHost,bot:true,at:Date.now()};
+            try{
+              await set(giftRef,payload);
+              // Show one chat line per gift; no duplicate local rendering.
+              const msgRef=push(ref(db,`lives/${currentLiveId}/chat`));
+              const msgKey=msgRef.key;
+              if(msgKey)seenChatIds.add(msgKey);
+              await set(msgRef,{name:from,text:`sent ${gift.emoji} ${gift.name} (🪙${formatCoins(gift.cost)})`,host:false,gift:true,bot:true,giftEmoji:gift.emoji,giftName:gift.name,giftCost:gift.cost,at:Date.now()});
+              addMsg(from,`sent ${gift.emoji} ${gift.name} (🪙${formatCoins(gift.cost)})`,false,true);
+            }catch(e){console.warn('Bot gift failed',e);}
+          }
+        }
+        const delay=botCount>10000?1800:botCount>1000?2500:botCount>100?4000:7000;
+        botGiftTimer=setTimeout(tick,delay+Math.random()*1500);
+      };
+      botGiftTimer=setTimeout(tick,4000);
+    }
+    function stopBotGiftSim(){clearTimeout(botGiftTimer);botGiftTimer=null;}
 
     // B button (only special)
     // B button: click = add botsPerClick, hold = open amount menu
