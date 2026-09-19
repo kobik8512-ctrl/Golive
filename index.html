@@ -53,11 +53,11 @@ input{font-family:inherit}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
 .title-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .watchers{color:var(--muted);font-weight:500;white-space:nowrap}
-.header-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-.icon-btn{width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.55);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.08);color:#fff;font-size:1.05rem;display:flex;align-items:center;justify-content:center}
+.header-btns{display:flex;flex-direction:column;gap:10px;align-items:flex-end}
+.icon-btn{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.55);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.08);color:#fff;font-size:1.25rem;display:flex;align-items:center;justify-content:center}
 .icon-btn:active{transform:scale(.92)}
 .icon-btn.muted{background:var(--danger);border-color:transparent}
-.icon-btn.b-btn{background:linear-gradient(135deg,#7c3aed,#06b6d4);font-weight:800;font-size:.95rem;border:none}
+.icon-btn.b-btn{background:linear-gradient(135deg,#7c3aed,#06b6d4);font-weight:800;font-size:1rem;border:none}
 .chat-wrap{position:absolute;bottom:0;left:0;right:0;height:34%;display:flex;flex-direction:column;background:linear-gradient(to top,rgba(0,0,0,.92) 55%,transparent);z-index:30;pointer-events:none}
 .chat-list{flex:1;overflow-y:auto;overflow-x:hidden;padding:10px 14px 6px;display:flex;flex-direction:column;gap:5px;pointer-events:auto;scrollbar-width:none}
 .chat-list::-webkit-scrollbar{display:none}
@@ -71,16 +71,16 @@ input{font-family:inherit}
 .chat-bar{display:flex;gap:6px;padding:6px 10px 16px;pointer-events:auto;align-items:center}
 #chat-input{flex:1;min-width:0;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:11px 14px;color:#fff;font-size:.9rem;outline:none}
 #chat-input::placeholder{color:rgba(255,255,255,.4)}
-.btn-send{background:var(--accent);color:#fff;font-weight:700;font-size:.82rem;padding:11px 14px;border-radius:999px;flex-shrink:0}
-.btn-gift{background:linear-gradient(135deg,#ffd60a,#ff9f0a);color:#1a1a1a;font-weight:800;font-size:.85rem;padding:10px 12px;border-radius:999px;flex-shrink:0}
-.btn-like{background:rgba(255,255,255,.12);color:#fff;font-weight:700;font-size:.85rem;padding:10px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.15);flex-shrink:0}
+.btn-send{background:var(--accent);color:#fff;font-weight:700;font-size:.9rem;padding:11px 14px;border-radius:999px;flex-shrink:0}
+.btn-gift{background:linear-gradient(135deg,#ffd60a,#ff9f0a);color:#1a1a1a;font-weight:800;font-size:.95rem;padding:10px 12px;border-radius:999px;flex-shrink:0}
+.btn-like{background:rgba(255,255,255,.12);color:#fff;font-weight:700;font-size:.95rem;padding:10px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.15);flex-shrink:0}
 .btn-like.liked{background:rgba(255,45,85,.35);border-color:var(--accent);color:#ff8fa3}
 .mic-status{position:absolute;bottom:36%;left:12px;font-size:.78rem;color:var(--green);z-index:25;pointer-events:none;opacity:.85}
 .stats-row{position:absolute;bottom:36%;right:12px;z-index:25;display:flex;gap:8px;pointer-events:none}
 .coins-badge,.likes-badge{background:rgba(0,0,0,.65);backdrop-filter:blur(8px);border-radius:999px;padding:6px 12px;font-size:.82rem;font-weight:700;display:flex;align-items:center;gap:5px;border:1px solid rgba(255,215,0,.3)}
 .likes-badge{border-color:rgba(255,45,85,.4)}
 .coin-icon{color:var(--gold)}
-#b-menu{position:fixed;top:56px;right:12px;z-index:80;background:rgba(20,20,28,.95);border:1px solid var(--border);border-radius:14px;padding:8px;display:none;flex-direction:column;gap:4px;backdrop-filter:blur(12px);min-width:90px}
+#b-menu{position:fixed;top:56px;right:64px;z-index:80;background:rgba(20,20,28,.95);border:1px solid var(--border);border-radius:14px;padding:8px;display:none;flex-direction:column;gap:4px;backdrop-filter:blur(12px);min-width:90px}
 #b-menu.show{display:flex}
 .b-opt{padding:10px 14px;border-radius:10px;font-weight:700;font-size:.9rem;text-align:center;background:var(--card2);color:#fff}
 .b-opt.active{background:linear-gradient(135deg,#7c3aed,#06b6d4)}
@@ -126,6 +126,7 @@ input{font-family:inherit}
     <div class="login-note">Real Google login + live streaming</div>
   </div>
 </div>
+
 <div id="menu" class="screen">
   <div class="broadcast-label">Broadcast</div>
   <div class="menu-title">GO <span>LIVE</span></div>
@@ -133,11 +134,12 @@ input{font-family:inherit}
   <div class="section-label">Live now</div>
   <div class="lives-list" id="lives-list"><div class="empty-state" id="empty-state">No one is live right now.<br>Be the first to go live!</div></div>
   <div class="bottom-actions">
-    <button class="btn-go-live" id="btn-go-live">● Go Live</button>
-    <button class="btn-secondary" id="btn-clear">Clear stuck lives</button>
-    <button class="btn-secondary" id="btn-signout">Sign out</button>
+    <button class="btn-go-live" id="btn-go-live">🔴 Go Live</button>
+    <button class="btn-secondary" id="btn-clear">🧹 Clear stuck lives</button>
+    <button class="btn-secondary" id="btn-signout">👋 Sign out</button>
   </div>
 </div>
+
 <div id="live-room" class="screen">
   <div id="video-wrap">
     <video id="local-video" autoplay playsinline muted></video>
@@ -147,13 +149,14 @@ input{font-family:inherit}
   <div class="live-header">
     <div class="live-pill"><div class="red-dot"></div><span class="title-text" id="live-title-text">LIVE</span><span class="watchers" id="watchers-text">0 watching</span></div>
     <div class="header-btns">
+      <button class="icon-btn" id="btn-leave" title="Leave">❌</button>
+      <button class="icon-btn" id="btn-mic" title="Mic">🎤</button>
+      <button class="icon-btn" id="btn-flip" title="Flip camera">🔄</button>
+      <button class="icon-btn" id="btn-cam" title="Camera on/off">📷</button>
       <button class="icon-btn b-btn" id="btn-b" style="display:none" title="Add bots">B</button>
-      <button class="icon-btn" id="btn-mic" title="Mute">🔇</button>
-      <button class="icon-btn" id="btn-flip" title="Flip">🔄</button>
-      <button class="icon-btn" id="btn-leave" title="Leave">✕</button>
     </div>
   </div>
-  <div class="mic-status" id="mic-status">Mic: listening...</div>
+  <div class="mic-status" id="mic-status">🎤 Mic: listening...</div>
   <div class="stats-row">
     <div class="likes-badge">❤️ <span id="likes-count">0</span></div>
     <div class="coins-badge"><span class="coin-icon">🪙</span> <span id="coins-count">0</span></div>
@@ -164,17 +167,18 @@ input{font-family:inherit}
       <input type="text" id="chat-input" placeholder="Say something..." maxlength="140" autocomplete="off"/>
       <button class="btn-like" id="btn-like">❤️</button>
       <button class="btn-gift" id="btn-gift">🎁</button>
-      <button class="btn-send" id="btn-send">Send</button>
+      <button class="btn-send" id="btn-send">➤</button>
     </div>
   </div>
 </div>
+
 <div id="b-menu">
   <div class="b-opt" data-amt="1">1</div><div class="b-opt" data-amt="10">10</div><div class="b-opt" data-amt="100">100</div>
   <div class="b-opt" data-amt="1000">1K</div><div class="b-opt" data-amt="10000">10K</div><div class="b-opt" data-amt="100000">100K</div><div class="b-opt" data-amt="1000000">1M</div>
 </div>
-<div id="gift-panel"><div class="gift-sheet"><div class="gift-sheet-header"><h3>Send a Gift</h3><button id="gift-close">✕</button></div><div class="gift-grid" id="gift-grid"></div></div></div>
+<div id="gift-panel"><div class="gift-sheet"><div class="gift-sheet-header"><h3>🎁 Send a Gift</h3><button id="gift-close">❌</button></div><div class="gift-grid" id="gift-grid"></div></div></div>
 <div id="gift-anim"></div>
-<div id="title-modal"><div class="modal-card"><h3>Name your live</h3><input type="text" id="title-input" placeholder="e.g. my live" maxlength="40"/><div class="modal-actions"><button class="btn-cancel" id="btn-cancel">Cancel</button><button class="btn-confirm" id="btn-start">Start Live</button></div></div></div>
+<div id="title-modal"><div class="modal-card"><h3>Name your live</h3><input type="text" id="title-input" placeholder="e.g. my live" maxlength="40"/><div class="modal-actions"><button class="btn-cancel" id="btn-cancel">Cancel</button><button class="btn-confirm" id="btn-start">🔴 Start Live</button></div></div></div>
 <div id="toast"></div>
 
 <script type="module">
@@ -199,6 +203,8 @@ const db = getDatabase(app);
 
 const SPECIAL_EMAIL = 'kobik8512@gmail.com';
 const ADMIN_PIN = 'blue007';
+const SPEECH_LANG = 'en-US';      // language the bots listen for (e.g. 'he-IL' for Hebrew)
+const CONTEXT_RATE = 0.75;        // ~75% of bot chats are about what you just said
 const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -208,16 +214,17 @@ const ICE_SERVERS = {
   ]
 };
 
-let user=null, isHost=false, isSpecialUser=false, isInfinite=false;
+let user=null, isHost=false, isSpecialUser=false;
 let liveTitle='', currentLiveId=null, viewerId=null;
-let stream=null, facingMode='user', isMuted=false;
+let stream=null, facingMode='user', isMuted=false, camOn=true;
 let botCount=0, realViewers=0, likeCount=0, botsPerClick=1, hasLiked=false, chatPhase='greet';
 let remoteBotPower=0, offerHandled=false;
 let peerConnections={}, viewerPC=null;
-let botTimer=null, chatTimer=null, leaveTimer=null, likeTimer=null, botGiftTimer=null, realTimer=null, viewerBotTimer=null;
+let botTimer=null, chatTimer=null, leaveTimer=null, likeTimer=null, botGiftTimer=null, realTimer=null, viewerBotTimer=null, phaseTimer=null;
 let unsubViewers=null, unsubLiveEnd=null, unsubChat=null, unsubLives=null;
 let coins=0;
 
+/* ---------- GIFTS ---------- */
 const GIFTS=[
   {emoji:'🌹',name:'Rose',cost:1},{emoji:'❤️',name:'Heart',cost:5},{emoji:'🍭',name:'Lollipop',cost:10},
   {emoji:'🍦',name:'Ice Cream',cost:15},{emoji:'🍩',name:'Donut',cost:20},{emoji:'🎈',name:'Balloon',cost:25},
@@ -227,21 +234,186 @@ const GIFTS=[
   {emoji:'✈️',name:'Airplane',cost:12000},{emoji:'🏰',name:'Castle',cost:40000},{emoji:'🦁',name:'Golden Lion',cost:49000},
   {emoji:'🌌',name:'Galaxy',cost:60000},{emoji:'🌍',name:'Earth',cost:100000},{emoji:'🏆',name:'Trophy',cost:900}
 ];
+
+/* ---------- BOT NAMES ---------- */
 const adjs=['Cool','Epic','Pro','Shadow','Neon','Cyber','Swift','Fire','Ice','Nova','Turbo','Elite','Ace','Ninja','Pixel','Lucky','Wild','Silent','Blaze','Ghost','Royal','Crystal','Golden','Omega','Alpha','Hyper','Magic','Storm','Jade','Violet'];
 const nouns=['Gamer','Player','Stream','Live','Chat','Fan','Master','Legend','Hero','Star','Soul','Wave','Blade','Flash','Coder','Cat','Dog','Panda','Wolf','Dragon','Fox','Tiger','Shark','Raven','Owl','Bro','Kid','Pro','Chad'];
 const tags=['','123','99','X','XX','69','420','YT','TV','GG','OP','Live','Pro','77','01'];
-const phrases=['w','W','WW','lets go','hi','hello','hey','yo','sup','first','nice stream','fire','🔥','💯','👏','❤️','😂','lmao','lol','love this','keep going','pog','based','mid','ratio','L','W','aura','rizz','no cap','fr','sheesh','yooo','bussin','goated','fyp','huge W','mic check','respect','camera good','still watching','fire stream','main character','lag?','clip that','10/10','nice cam','what game','ggs','insane'];
-const greetings=['hi','hello','hii','hiii','hi!','hey','yo','sup','hi bro','helloo','hi kobi','hey host','hi everyone','first','im early','hello chat','hi hi','heyyy','wassup','hi there','hola','yo yo','gm','hi stream','joined'];
-const fillers=['omg','bruh','dude','bro','fam','chat','guys','tbh','ngl','fr','idk','lowkey','highkey','sheesh','yooo','bussin','cooked','mid','goated'];
 function rand(a){return a[Math.floor(Math.random()*a.length)]}
 function makeName(){return rand(adjs)+rand(nouns)+rand(tags)+(Math.random()<0.35?Math.floor(Math.random()*900+100):'')}
-function makeMsg(){if(Math.random()<0.6)return rand(phrases);const p=[];const n=1+Math.floor(Math.random()*3);for(let i=0;i<n;i++)p.push(Math.random()<0.55?rand(phrases):rand(fillers));if(Math.random()<0.25)p.push(String(Math.floor(Math.random()*99)));return p.join(' ').slice(0,90)}
 const NAMES=[...new Set(Array.from({length:4000},makeName))];
-const MSGS=[...new Set(Array.from({length:6000},makeMsg))];
-let ni=0,mi=0;
+let ni=0;
 function nextName(){const n=NAMES[ni%NAMES.length];ni++;return ni>NAMES.length?n+Math.floor(Math.random()*50):n}
-function nextMsg(){if(chatPhase==='greet'&&Math.random()<0.72)return rand(greetings);const m=MSGS[mi%MSGS.length];mi++;return m}
 
+/* ---------- BOT CHAT BRAIN ---------- */
+// Generic chat is built from parts (opener + core + ending), so it almost never repeats.
+const EMOJIS=['🔥','😂','💯','❤️','👏','😭','💀','🙌','😍','🤩','👀','✨','😎','🥹','🤣','💪','🎉','🫶','👑','🚀'];
+const PHRASES=['w','W','WW','lets go','hi','hello','hey','yo','sup','first','nice stream','fire','🔥','💯','👏','❤️','😂','lmao','lol','love this','keep going','pog','based','mid','ratio','L','aura','rizz','no cap','fr','sheesh','yooo','bussin','goated','fyp','huge W','mic check','respect','camera good','still watching','fire stream','main character','lag?','clip that','10/10','nice cam','ggs','insane','vibes','so good','underrated','cracked','clean','legend','king','queen','let him cook','cooking','he cooked','locked in','peak','real','facts','true','same','literally','sending love','good stream','love the energy','w stream','banger','hard','wild','crazy','wow','omg','whoa','ayooo','nahh','stop it','im crying','dead','deadass','ok ok','slay','period','fair','valid','underrated fr','more please','again','encore','so funny','hilarious','goat','elite','clutch','smooth','fresh','smart','big brain','cold','sick','dope','nice one','thats it','exactly','say it louder'];
+const OPENERS=['ok','bro','yo','wait','honestly','ngl','lowkey','damn','omg','guys','chat','man','lol','bruh','fr','ayo','hold on','not gonna lie','no because','be fr','ok but','real talk','yeah but','gotta say','ok so','listen','mannn','dude','fam','fellas'];
+const CORES=['this is so good','the vibe is immaculate','stream is actually fire','cant stop watching','this is cracked','you are so funny','the energy is crazy','this stream is underrated','why is this so entertaining','need more people here','how is this not bigger','the cam looks clean','audio is clear','this is my fav stream rn','just found this and staying','never leaving','you have a good voice','this is peak','how long you been streaming','where are you from','been here since the start','you cooking rn','this is so real','no way this is happening','this is wild','you got this','chat is moving fast','the chat is crazy','ive been waiting for this','sending love','hi from the other side of the world','good vibes only','best live on the app','this made my day','my night is saved','so chill','so wholesome','you deserve more views','this is actually insane','i cant even','hard agree','that was clean','you should stream more','following for more','turned on notifs','showing this to my friends','just joined what did i miss','whats the plan today','what are we doing next','the lighting is nice','love the setup','you look good','this is smooth','who else is here','how many are watching','literally cant leave','this hits','the mood is perfect'];
+const ENDINGS=['😂','🔥','💯','fr','lol','no cap','tbh','honestly','for real','😭','👏','❤️','!!','??','lmao','haha','frfr','💀','🙌','ngl','rn','bro','man','chat'];
+const GREETINGS=['hi','hello','hii','hiii','hi!','hey','yo','sup','hi bro','helloo','hey host','hi everyone','first','im early','hello chat','hi hi','heyyy','wassup','hi there','hola','yo yo','gm','hi stream','joined','hey hey','heyo'];
+
+// Reactions to what the host says
+const T_KEYWORD=['{k}','{k}??','{k} 😂','wait {k}?','yo {k}','{k} fr','{k} 🔥','not {k} 💀','{k} lets gooo','lol {k}','{k} is crazy','bro said {k}','{k} tho','ok but {k}','{k} W','honestly {k}','{k} 😭','wym {k}','why {k}','love {k}','{k} energy','{k} hits different','who else likes {k}','{k} real','{k} again? 😂','{k} is so true','talk more about {k}','{k} gang','{k} lol same','ayo {k}?'];
+const T_PHRASE=['"{p}" 😂','{p} lol','{p} fr','{p} 💯','said {p} 💀','{p}?? 😭','{p} facts','{p} true','wait {p}?','ok {p}','lmaooo {p}','{p} bro','{p} W','{p} 🔥','{p} 😮','yeah {p}','{p} exactly','did he just say {p}','{p} i agree'];
+const T_ANSWER=['yes','yeah','yep','no','nah','maybe','idk','depends','of course','100%','fr yes','nope','yes!!','ofc','i think so','probably','not really','hmm','same question','lol idk','yesss','definitely','no way','absolutely'];
+const T_GREET=['hi!','hello!','hey 👋','hi host','hii','yo!','hey hey','hello 👋','hi 👋','sup','heyyy','hiii 👋'];
+const T_LAUGH=['😂😂','lmaooo','LOL','💀💀','im dead','dying 😂','haha','lolll','😭😭','cant stop laughing','hahaha','bro 💀'];
+const T_THANKS=['np','anytime','❤️','love u','of course','you deserve it','🙏','respect','ur welcome lol','always'];
+const T_HYPE=['LETS GOOO','W','fire 🔥','yoooo','huge','insane','crazy','no way','wow','sheesh','goated','lets goooo','W host','massive'];
+const T_FOLLOW=['followed ✅','liked ❤️','done ✅','already did','just followed','following!','liked and followed','notifs on 🔔'];
+
+const STOP=new Set('the a an and or but if so to of in on at for with about as by from up out is are was were be been am do does did have has had i me my we our you your he she it they them this that these those there here what which who when where why how not no yes just like really very can could should would will its im ive dont cant wont thats then than too also get got go going gonna wanna let lets say said says know think want mean okay ok yeah well one now some any more most much many even still only back into over off see look come came make made thing things guys chat hello hi hey right actually basically literally because cause gotta thing stuff kinda sorta maybe'.split(' '));
+const heard=[];                    // what the host said recently
+const recentMsgs=new Set();        // stops bots repeating themselves
+const recentOrder=[];
+let recog=null, recogWanted=false;
+
+function words(t){return t.replace(/[^\p{L}\p{N}\s']/gu,' ').split(/\s+/).filter(Boolean)}
+function extractKeywords(t){
+  const seen=new Set(),out=[];
+  for(const w of words(t)){
+    const x=w.replace(/'/g,'');
+    if(x.length<3||STOP.has(x)||STOP.has(w)||seen.has(x))continue;
+    seen.add(x);out.push(x);
+  }
+  return out.slice(0,8);
+}
+function extractPhrases(t){
+  const w=words(t),out=[];
+  for(let i=0;i<w.length;i++){
+    for(let n=2;n<=3;n++){
+      const ch=w.slice(i,i+n);
+      if(ch.length<n||ch.every(x=>STOP.has(x)))continue;
+      const s=ch.join(' ');
+      if(s.length<=24)out.push(s);
+    }
+  }
+  return out.slice(0,12);
+}
+function detectKind(t){
+  if(/^(what|why|how|who|where|when|do|does|did|can|could|should|is|are|would|will|which)\b/.test(t)||/\b(do you|you think|anyone|any of you|right guys)\b/.test(t))return 'question';
+  if(/\b(follow|subscribe|like the|hit the like)\b/.test(t))return 'follow';
+  if(/\b(thank|thanks|appreciate)\b/.test(t))return 'thanks';
+  if(/\b(haha|lol|funny|laugh|joke|hilarious)\b/.test(t))return 'laugh';
+  if(/\b(hi|hello|hey|welcome|whats up|what's up|sup|good morning|good evening)\b/.test(t))return 'greet';
+  if(/\b(lets go|let's go|crazy|insane|amazing|awesome|wow|win|won|best|incredible)\b/.test(t))return 'hype';
+  return 'talk';
+}
+function remember(m){
+  recentMsgs.add(m);recentOrder.push(m);
+  if(recentOrder.length>250){recentMsgs.delete(recentOrder.shift())}
+}
+function uniq(gen){
+  for(let i=0;i<10;i++){const m=gen();if(m&&!recentMsgs.has(m)){remember(m);return m}}
+  const m=(gen()||rand(PHRASES))+' '+rand(EMOJIS);
+  remember(m);return m;
+}
+function dress(m){
+  const r=Math.random();
+  if(r<0.10)m=m.toUpperCase();
+  else if(r<0.18)m=m.replace(/([aeiou])(?!.*[aeiou])/i,c=>c+c+c);
+  else if(r<0.24)m=m.toLowerCase();
+  if(Math.random()<0.18)m+=' '+rand(EMOJIS);
+  return m.slice(0,90);
+}
+function hostFirst(){return ((user&&user.name)||'').split(' ')[0].toLowerCase()}
+function greetingMsg(){
+  const hf=hostFirst();
+  if(hf&&Math.random()<0.15)return rand(['hi ','hey ','yo '])+hf;
+  return rand(GREETINGS);
+}
+function genericMsg(){
+  const r=Math.random();
+  if(r<0.30)return rand(PHRASES);
+  if(r<0.58)return rand(OPENERS)+' '+rand(CORES);
+  if(r<0.80)return rand(CORES)+' '+rand(ENDINGS);
+  return rand(OPENERS)+' '+rand(CORES)+' '+rand(ENDINGS);
+}
+function contextMsg(u){
+  if(!u)return null;
+  const r=Math.random();
+  let pool=null;
+  if(u.kind==='greet'&&r<0.6)pool=T_GREET;
+  else if(u.kind==='question'&&r<0.55)pool=T_ANSWER;
+  else if(u.kind==='laugh'&&r<0.6)pool=T_LAUGH;
+  else if(u.kind==='thanks'&&r<0.6)pool=T_THANKS;
+  else if(u.kind==='hype'&&r<0.5)pool=T_HYPE;
+  else if(u.kind==='follow'&&r<0.7)pool=T_FOLLOW;
+  if(pool)return rand(pool);
+  if(u.phrases.length&&(Math.random()<0.4||!u.kws.length))return rand(T_PHRASE).replace(/\{p\}/g,rand(u.phrases));
+  if(u.kws.length)return rand(T_KEYWORD).replace(/\{k\}/g,rand(u.kws));
+  return null;
+}
+function freshUtterance(){
+  const now=Date.now();
+  const fresh=heard.filter(h=>now-h.at<45000);
+  if(!fresh.length)return null;
+  return Math.random()<0.6?fresh[fresh.length-1]:rand(fresh);
+}
+function nextMsg(){
+  if(chatPhase==='greet'&&Math.random()<0.72)return uniq(greetingMsg);
+  if(Math.random()<CONTEXT_RATE){
+    const u=freshUtterance();
+    if(u)return uniq(()=>dress(contextMsg(u)||genericMsg()));
+  }
+  return uniq(()=>dress(genericMsg()));
+}
+function hear(raw){
+  const text=String(raw||'').trim().toLowerCase();
+  if(!text)return;
+  const u={text,kws:extractKeywords(text),phrases:extractPhrases(text),kind:detectKind(text),at:Date.now()};
+  heard.push(u);
+  if(heard.length>12)heard.shift();
+  reactToSpeech(u);
+}
+// After the host says something, a wave of bots reacts within a few seconds
+function reactToSpeech(u){
+  if(!isHost||!isSpecialUser||botCount<=0)return;
+  const n=Math.min(10,1+Math.floor(Math.log10(botCount+1)*2.5));
+  for(let i=0;i<n;i++){
+    setTimeout(()=>{
+      if(!isHost||!currentLiveId)return;
+      const m=Math.random()<CONTEXT_RATE
+        ?uniq(()=>dress(contextMsg(u)||genericMsg()))
+        :uniq(()=>dress(genericMsg()));
+      addMsg(nextName(),m);
+    },900+Math.random()*4500+i*250);
+  }
+}
+
+/* ---------- SPEECH (bots listen to the host) ---------- */
+function startListening(){
+  stopListening();
+  const st=document.getElementById('mic-status');
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){st.textContent='🎤 Mic: listening... (bots cant hear: browser not supported)';return}
+  recogWanted=true;
+  recog=new SR();
+  recog.continuous=true;recog.interimResults=false;recog.lang=SPEECH_LANG;
+  recog.onstart=()=>{st.textContent='🎤 Mic: listening... 🤖 bots hear you';st.style.color='var(--green)'};
+  recog.onresult=e=>{
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal)hear(e.results[i][0].transcript);
+    }
+  };
+  recog.onerror=e=>{
+    if(e.error==='not-allowed'||e.error==='service-not-allowed'){
+      recogWanted=false;st.textContent='🎤 Mic: listening... (speech access blocked)';
+    }
+  };
+  recog.onend=()=>{
+    if(recogWanted&&isHost&&!isMuted)setTimeout(()=>{try{recog&&recog.start()}catch(e){}},400);
+  };
+  try{recog.start()}catch(e){}
+}
+function stopListening(){
+  recogWanted=false;
+  if(recog){try{recog.onend=null;recog.stop()}catch(e){}recog=null}
+}
+
+/* ---------- HELPERS ---------- */
 function toast(t,ms=1600){const e=document.getElementById('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),ms)}
 function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
@@ -253,14 +425,19 @@ function checkAdmin(){
   if(user&&user.email&&user.email.toLowerCase()===SPECIAL_EMAIL)return true;
   return localStorage.getItem('gl_admin')==='1';
 }
-function loadCoins(){
-  if(isInfinite){coins=Infinity;updateCoinsUI();return}
-  coins=Number(localStorage.getItem('gl_coins')||0)||0;updateCoinsUI();
-}
-function saveCoins(){if(!isInfinite)localStorage.setItem('gl_coins',String(Math.floor(coins||0)))}
-function updateCoinsUI(){document.getElementById('coins-count').textContent=isInfinite?'∞':format(coins)}
+// Everyone (admin included) has real coins now, starting at 0
+function loadCoins(){coins=Number(localStorage.getItem('gl_coins')||0)||0;updateCoinsUI()}
+function saveCoins(){localStorage.setItem('gl_coins',String(Math.floor(coins||0)))}
+function updateCoinsUI(){document.getElementById('coins-count').textContent=format(coins)}
 function updateLikesUI(){document.getElementById('likes-count').textContent=format(likeCount)}
 
+function setRoleButtons(host){
+  const d=host?'flex':'none';
+  ['btn-mic','btn-flip','btn-cam'].forEach(id=>document.getElementById(id).style.display=d);
+  document.getElementById('btn-b').style.display=isSpecialUser?'flex':'none';
+}
+
+/* ---------- LOGIN ---------- */
 const btnGoogle=document.getElementById('btn-google');
 btnGoogle.onclick=async()=>{
   btnGoogle.disabled=true;
@@ -271,16 +448,16 @@ document.getElementById('btn-signout').onclick=()=>signOut(auth);
 onAuthStateChanged(auth,(u)=>{
   if(u){
     user={uid:u.uid,name:u.displayName||'User',email:u.email||''};
-    isSpecialUser=checkAdmin();isInfinite=isSpecialUser;
+    isSpecialUser=checkAdmin();
     document.getElementById('display-name').textContent=user.name+(isSpecialUser?' 🔑':'');
     loadCoins();show('menu');listenLives();
     toast(isSpecialUser?'Signed in as Admin 🔑':'Signed in as '+user.name);
   }else{
-    user=null;isInfinite=false;isSpecialUser=false;show('login-screen');btnGoogle.disabled=false;
+    user=null;isSpecialUser=false;show('login-screen');btnGoogle.disabled=false;
   }
 });
 
-// Triple-tap title for PIN unlock
+// Triple-tap title for PIN unlock (admin tools only, no free coins)
 let pinTaps=0;
 document.querySelector('.menu-title')?.addEventListener('click',()=>{
   pinTaps++;
@@ -288,7 +465,7 @@ document.querySelector('.menu-title')?.addEventListener('click',()=>{
     pinTaps=0;
     const p=prompt('Admin PIN');
     if(p===ADMIN_PIN){
-      isSpecialUser=true;isInfinite=true;localStorage.setItem('gl_admin','1');loadCoins();
+      isSpecialUser=true;localStorage.setItem('gl_admin','1');
       document.getElementById('display-name').textContent=(user?.name||'')+' 🔑';
       toast('Admin unlocked');
     }
@@ -305,6 +482,7 @@ document.getElementById('btn-clear').onclick=async()=>{
   toast('Cleared');
 };
 
+/* ---------- LIVES LIST ---------- */
 function listenLives(){
   if(unsubLives)unsubLives();
   unsubLives=onValue(ref(db,'lives'),snap=>{
@@ -320,7 +498,7 @@ function listenLives(){
       card.className='live-card';
       card.innerHTML=`<div class="live-info"><div class="live-name">${esc(live.title||'Live')}</div><div class="live-meta"><span class="dot"></span>${esc(live.host||'Host')} · ${format(Number(live.viewers)||0)} watching</div></div>
         <button class="btn-join" data-id="${live.id}">Join</button>
-        ${isMine||isSpecialUser?`<button class="btn-x-small" data-remove="${live.id}">✕</button>`:''}`;
+        ${isMine||isSpecialUser?`<button class="btn-x-small" data-remove="${live.id}">❌</button>`:''}`;
       list.appendChild(card);
     });
     list.querySelectorAll('.btn-join').forEach(b=>b.onclick=()=>{
@@ -332,6 +510,7 @@ function listenLives(){
   });
 }
 
+/* ---------- GO LIVE (HOST) ---------- */
 document.getElementById('btn-go-live').onclick=()=>{
   document.getElementById('title-input').value='';
   document.getElementById('title-modal').classList.add('show');
@@ -345,25 +524,26 @@ async function startHost(){
   liveTitle=document.getElementById('title-input').value.trim()||((user?.name||'User')+"'s Live");
   document.getElementById('title-modal').classList.remove('show');
   isHost=true;currentLiveId=user.uid+'_'+Date.now();
-  botCount=0;realViewers=0;likeCount=0;ni=0;mi=0;chatPhase='greet';hasLiked=false;offerHandled=false;remoteBotPower=0;
+  botCount=0;realViewers=0;likeCount=0;ni=0;chatPhase='greet';hasLiked=false;offerHandled=false;remoteBotPower=0;
+  heard.length=0;recentMsgs.clear();recentOrder.length=0;
   updateCount();updateLikesUI();
   try{
     await set(ref(db,'lives/'+currentLiveId),{
       title:liveTitle,host:user.name,hostEmail:user.email,viewers:0,likes:0,startedAt:Date.now()
     });
   }catch(e){toast('Could not publish live')}
-  document.getElementById('btn-b').style.display=isSpecialUser?'flex':'none';
+  setRoleButtons(true);
   document.getElementById('live-title-text').textContent=liveTitle;
   document.getElementById('chat-list').innerHTML='';
-  document.getElementById('mic-status').textContent='Mic: listening...';
+  document.getElementById('mic-status').textContent='🎤 Mic: listening...';
   document.getElementById('mic-status').style.color='var(--green)';
   document.getElementById('remote-video').style.display='none';
   document.getElementById('btn-like').classList.remove('liked');
   show('live-room');
   await startCam();
-  if(isSpecialUser)startBots();
+  if(isSpecialUser){startBots();startListening()}
   startRealSim();listenForViewers();listenToChat(currentLiveId);listenForGifts(currentLiveId);startLikeSim();
-  toast('You are live');
+  toast('You are live 🔴');
 }
 
 async function startCam(){
@@ -376,9 +556,9 @@ async function startCam(){
     });
     if(facingMode==='user')vid.classList.add('mirror');else vid.classList.remove('mirror');
     vid.srcObject=stream;vid.style.display='block';off.style.display='none';
-    vid.muted=true;isMuted=false;
-    document.getElementById('btn-mic').textContent='🎤';
-    document.getElementById('btn-mic').classList.remove('muted');
+    vid.muted=true;isMuted=false;camOn=true;
+    const mic=document.getElementById('btn-mic');mic.textContent='🎤';mic.classList.remove('muted');
+    const cam=document.getElementById('btn-cam');cam.textContent='📷';cam.classList.remove('muted');
     Object.values(peerConnections).forEach(pc=>{
       stream.getTracks().forEach(track=>{
         const sender=pc.getSenders().find(s=>s.track&&s.track.kind===track.kind);
@@ -392,6 +572,7 @@ function stopCam(){
   document.getElementById('local-video').srcObject=null;
 }
 
+/* ---------- WEBRTC: HOST ---------- */
 function listenForViewers(){
   if(unsubViewers)unsubViewers();
   const viewersRef=ref(db,'lives/'+currentLiveId+'/viewers');
@@ -440,10 +621,11 @@ async function createHostPeer(viewerId){
   }catch(e){}
 }
 
+/* ---------- WEBRTC: VIEWER ---------- */
 async function joinViewer(live){
   cleanupViewerListeners();
   isHost=false;currentLiveId=live.id;offerHandled=false;hasLiked=false;remoteBotPower=0;
-  document.getElementById('btn-b').style.display=isSpecialUser?'flex':'none';
+  setRoleButtons(false);
   document.getElementById('live-title-text').textContent=live.title;
   document.getElementById('chat-list').innerHTML='';
   document.getElementById('local-video').style.display='none';
@@ -516,7 +698,7 @@ function cleanupViewerListeners(){
   stopViewerBotChat();
 }
 function forceLeaveLive(msg){
-  cleanupViewerListeners();stopCam();stopBots();stopRealSim();stopLikeSim();
+  cleanupViewerListeners();stopCam();stopBots();stopRealSim();stopLikeSim();stopListening();
   if(viewerPC){try{viewerPC.close()}catch(e){}viewerPC=null}
   Object.values(peerConnections).forEach(pc=>{try{pc.close()}catch(e){}});
   peerConnections={};
@@ -531,7 +713,7 @@ async function endLiveInDb(){
   if(currentLiveId)try{await remove(ref(db,'lives/'+currentLiveId))}catch(e){}
 }
 async function stopLive(){
-  cleanupViewerListeners();stopCam();stopBots();stopRealSim();stopLikeSim();
+  cleanupViewerListeners();stopCam();stopBots();stopRealSim();stopLikeSim();stopListening();
   Object.values(peerConnections).forEach(pc=>{try{pc.close()}catch(e){}});
   peerConnections={};
   if(viewerPC){try{viewerPC.close()}catch(e){}viewerPC=null}
@@ -542,6 +724,8 @@ async function stopLive(){
   document.getElementById('remote-video').style.display='none';
   show('menu');toast('Live ended');
 }
+
+/* ---------- CONTROLS ---------- */
 document.getElementById('btn-leave').onclick=()=>stopLive();
 document.getElementById('btn-mic').onclick=()=>{
   if(!isHost||!stream)return;
@@ -550,14 +734,29 @@ document.getElementById('btn-mic').onclick=()=>{
   const btn=document.getElementById('btn-mic');
   btn.textContent=isMuted?'🔇':'🎤';
   btn.classList.toggle('muted',isMuted);
-  document.getElementById('mic-status').textContent=isMuted?'Mic: muted':'Mic: listening...';
-  document.getElementById('mic-status').style.color=isMuted?'var(--danger)':'var(--green)';
+  const st=document.getElementById('mic-status');
+  if(isMuted){
+    stopListening();
+    st.textContent='🔇 Mic: muted';st.style.color='var(--danger)';
+  }else{
+    st.textContent='🎤 Mic: listening...';st.style.color='var(--green)';
+    if(isSpecialUser)startListening();
+  }
 };
 document.getElementById('btn-flip').onclick=async()=>{
   if(!isHost)return;
   facingMode=facingMode==='user'?'environment':'user';
   await startCam();
-  toast(facingMode==='user'?'Front camera':'Back camera');
+  toast(facingMode==='user'?'🤳 Front camera':'📷 Back camera');
+};
+document.getElementById('btn-cam').onclick=()=>{
+  if(!isHost||!stream)return;
+  camOn=!camOn;
+  stream.getVideoTracks().forEach(t=>t.enabled=camOn);
+  const btn=document.getElementById('btn-cam');
+  btn.textContent=camOn?'📷':'🚫';
+  btn.classList.toggle('muted',!camOn);
+  toast(camOn?'📷 Camera on':'🚫 Camera off');
 };
 function updateCount(){
   const total=Math.floor(Number(botCount)+Number(realViewers))||0;
@@ -566,7 +765,7 @@ function updateCount(){
 }
 function updateCountDisplay(n){document.getElementById('watchers-text').textContent=format(n)+' watching'}
 
-// B BUTTON
+/* ---------- B BUTTON (ADMIN) ---------- */
 let bHoldTimer=null,bHoldFired=false;
 const btnB=document.getElementById('btn-b');
 const bMenu=document.getElementById('b-menu');
@@ -637,9 +836,10 @@ function startViewerBotChat(){
 }
 function stopViewerBotChat(){clearTimeout(viewerBotTimer);viewerBotTimer=null}
 
+/* ---------- BOT SIMULATION ---------- */
 function startBots(){
   stopBots();chatPhase='greet';
-  setTimeout(()=>{chatPhase='normal'},22000);
+  phaseTimer=setTimeout(()=>{chatPhase='normal'},22000);
   botTimer=setTimeout(scheduleJoin,3500);
   scheduleChat();scheduleLeave();scheduleBotDonation();
 }
@@ -648,6 +848,7 @@ function stopBots(){
   clearTimeout(chatTimer);chatTimer=null;
   clearTimeout(leaveTimer);leaveTimer=null;
   clearTimeout(botGiftTimer);botGiftTimer=null;
+  clearTimeout(phaseTimer);phaseTimer=null;
 }
 function scheduleJoin(){
   let delay;
@@ -712,6 +913,7 @@ function startRealSim(){
 }
 function stopRealSim(){clearInterval(realTimer);realTimer=null}
 
+/* ---------- LIKES ---------- */
 function floatHeart(){
   const el=document.createElement('div');
   el.className='like-float';
@@ -730,7 +932,7 @@ document.getElementById('btn-like').onclick=async()=>{
   if(hasLiked){toast('Already liked');return}
   hasLiked=true;
   document.getElementById('btn-like').classList.add('liked');
-  await addLikes(1);toast('Liked!');
+  await addLikes(1);toast('Liked! ❤️');
 };
 function startLikeSim(){
   stopLikeSim();
@@ -749,6 +951,7 @@ function startLikeSim(){
 }
 function stopLikeSim(){clearTimeout(likeTimer);likeTimer=null}
 
+/* ---------- CHAT ---------- */
 const seenChatIds=new Set();
 const MAX_CHAT=45;
 const chatQueue=[];
@@ -824,6 +1027,7 @@ async function sendMsg(){
   input.value='';
 }
 
+/* ---------- GIFTS ---------- */
 function pickBotGift(){
   if(!GIFTS.length)return null;
   const b=Math.max(0,Math.floor(Number(botCount)||0));
@@ -836,6 +1040,7 @@ function pickBotGift(){
   for(let i=0;i<GIFTS.length;i++){r-=weights[i];if(r<=0)return GIFTS[i]}
   return GIFTS[0];
 }
+// Bot gifts are visual only: they never add coins to your balance
 function scheduleBotDonation(){
   clearTimeout(botGiftTimer);botGiftTimer=null;
   if(!isHost||!currentLiveId)return;
@@ -855,15 +1060,13 @@ function scheduleBotDonation(){
       const gift=pickBotGift();
       if(gift){
         const from=nextName();
-        const toStreamer=Math.floor(gift.cost*0.7);
         const now=Date.now();
         playGiftAnim(gift.emoji,gift.name,gift.cost);
-        if(!isInfinite){coins+=toStreamer;saveCoins();updateCoinsUI()}
         toast('🎁 '+from+' · '+gift.emoji);
         addMsg(from,'sent '+gift.emoji+' '+gift.name+' (🪙'+formatCoins(gift.cost)+')',false,true);
         try{
-          await push(ref(db,`lives/${currentLiveId}/gifts`),{from,emoji:gift.emoji,name:gift.name,cost:gift.cost,toHost:toStreamer,bot:true,at:now});
-          await push(ref(db,`lives/${currentLiveId}/chat`),{name:from,text:`sent ${gift.emoji} ${gift.name} (🪙${formatCoins(gift.cost)})`,host:false,gift:true,bot:true,at:now,giftEmoji:gift.emoji,giftName:gift.name,giftCost:gift.cost,coinsToHost:toStreamer});
+          await push(ref(db,`lives/${currentLiveId}/gifts`),{from,emoji:gift.emoji,name:gift.name,cost:gift.cost,toHost:0,bot:true,at:now});
+          await push(ref(db,`lives/${currentLiveId}/chat`),{name:from,text:`sent ${gift.emoji} ${gift.name} (🪙${formatCoins(gift.cost)})`,host:false,gift:true,bot:true,at:now,giftEmoji:gift.emoji,giftName:gift.name,giftCost:gift.cost,coinsToHost:0});
         }catch(e){}
       }
     }
@@ -893,8 +1096,8 @@ document.getElementById('gift-panel').onclick=e=>{if(e.target.id==='gift-panel')
 async function sendGift(gift){
   if(isHost){toast("You can't gift in your own live");return}
   if(!currentLiveId){toast('Not in a live');return}
-  if(!isInfinite&&coins<gift.cost){toast('Not enough coins!');return}
-  if(!isInfinite){coins-=gift.cost;saveCoins();updateCoinsUI()}
+  if(coins<gift.cost){toast('Not enough coins!');return}
+  coins-=gift.cost;saveCoins();updateCoinsUI();
   document.getElementById('gift-panel').classList.remove('show');
   playGiftAnim(gift.emoji,gift.name,gift.cost);
   const sender=user?user.name:'You';
@@ -905,7 +1108,10 @@ async function sendGift(gift){
       host:false,gift:true,at:Date.now(),giftEmoji:gift.emoji,giftName:gift.name,giftCost:gift.cost,coinsToHost:toStreamer
     });
     await push(ref(db,`lives/${currentLiveId}/gifts`),{from:sender,emoji:gift.emoji,name:gift.name,cost:gift.cost,toHost:toStreamer,at:Date.now()});
-  }catch(e){toast('Gift failed');return}
+  }catch(e){
+    coins+=gift.cost;saveCoins();updateCoinsUI();
+    toast('Gift failed');return;
+  }
   toast(`Gift sent! +${formatCoins(toStreamer)} to streamer`);
 }
 function playGiftAnim(emoji,name,cost){
@@ -919,10 +1125,10 @@ function listenForGifts(liveId){
     const g=snap.val();if(!g)return;
     if(g.bot)return;
     playGiftAnim(g.emoji,g.name,g.cost);
-    if(!isInfinite){coins+=(g.toHost||0);saveCoins();updateCoinsUI()}
+    coins+=(g.toHost||0);saveCoins();updateCoinsUI();
     toast(`+${formatCoins(g.toHost||0)} coins from gift!`);
   });
 }
 </script>
 </body>
-    </html>
+</html>
