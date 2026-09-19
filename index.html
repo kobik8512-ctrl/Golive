@@ -205,6 +205,8 @@ const SPECIAL_EMAIL = 'kobik8512@gmail.com';
 const ADMIN_PIN = 'blue007';
 const SPEECH_LANG = 'en-US';      // language the bots listen for (e.g. 'he-IL' for Hebrew)
 const CONTEXT_RATE = 0.75;        // ~75% of bot chats are about what you just said
+const GEMINI_API_KEY = '';        // optional: paste a Gemini key for smarter bot comments (leave '' to use the built-in generator)
+const GEMINI_MODEL = 'gemini-2.5-flash';
 const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -355,10 +357,49 @@ function freshUtterance(){
 function nextMsg(){
   if(chatPhase==='greet'&&Math.random()<0.72)return uniq(greetingMsg);
   if(Math.random()<CONTEXT_RATE){
+    const a=takeAi();
+    if(a){remember(a);return a}
     const u=freshUtterance();
     if(u)return uniq(()=>dress(contextMsg(u)||genericMsg()));
   }
   return uniq(()=>dress(genericMsg()));
+}
+
+/* ---------- OPTIONAL GEMINI ---------- */
+// One call returns ~20 comments about what you just said; bots drip them out over time.
+// If there is no key or the call fails, the built-in generator above keeps working.
+const aiQueue=[];
+let aiBusy=false, aiLastCall=0;
+function takeAi(){
+  while(aiQueue.length){
+    const it=aiQueue.shift();
+    if(Date.now()-it.at<45000)return it.m;
+  }
+  return null;
+}
+async function askGemini(){
+  if(!GEMINI_API_KEY||aiBusy||Date.now()-aiLastCall<6000)return;
+  const said=heard.filter(h=>Date.now()-h.at<60000).map(h=>h.text).join('. ');
+  if(!said)return;
+  aiBusy=true;aiLastCall=Date.now();
+  try{
+    const prompt='A streamer is live and just said: "'+said+'"\nWrite 20 short live-chat comments (2 to 10 words each) from different viewers reacting to exactly that. Casual slang, some emoji, some questions, some jokes, a few generic hype ones. No usernames, no hashtags, no repeats. Return only a JSON array of strings.';
+    const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+GEMINI_MODEL+':generateContent',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-goog-api-key':GEMINI_API_KEY},
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{responseMimeType:'application/json',temperature:1.1}})
+    });
+    if(!res.ok)throw new Error('gemini '+res.status);
+    const data=await res.json();
+    const txt=(data.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('');
+    const arr=JSON.parse(txt.replace(/```json|```/g,'').trim());
+    if(Array.isArray(arr)){
+      aiQueue.length=0;
+      const now=Date.now();
+      arr.forEach(m=>{m=String(m).trim().slice(0,90);if(m&&!recentMsgs.has(m))aiQueue.push({m,at:now})});
+    }
+  }catch(e){}
+  aiBusy=false;
 }
 function hear(raw){
   const text=String(raw||'').trim().toLowerCase();
@@ -366,20 +407,25 @@ function hear(raw){
   const u={text,kws:extractKeywords(text),phrases:extractPhrases(text),kind:detectKind(text),at:Date.now()};
   heard.push(u);
   if(heard.length>12)heard.shift();
+  askGemini();
   reactToSpeech(u);
 }
 // After the host says something, a wave of bots reacts within a few seconds
 function reactToSpeech(u){
   if(!isHost||!isSpecialUser||botCount<=0)return;
   const n=Math.min(10,1+Math.floor(Math.log10(botCount+1)*2.5));
+  const base=GEMINI_API_KEY?2500:900;
   for(let i=0;i<n;i++){
     setTimeout(()=>{
       if(!isHost||!currentLiveId)return;
-      const m=Math.random()<CONTEXT_RATE
-        ?uniq(()=>dress(contextMsg(u)||genericMsg()))
-        :uniq(()=>dress(genericMsg()));
+      let m;
+      if(Math.random()<CONTEXT_RATE){
+        const a=takeAi();
+        if(a){remember(a);m=a}
+        else m=uniq(()=>dress(contextMsg(u)||genericMsg()));
+      }else m=uniq(()=>dress(genericMsg()));
       addMsg(nextName(),m);
-    },900+Math.random()*4500+i*250);
+    },base+Math.random()*4500+i*250);
   }
 }
 
@@ -388,11 +434,11 @@ function startListening(){
   stopListening();
   const st=document.getElementById('mic-status');
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){st.textContent='🎤 Mic: listening... (bots cant hear: browser not supported)';return}
+  if(!SR){st.textContent='🎤 Mic: listening...';return}
   recogWanted=true;
   recog=new SR();
   recog.continuous=true;recog.interimResults=false;recog.lang=SPEECH_LANG;
-  recog.onstart=()=>{st.textContent='🎤 Mic: listening... 🤖 bots hear you';st.style.color='var(--green)'};
+  recog.onstart=()=>{st.textContent='🎤 Mic: listening...';st.style.color='var(--green)'};
   recog.onresult=e=>{
     for(let i=e.resultIndex;i<e.results.length;i++){
       if(e.results[i].isFinal)hear(e.results[i][0].transcript);
@@ -400,7 +446,7 @@ function startListening(){
   };
   recog.onerror=e=>{
     if(e.error==='not-allowed'||e.error==='service-not-allowed'){
-      recogWanted=false;st.textContent='🎤 Mic: listening... (speech access blocked)';
+      recogWanted=false;st.textContent='🎤 Mic: listening...';
     }
   };
   recog.onend=()=>{
@@ -420,6 +466,7 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 function colorClass(n){let h=0;for(let i=0;i<n.length;i++)h=(h*31+n.charCodeAt(i))>>>0;return 'c'+(h%8)}
 function format(n){n=Number(n)||0;if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1000)return(n/1000).toFixed(1)+'K';return String(Math.floor(n))}
 function formatCoins(n){return format(n)}
+function hostCut(cost){return Math.round((Number(cost)||0)*0.7)}   // streamer gets 70% of every gift
 
 function checkAdmin(){
   if(user&&user.email&&user.email.toLowerCase()===SPECIAL_EMAIL)return true;
@@ -1040,7 +1087,7 @@ function pickBotGift(){
   for(let i=0;i<GIFTS.length;i++){r-=weights[i];if(r<=0)return GIFTS[i]}
   return GIFTS[0];
 }
-// Bot gifts are visual only: they never add coins to your balance
+// Every gift (bot or real) pays the streamer 70% of its cost
 function scheduleBotDonation(){
   clearTimeout(botGiftTimer);botGiftTimer=null;
   if(!isHost||!currentLiveId)return;
@@ -1061,12 +1108,14 @@ function scheduleBotDonation(){
       if(gift){
         const from=nextName();
         const now=Date.now();
+        const toStreamer=hostCut(gift.cost);
         playGiftAnim(gift.emoji,gift.name,gift.cost);
-        toast('🎁 '+from+' · '+gift.emoji);
+        coins+=toStreamer;saveCoins();updateCoinsUI();
+        toast('🎁 '+from+' · '+gift.emoji+' +'+formatCoins(toStreamer)+' 🪙');
         addMsg(from,'sent '+gift.emoji+' '+gift.name+' (🪙'+formatCoins(gift.cost)+')',false,true);
         try{
-          await push(ref(db,`lives/${currentLiveId}/gifts`),{from,emoji:gift.emoji,name:gift.name,cost:gift.cost,toHost:0,bot:true,at:now});
-          await push(ref(db,`lives/${currentLiveId}/chat`),{name:from,text:`sent ${gift.emoji} ${gift.name} (🪙${formatCoins(gift.cost)})`,host:false,gift:true,bot:true,at:now,giftEmoji:gift.emoji,giftName:gift.name,giftCost:gift.cost,coinsToHost:0});
+          await push(ref(db,`lives/${currentLiveId}/gifts`),{from,emoji:gift.emoji,name:gift.name,cost:gift.cost,toHost:toStreamer,bot:true,at:now});
+          await push(ref(db,`lives/${currentLiveId}/chat`),{name:from,text:`sent ${gift.emoji} ${gift.name} (🪙${formatCoins(gift.cost)})`,host:false,gift:true,bot:true,at:now,giftEmoji:gift.emoji,giftName:gift.name,giftCost:gift.cost,coinsToHost:toStreamer});
         }catch(e){}
       }
     }
@@ -1101,7 +1150,7 @@ async function sendGift(gift){
   document.getElementById('gift-panel').classList.remove('show');
   playGiftAnim(gift.emoji,gift.name,gift.cost);
   const sender=user?user.name:'You';
-  const toStreamer=Math.floor(gift.cost*0.7);
+  const toStreamer=hostCut(gift.cost);
   try{
     await push(ref(db,`lives/${currentLiveId}/chat`),{
       name:sender,text:`sent ${gift.emoji} ${gift.name} (🪙${formatCoins(gift.cost)})`,
