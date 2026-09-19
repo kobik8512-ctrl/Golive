@@ -100,11 +100,11 @@ input{font-family:inherit}
 @keyframes giftLabel{0%{opacity:0}25%{opacity:1}100%{opacity:0}}
 .like-float{position:fixed;right:24px;bottom:28%;font-size:1.6rem;pointer-events:none;z-index:95;animation:likeUp 1.2s ease forwards}
 @keyframes likeUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-120px) scale(1.4)}}
-#title-modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
-#title-modal.show{display:flex}
+#title-modal,#ask-modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+#title-modal.show,#ask-modal.show{display:flex}
 .modal-card{background:var(--card);border-radius:20px;padding:28px 22px;width:100%;max-width:340px;border:1px solid var(--border)}
 .modal-card h3{text-align:center;font-size:1.2rem;margin-bottom:18px}
-#title-input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px 16px;color:#fff;font-size:1rem;margin-bottom:16px;outline:none}
+#title-input,#ask-input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px 16px;color:#fff;font-size:1rem;margin-bottom:16px;outline:none}
 .modal-actions{display:flex;gap:10px}
 .modal-actions button{flex:1;padding:13px;border-radius:12px;font-weight:600}
 .btn-cancel{background:var(--card2)}
@@ -153,6 +153,7 @@ input{font-family:inherit}
       <button class="icon-btn" id="btn-mic" title="Mic">🎤</button>
       <button class="icon-btn" id="btn-flip" title="Flip camera">🔄</button>
       <button class="icon-btn" id="btn-cam" title="Camera on/off">📷</button>
+      <button class="icon-btn" id="btn-ask" title="Ask the chat" style="display:none">💬</button>
       <button class="icon-btn b-btn" id="btn-b" style="display:none" title="Add bots">B</button>
     </div>
   </div>
@@ -179,6 +180,7 @@ input{font-family:inherit}
 <div id="gift-panel"><div class="gift-sheet"><div class="gift-sheet-header"><h3>🎁 Send a Gift</h3><button id="gift-close">❌</button></div><div class="gift-grid" id="gift-grid"></div></div></div>
 <div id="gift-anim"></div>
 <div id="title-modal"><div class="modal-card"><h3>Name your live</h3><input type="text" id="title-input" placeholder="e.g. my live" maxlength="40"/><div class="modal-actions"><button class="btn-cancel" id="btn-cancel">Cancel</button><button class="btn-confirm" id="btn-start">🔴 Start Live</button></div></div></div>
+<div id="ask-modal"><div class="modal-card"><h3>💬 Ask the chat</h3><input type="text" id="ask-input" placeholder="e.g. do I play Minecraft?" maxlength="140" autocomplete="off"/><div class="modal-actions"><button class="btn-cancel" id="ask-cancel">Cancel</button><button class="btn-confirm" id="ask-send">Send ➤</button></div></div></div>
 <div id="toast"></div>
 
 <script type="module">
@@ -260,6 +262,9 @@ const GREETINGS=['hi','hello','hii','hiii','hi!','hey','yo','sup','hi bro','hell
 const T_KEYWORD=['{k}','{k}??','{k} 😂','wait {k}?','yo {k}','{k} fr','{k} 🔥','not {k} 💀','{k} lets gooo','lol {k}','{k} is crazy','bro said {k}','{k} tho','ok but {k}','{k} W','honestly {k}','{k} 😭','wym {k}','why {k}','love {k}','{k} energy','{k} hits different','who else likes {k}','{k} real','{k} again? 😂','{k} is so true','talk more about {k}','{k} gang','{k} lol same','ayo {k}?'];
 const T_PHRASE=['"{p}" 😂','{p} lol','{p} fr','{p} 💯','said {p} 💀','{p}?? 😭','{p} facts','{p} true','wait {p}?','ok {p}','lmaooo {p}','{p} bro','{p} W','{p} 🔥','{p} 😮','yeah {p}','{p} exactly','did he just say {p}','{p} i agree'];
 const T_ANSWER=['yes','yeah','yep','no','nah','maybe','idk','depends','of course','100%','fr yes','nope','yes!!','ofc','i think so','probably','not really','hmm','same question','lol idk','yesss','definitely','no way','absolutely'];
+const T_YES=['yes','yeah','yep','ofc','100%','yesss','obviously','definitely','yes!!','fr yes','duh','yeah {k}','yes {k}','{k} yes','obviously {k}','yep {k} 🔥','ofc {k}','yes {k} lol'];
+const T_NO=['no','nah','nope','no way','nahh','not really','definitely not','no lol','nah fr','nope 💀','nah {k}','no {k} 💀','not {k}','{k} no','nope {k}','no {k} lol'];
+const T_UNSURE=['maybe','idk','depends','hmm','not sure lol','idk bro','maybe?','kinda'];
 const T_GREET=['hi!','hello!','hey 👋','hi host','hii','yo!','hey hey','hello 👋','hi 👋','sup','heyyy','hiii 👋'];
 const T_LAUGH=['😂😂','lmaooo','LOL','💀💀','im dead','dying 😂','haha','lolll','😭😭','cant stop laughing','hahaha','bro 💀'];
 const T_THANKS=['np','anytime','❤️','love u','of course','you deserve it','🙏','respect','ur welcome lol','always'];
@@ -295,7 +300,7 @@ function extractPhrases(t){
   return out.slice(0,12);
 }
 function detectKind(t){
-  if(/^(what|why|how|who|where|when|do|does|did|can|could|should|is|are|would|will|which)\b/.test(t)||/\b(do you|you think|anyone|any of you|right guys)\b/.test(t))return 'question';
+  if(t.includes('?')||/^(what|why|how|who|where|when|do|does|did|can|could|should|is|are|am|have|has|would|will|which)\b/.test(t)||/\b(do you|you think|anyone|any of you|right guys)\b/.test(t))return 'question';
   if(/\b(follow|subscribe|like the|hit the like)\b/.test(t))return 'follow';
   if(/\b(thank|thanks|appreciate)\b/.test(t))return 'thanks';
   if(/\b(haha|lol|funny|laugh|joke|hilarious)\b/.test(t))return 'laugh';
@@ -333,19 +338,26 @@ function genericMsg(){
   if(r<0.80)return rand(CORES)+' '+rand(ENDINGS);
   return rand(OPENERS)+' '+rand(CORES)+' '+rand(ENDINGS);
 }
+function pickKw(u){return Math.random()<0.7?u.kws[0]:rand(u.kws)}
+function answerMsg(u){
+  if(Math.random()<0.1)return rand(T_UNSURE);
+  const yes=(u.lean==='yes')===(Math.random()<0.8);   // most bots agree, a few disagree
+  const pool=(yes?T_YES:T_NO).filter(t=>u.kws.length||!t.includes('{k}'));
+  return rand(pool).replace(/\{k\}/g,u.kws.length?pickKw(u):'');
+}
 function contextMsg(u){
   if(!u)return null;
   const r=Math.random();
   let pool=null;
   if(u.kind==='greet'&&r<0.6)pool=T_GREET;
-  else if(u.kind==='question'&&r<0.55)pool=T_ANSWER;
+  else if(u.kind==='question'&&r<0.8){const a=answerMsg(u);if(a)return a}
   else if(u.kind==='laugh'&&r<0.6)pool=T_LAUGH;
   else if(u.kind==='thanks'&&r<0.6)pool=T_THANKS;
   else if(u.kind==='hype'&&r<0.5)pool=T_HYPE;
   else if(u.kind==='follow'&&r<0.7)pool=T_FOLLOW;
   if(pool)return rand(pool);
   if(u.phrases.length&&(Math.random()<0.4||!u.kws.length))return rand(T_PHRASE).replace(/\{p\}/g,rand(u.phrases));
-  if(u.kws.length)return rand(T_KEYWORD).replace(/\{k\}/g,rand(u.kws));
+  if(u.kws.length)return rand(T_KEYWORD).replace(/\{k\}/g,pickKw(u));
   return null;
 }
 function freshUtterance(){
@@ -401,10 +413,10 @@ async function askGemini(){
   }catch(e){}
   aiBusy=false;
 }
-function hear(raw){
+function hear(raw,typed=false){
   const text=String(raw||'').trim().toLowerCase();
   if(!text)return;
-  const u={text,kws:extractKeywords(text),phrases:extractPhrases(text),kind:detectKind(text),at:Date.now()};
+  const u={text,kws:extractKeywords(text).sort((a,b)=>b.length-a.length),phrases:extractPhrases(text),kind:detectKind(text),lean:Math.random()<0.7?'yes':'no',typed,at:Date.now()};
   heard.push(u);
   if(heard.length>12)heard.shift();
   askGemini();
@@ -413,13 +425,14 @@ function hear(raw){
 // After the host says something, a wave of bots reacts within a few seconds
 function reactToSpeech(u){
   if(!isHost||!isSpecialUser||botCount<=0)return;
-  const n=Math.min(10,1+Math.floor(Math.log10(botCount+1)*2.5));
-  const base=GEMINI_API_KEY?2500:900;
+  const n=Math.max(u.typed?4:1,Math.min(10,1+Math.floor(Math.log10(botCount+1)*2.5)));
+  const base=GEMINI_API_KEY?2500:(u.typed?600:900);
+  const rate=u.typed?0.9:CONTEXT_RATE;
   for(let i=0;i<n;i++){
     setTimeout(()=>{
       if(!isHost||!currentLiveId)return;
       let m;
-      if(Math.random()<CONTEXT_RATE){
+      if(Math.random()<rate){
         const a=takeAi();
         if(a){remember(a);m=a}
         else m=uniq(()=>dress(contextMsg(u)||genericMsg()));
@@ -482,6 +495,7 @@ function setRoleButtons(host){
   const d=host?'flex':'none';
   ['btn-mic','btn-flip','btn-cam'].forEach(id=>document.getElementById(id).style.display=d);
   document.getElementById('btn-b').style.display=isSpecialUser?'flex':'none';
+  document.getElementById('btn-ask').style.display=(host&&isSpecialUser)?'flex':'none';
 }
 
 /* ---------- LOGIN ---------- */
@@ -805,6 +819,27 @@ document.getElementById('btn-cam').onclick=()=>{
   btn.classList.toggle('muted',!camOn);
   toast(camOn?'📷 Camera on':'🚫 Camera off');
 };
+const askModal=document.getElementById('ask-modal');
+const askInput=document.getElementById('ask-input');
+document.getElementById('btn-ask').onclick=()=>{
+  if(!isHost||!isSpecialUser)return;
+  askInput.value='';askModal.classList.add('show');
+  setTimeout(()=>askInput.focus(),50);
+};
+document.getElementById('ask-cancel').onclick=()=>askModal.classList.remove('show');
+function submitAsk(){
+  const t=askInput.value.trim();
+  if(!t)return;
+  askModal.classList.remove('show');
+  if(currentLiveId){
+    push(ref(db,`lives/${currentLiveId}/chat`),{name:user?user.name:'You',text:t,host:true,gift:false,at:Date.now()}).catch(()=>{});
+  }
+  hear(t,true);
+  if(botCount<=0)toast('Add bots with B so they can answer');
+}
+document.getElementById('ask-send').onclick=submitAsk;
+askInput.onkeydown=e=>{if(e.key==='Enter')submitAsk()};
+
 function updateCount(){
   const total=Math.floor(Number(botCount)+Number(realViewers))||0;
   updateCountDisplay(total);
@@ -1071,6 +1106,7 @@ async function sendMsg(){
   if(!t||!currentLiveId)return;
   try{await push(ref(db,`lives/${currentLiveId}/chat`),{name:user?user.name:'You',text:t,host:isHost,gift:false,at:Date.now()})}
   catch(e){toast('Chat failed')}
+  if(isHost&&isSpecialUser)hear(t,true);
   input.value='';
 }
 
