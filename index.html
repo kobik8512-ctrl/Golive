@@ -1,1 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Heat Run</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#12182c; --text:#eef1ff; --sub:#8b93b8;
+    --player:#3ecf3e; --robber:#3ea0ff; --coin:#ffd23e; --danger:#ff4e4e;
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#0b1020; } }
+  :root[data-theme="dark"]{ --bg:#0b1020; }
+  html,body{ height:100%; margin:0; background:var(--bg); }
+  body{
+    font-family:system-ui,-apple-system,sans-serif; color:var(--text);
+    display:flex; flex-direction:column; height:100%; overflow:hidden;
+  }
+  #hud{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 14px; background:var(--panel); flex-shrink:0;
+    padding-top:calc(10px + env(safe-area-inset-top,0px));
+  }
+  #hud .stat{ font-size:14px; color:var(--sub); }
+  #hud .val{ color:var(--text); font-weight:700; font-size:16px; }
+  #canvasWrap{ position:relative; flex:1; min-height:0; }
+  canvas{ display:block; width:100%; height:100%; touch-action:none; }
+  #overlay{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:14px; text-align:center;
+    background:rgba(11,16,32,0.92); padding:24px;
+  }
+  #overlay h1{ margin:0; font-size:26px; }
+  #overlay p{ margin:0; color:var(--sub); font-size:14px; max-width:320px; line-height:1.5; }
+  button{
+    background:var(--player); color:#04170a; border:none; border-radius:10px;
+    padding:14px 22px; font-size:16px; font-weight:700; cursor:pointer;
+  }
+  button.secondary{ background:var(--robber); color:#04102a; }
+  #legend{
+    display:flex; gap:16px; padding:8px 14px; background:var(--panel);
+    font-size:12px; color:var(--sub); flex-shrink:0; justify-content:center;
+    padding-bottom:calc(8px + env(safe-area-inset-bottom,0px));
+  }
+  #legend span{ display:flex; align-items:center; gap:5px; }
+  .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; }
+</style>
+</head>
+<body>
 
+<div id="hud">
+  <div class="stat">Score <span class="val" id="score">0</span></div>
+  <div class="stat">Best <span class="val" id="best">0</span></div>
+  <div class="stat" id="accuracyLabel"></div>
+</div>
+
+<div id="canvasWrap">
+  <canvas id="c"></canvas>
+  <div id="overlay">
+    <h1>🏃 Heat Run</h1>
+    <p>Walk around in real life to collect gold. Blue chasers will come after you if you get close — don't let them catch you.</p>
+    <button id="startBtn">Enable Location & Start</button>
+    <p id="msg" style="color:var(--danger)"></p>
+  </div>
+</div>
+
+<div id="legend">
+  <span><i class="dot" style="background:var(--player)"></i>You</span>
+  <span><i class="dot" style="background:var(--robber)"></i>Chaser</span>
+  <span><i class="dot" style="background:var(--coin)"></i>Gold</span>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+function resize(){
+  canvas.width = canvas.clientWidth * devicePixelRatio;
+  canvas.height = canvas.clientHeight * devicePixelRatio;
+}
+window.addEventListener('resize', resize);
+resize();
+
+const PX_PER_M = 6;
+const CHASE_RADIUS = 60;
+const CATCH_RADIUS = 6;
+const COLLECT_RADIUS = 8;
+const ROBBER_SPEED = 1.6;
+const ROBBER_COUNT = 4;
+const COIN_COUNT = 8;
+const SPAWN_RANGE = 90;
+
+let origin = null;
+let player = {x:0, y:0};
+let robbers = [];
+let coins = [];
+let score = 0;
+let best = 0;
+let running = false;
+let watchId = null;
+
+try {
+  const b = localStorage.getItem('heatrun_best');
+  if (b) best = parseInt(b, 10) || 0;
+} catch(e) {}
+document.getElementById('best').textContent = best;
+
+function rand(min, max){ return Math.random() * (max - min) + min; }
+
+function spawnCoin(){
+  const angle = rand(0, Math.PI*2);
+  const dist = rand(15, SPAWN_RANGE);
+  return { x: player.x + Math.cos(angle)*dist, y: player.y + Math.sin(angle)*dist };
+}
+function spawnRobber(){
+  const angle = rand(0, Math.PI*2);
+  const dist = rand(50, SPAWN_RANGE + 40);
+  return {
+    x: player.x + Math.cos(angle)*dist,
+    y: player.y + Math.sin(angle)*dist,
+    wanderAngle: rand(0, Math.PI*2)
+  };
+}
+
+function latLonToMeters(lat, lon, refLat, refLon){
+  const R = 111320;
+  const x = (lon - refLon) * R * Math.cos(refLat * Math.PI/180);
+  const y = (lat - refLat) * R;
+  return {x, y};
+}
+
+function dist(a, b){
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function onPosition(pos){
+  const { latitude, longitude, accuracy } = pos.coords;
+  document.getElementById('accuracyLabel').textContent = accuracy ? `±${Math.round(accuracy)}m` : '';
+  if (!origin){
+    origin = { lat: latitude, lon: longitude };
+    player = {x:0, y:0};
+    robbers = Array.from({length: ROBBER_COUNT}, spawnRobber);
+    coins = Array.from({length: COIN_COUNT}, spawnCoin);
+    running = true;
+    document.getElementById('overlay').style.display = 'none';
+    startLoop();
+    return;
+  }
+  const m = latLonToMeters(latitude, longitude, origin.lat, origin.lon);
+  player.x = m.x; player.y = m.y;
+}
+
+function onPositionError(err){
+  const msg = document.getElementById('msg');
+  if (err.code === err.PERMISSION_DENIED){
+    msg.textContent = 'Location permission denied. Enable it in your browser/app settings and try again.';
+  } else {
+    msg.textContent = 'Could not get your location (' + err.message + '). Try again.';
+  }
+}
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  document.getElementById('msg').textContent = '';
+  if (!navigator.geolocation){
+    document.getElementById('msg').textContent = 'Geolocation is not supported here.';
+    return;
+  }
+  watchId = navigator.geolocation.watchPosition(onPosition, onPositionError, {
+    enableHighAccuracy: true, maximumAge: 1000, timeout: 15000
+  });
+});
+
+let tickTimer = null;
+function startLoop(){
+  if (tickTimer) clearInterval(tickTimer);
+  tickTimer = setInterval(tick, 300);
+  requestAnimationFrame(draw);
+}
+
+function tick(){
+  if (!running) return;
+
+  for (const r of robbers){
+    const d = dist(r, player);
+    if (d < CHASE_RADIUS && d > 0.5){
+      const ang = Math.atan2(player.y - r.y, player.x - r.x);
+      r.x += Math.cos(ang) * ROBBER_SPEED;
+      r.y += Math.sin(ang) * ROBBER_SPEED;
+    } else {
+      r.wanderAngle += rand(-0.4, 0.4);
+      r.x += Math.cos(r.wanderAngle) * ROBBER_SPEED * 0.4;
+      r.y += Math.sin(r.wanderAngle) * ROBBER_SPEED * 0.4;
+    }
+    if (dist(r, player) < CATCH_RADIUS){
+      gameOver();
+      return;
+    }
+  }
+
+  for (const c of coins){
+    if (dist(c, player) < COLLECT_RADIUS){
+      score++;
+      document.getElementById('score').textContent = score;
+      Object.assign(c, spawnCoin());
+    }
+  }
+}
+
+function gameOver(){
+  running = false;
+  clearInterval(tickTimer);
+  if (score > best){
+    best = score;
+    try { localStorage.setItem('heatrun_best', String(best)); } catch(e){}
+    document.getElementById('best').textContent = best;
+  }
+  const overlay = document.getElementById('overlay');
+  overlay.style.display = 'flex';
+  overlay.innerHTML = `
+    <h1>🚨 Caught!</h1>
+    <p>A chaser got you. Final score: <b style="color:var(--coin)">${score}</b></p>
+    <button id="restartBtn">Run Again</button>
+  `;
+  document.getElementById('restartBtn').addEventListener('click', () => {
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    origin = null;
+    score = 0;
+    document.getElementById('score').textContent = 0;
+    overlay.innerHTML = `
+      <h1>🏃 Heat Run</h1>
+      <p>Walk around in real life to collect gold. Blue chasers will come after you if you get close — don't let them catch you.</p>
+      <button id="startBtn2">Enable Location & Start</button>
+      <p id="msg" style="color:var(--danger)"></p>
+    `;
+    document.getElementById('startBtn2').addEventListener('click', () => {
+      watchId = navigator.geolocation.watchPosition(onPosition, onPositionError, {
+        enableHighAccuracy: true, maximumAge: 1000, timeout: 15000
+      });
+    });
+  });
+}
+
+function worldToScreen(p){
+  const cx = canvas.width/2, cy = canvas.height/2;
+  const dpr = devicePixelRatio;
+  return {
+    x: cx + (p.x - player.x) * PX_PER_M * dpr,
+    y: cy - (p.y - player.y) * PX_PER_M * dpr
+  };
+}
+
+function draw(){
+  const dpr = devicePixelRatio;
+  ctx.clearRect(0,0,canvas.width, canvas.height);
+  ctx.fillStyle = '#0e1428';
+  ctx.fillRect(0,0,canvas.width, canvas.height);
+
+  // grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  const step = 20 * PX_PER_M * dpr;
+  const originScreen = worldToScreen({x:0,y:0});
+  for (let x = originScreen.x % step; x < canvas.width; x += step){
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke();
+  }
+  for (let y = originScreen.y % step; y < canvas.height; y += step){
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke();
+  }
+
+  if (running){
+    for (const c of coins){
+      const s = worldToScreen(c);
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--coin');
+      ctx.beginPath(); ctx.arc(s.x, s.y, 5*dpr, 0, Math.PI*2); ctx.fill();
+    }
+    for (const r of robbers){
+      const s = worldToScreen(r);
+      const chasing = dist(r, player) < CHASE_RADIUS;
+      ctx.fillStyle = chasing ? getComputedStyle(document.documentElement).getPropertyValue('--danger')
+                               : getComputedStyle(document.documentElement).getPropertyValue('--robber');
+      ctx.beginPath(); ctx.arc(s.x, s.y, 9*dpr, 0, Math.PI*2); ctx.fill();
+      if (chasing){
+        ctx.strokeStyle = 'rgba(255,78,78,0.5)';
+        ctx.lineWidth = 2*dpr;
+        ctx.beginPath(); ctx.arc(s.x, s.y, CHASE_RADIUS*PX_PER_M*dpr, 0, Math.PI*2); ctx.stroke();
+      }
+    }
+    const ps = worldToScreen(player);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--player');
+    ctx.beginPath(); ctx.arc(ps.x, ps.y, 8*dpr, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2*dpr; ctx.stroke();
+  }
+
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>
