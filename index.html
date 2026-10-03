@@ -1,328 +1,369 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Heat Run</title>
-<style>
-  :root{
-    --bg:#0b1020; --panel:#12182c; --text:#eef1ff; --sub:#8b93b8;
-    --player:#3ecf3e; --robber:#3ea0ff; --coin:#ffd23e; --danger:#ff4e4e;
-    box-sizing:border-box;
-    padding-top:env(safe-area-inset-top,0px);
-    padding-bottom:env(safe-area-inset-bottom,0px);
-  }
-  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#0b1020; } }
-  :root[data-theme="dark"]{ --bg:#0b1020; }
-  html,body{ height:100%; margin:0; background:var(--bg); }
-  body{
-    font-family:system-ui,-apple-system,sans-serif; color:var(--text);
-    display:flex; flex-direction:column; height:100%; overflow:hidden;
-  }
-  #hud{
-    display:flex; justify-content:space-between; align-items:center;
-    padding:10px 14px; background:var(--panel); flex-shrink:0;
-    padding-top:calc(10px + env(safe-area-inset-top,0px));
-  }
-  #hud .stat{ font-size:14px; color:var(--sub); }
-  #hud .val{ color:var(--text); font-weight:700; font-size:16px; }
-  #canvasWrap{ position:relative; flex:1; min-height:0; }
-  canvas{ display:block; width:100%; height:100%; touch-action:none; }
-  #overlay{
-    position:absolute; inset:0; display:flex; flex-direction:column;
-    align-items:center; justify-content:center; gap:14px; text-align:center;
-    background:rgba(11,16,32,0.92); padding:24px;
-  }
-  #overlay h1{ margin:0; font-size:26px; }
-  #overlay p{ margin:0; color:var(--sub); font-size:14px; max-width:320px; line-height:1.5; }
-  button{
-    background:var(--player); color:#04170a; border:none; border-radius:10px;
-    padding:14px 22px; font-size:16px; font-weight:700; cursor:pointer;
-  }
-  button.secondary{ background:var(--robber); color:#04102a; }
-  #legend{
-    display:flex; gap:16px; padding:8px 14px; background:var(--panel);
-    font-size:12px; color:var(--sub); flex-shrink:0; justify-content:center;
-    padding-bottom:calc(8px + env(safe-area-inset-bottom,0px));
-  }
-  #legend span{ display:flex; align-items:center; gap:5px; }
-  .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Kobi's Texture Merger</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b0d10;
+      --card: #141820;
+      --line: rgba(255,255,255,0.08);
+      --text: #eef2f7;
+      --muted: #8b95a8;
+      --accent: #3ddc84;
+      --accent2: #2b8cff;
+      --danger: #ff5c7a;
+      --warn: #ffb020;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(61,220,132,0.12), transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, rgba(80,140,255,0.1), transparent 50%),
+        var(--bg);
+      color: var(--text);
+      padding: 24px 16px 48px;
+    }
+    .wrap { max-width: 640px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 28px; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 12px; border-radius: 999px;
+      background: rgba(61,220,132,0.12); color: var(--accent);
+      font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
+      margin-bottom: 14px;
+    }
+    h1 {
+      font-size: clamp(1.6rem, 5vw, 2.1rem);
+      font-weight: 800; letter-spacing: -0.03em;
+      margin-bottom: 8px;
+    }
+    h1 span { color: var(--accent); }
+    .sub { color: var(--muted); font-size: 14px; line-height: 1.5; max-width: 420px; margin: 0 auto; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card h2 { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+
+    .drop {
+      border: 2px dashed rgba(61,220,132,0.35);
+      border-radius: 14px;
+      padding: 28px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: 0.15s ease;
+      background: rgba(61,220,132,0.04);
+    }
+    .drop:hover, .drop.drag {
+      border-color: var(--accent);
+      background: rgba(61,220,132,0.1);
+    }
+    .drop strong { display: block; margin-bottom: 6px; font-size: 15px; }
+    .drop span { color: var(--muted); font-size: 13px; }
+    #file-input { display: none; }
+
+    .list { list-style: none; margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+    .list:empty::after {
+      content: "No packs added yet.";
+      color: var(--muted); font-size: 13px; display: block; padding: 8px 0;
+    }
+    .item {
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+    .item .ord {
+      width: 26px; height: 26px; border-radius: 8px;
+      background: rgba(61,220,132,0.15); color: var(--accent);
+      display: grid; place-items: center;
+      font-size: 12px; font-weight: 700; flex-shrink: 0;
+    }
+    .item .meta { flex: 1; min-width: 0; }
+    .item .name {
+      font-size: 13px; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .item .size { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .item button {
+      border: none; background: transparent; color: var(--muted);
+      cursor: pointer; font-size: 18px; line-height: 1; padding: 4px 6px;
+      border-radius: 8px;
+    }
+    .item button:hover { color: var(--danger); background: rgba(255,92,122,0.1); }
+
+    .hint {
+      font-size: 12px; color: var(--muted); line-height: 1.45; margin-top: 12px;
+    }
+    .hint b { color: #c8d0dc; }
+
+    label.field {
+      display: block; font-size: 12px; font-weight: 600; color: var(--muted);
+      margin-bottom: 6px;
+    }
+    input[type="text"] {
+      width: 100%;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+    }
+    input[type="text"]:focus { border-color: rgba(61,220,132,0.5); }
+
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+    button.primary, button.ghost {
+      flex: 1; min-width: 140px;
+      border: none; border-radius: 12px;
+      padding: 14px 16px;
+      font-size: 14px; font-weight: 700;
+      cursor: pointer;
+      transition: 0.15s ease;
+    }
+    button.primary {
+      background: linear-gradient(135deg, #3ddc84, #22b36a);
+      color: #04140b;
+    }
+    button.primary:disabled {
+      opacity: 0.4; cursor: not-allowed;
+    }
+    button.primary:not(:disabled):hover { filter: brightness(1.06); }
+    button.ghost {
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+    button.ghost:hover { background: rgba(255,255,255,0.09); }
+
+    .status {
+      margin-top: 14px;
+      font-size: 13px;
+      color: var(--muted);
+      min-height: 1.2em;
+    }
+    .status.ok { color: var(--accent); }
+    .status.err { color: var(--danger); }
+    .status.busy { color: var(--warn); }
+
+    footer {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+  </style>
 </head>
 <body>
+  <div class="wrap">
+    <header>
+      <div class="badge">⛏ Aternos · Minecraft</div>
+      <h1>Kobi's <span>Texture Merger</span></h1>
+      <p class="sub">Drop multiple resource packs. We fuse them into one zip so Aternos can load them all.</p>
+    </header>
 
-<div id="hud">
-  <div class="stat">Score <span class="val" id="score">0</span></div>
-  <div class="stat">Best <span class="val" id="best">0</span></div>
-  <div class="stat" id="accuracyLabel"></div>
-</div>
+    <div class="card">
+      <h2>1 · Add texture packs</h2>
+      <div class="drop" id="drop-zone">
+        <strong>Click or drop .zip packs here</strong>
+        <span>You can add several. Later packs override earlier ones on conflicts.</span>
+      </div>
+      <input type="file" id="file-input" accept=".zip,application/zip" multiple />
+      <ul class="list" id="pack-list"></ul>
+      <p class="hint">
+        Order matters: pack <b>#1</b> is the base. Pack <b>#2</b>, <b>#3</b>… overwrite the same file paths.
+        That way your favorite textures win on top.
+      </p>
+    </div>
 
-<div id="canvasWrap">
-  <canvas id="c"></canvas>
-  <div id="overlay">
-    <h1>🏃 Heat Run</h1>
-    <p>Walk around in real life to collect gold. Blue chasers will come after you if you get close — don't let them catch you.</p>
-    <button id="startBtn">Enable Location & Start</button>
-    <p id="msg" style="color:var(--danger)"></p>
+    <div class="card">
+      <h2>2 · Build & download</h2>
+      <p class="hint" style="margin-top:0;margin-bottom:12px">Output file is always <b>kobis_fused_texture_pack.zip</b> (name locked).</p>
+      <div class="actions">
+        <button class="primary" id="merge-btn" disabled>Create merged pack</button>
+        <button class="ghost" id="clear-btn">Clear list</button>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+
+    <footer>Runs fully in your browser · files never leave your device</footer>
   </div>
-</div>
 
-<div id="legend">
-  <span><i class="dot" style="background:var(--player)"></i>You</span>
-  <span><i class="dot" style="background:var(--robber)"></i>Chaser</span>
-  <span><i class="dot" style="background:var(--coin)"></i>Gold</span>
-</div>
+  <script>
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const packList = document.getElementById('pack-list');
+    const mergeBtn = document.getElementById('merge-btn');
+    const clearBtn = document.getElementById('clear-btn');
+    const statusEl = document.getElementById('status');
+    const FIXED_NAME = 'kobis_fused_texture_pack';
 
-<script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-function resize(){
-  canvas.width = canvas.clientWidth * devicePixelRatio;
-  canvas.height = canvas.clientHeight * devicePixelRatio;
-}
-window.addEventListener('resize', resize);
-resize();
+    /** @type {{ name: string, file: File }[]} */
+    let packs = [];
 
-const PX_PER_M = 6;
-const CHASE_RADIUS = 60;
-const CATCH_RADIUS = 6;
-const COLLECT_RADIUS = 8;
-const ROBBER_SPEED = 1.6;
-const ROBBER_COUNT = 4;
-const COIN_COUNT = 8;
-const SPAWN_RANGE = 35;
-
-let origin = null;
-let player = {x:0, y:0};
-let robbers = [];
-let coins = [];
-let score = 0;
-let best = 0;
-let running = false;
-let watchId = null;
-
-try {
-  const b = localStorage.getItem('heatrun_best');
-  if (b) best = parseInt(b, 10) || 0;
-} catch(e) {}
-document.getElementById('best').textContent = best;
-
-function rand(min, max){ return Math.random() * (max - min) + min; }
-
-function spawnCoin(){
-  const angle = rand(0, Math.PI*2);
-  const dist = rand(15, SPAWN_RANGE);
-  return { x: player.x + Math.cos(angle)*dist, y: player.y + Math.sin(angle)*dist };
-}
-function spawnRobber(){
-  const angle = rand(0, Math.PI*2);
-  const dist = rand(18, SPAWN_RANGE);
-  return {
-    x: player.x + Math.cos(angle)*dist,
-    y: player.y + Math.sin(angle)*dist,
-    wanderAngle: rand(0, Math.PI*2)
-  };
-}
-
-function latLonToMeters(lat, lon, refLat, refLon){
-  const R = 111320;
-  const x = (lon - refLon) * R * Math.cos(refLat * Math.PI/180);
-  const y = (lat - refLat) * R;
-  return {x, y};
-}
-
-function dist(a, b){
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function onPosition(pos){
-  const { latitude, longitude, accuracy } = pos.coords;
-  document.getElementById('accuracyLabel').textContent = accuracy ? `±${Math.round(accuracy)}m` : '';
-  if (!origin){
-    origin = { lat: latitude, lon: longitude };
-    player = {x:0, y:0};
-    robbers = Array.from({length: ROBBER_COUNT}, spawnRobber);
-    coins = Array.from({length: COIN_COUNT}, spawnCoin);
-    running = true;
-    document.getElementById('overlay').style.display = 'none';
-    startLoop();
-    return;
-  }
-  const m = latLonToMeters(latitude, longitude, origin.lat, origin.lon);
-  // Blend toward each new fix instead of snapping to it, and trust
-  // low-accuracy fixes less, so GPS jitter can't yank the dot around
-  // or swallow small real movements.
-  const weight = accuracy ? Math.min(0.7, 15 / accuracy) : 0.35;
-  player.x += (m.x - player.x) * weight;
-  player.y += (m.y - player.y) * weight;
-}
-
-function onPositionError(err){
-  const msg = document.getElementById('msg');
-  if (err.code === err.PERMISSION_DENIED){
-    msg.textContent = 'Location permission denied. Enable it in your browser/app settings and try again.';
-  } else {
-    msg.textContent = 'Could not get your location (' + err.message + '). Try again.';
-  }
-}
-
-document.getElementById('startBtn').addEventListener('click', () => {
-  document.getElementById('msg').textContent = '';
-  if (!navigator.geolocation){
-    document.getElementById('msg').textContent = 'Geolocation is not supported here.';
-    return;
-  }
-  watchId = navigator.geolocation.watchPosition(onPosition, onPositionError, {
-    enableHighAccuracy: true, maximumAge: 1000, timeout: 15000
-  });
-});
-
-let tickTimer = null;
-function startLoop(){
-  if (tickTimer) clearInterval(tickTimer);
-  tickTimer = setInterval(tick, 300);
-  requestAnimationFrame(draw);
-}
-
-function tick(){
-  if (!running) return;
-
-  for (const r of robbers){
-    const d = dist(r, player);
-    if (d < CHASE_RADIUS && d > 0.5){
-      const ang = Math.atan2(player.y - r.y, player.x - r.x);
-      r.x += Math.cos(ang) * ROBBER_SPEED;
-      r.y += Math.sin(ang) * ROBBER_SPEED;
-    } else {
-      r.wanderAngle += rand(-0.4, 0.4);
-      r.x += Math.cos(r.wanderAngle) * ROBBER_SPEED * 0.4;
-      r.y += Math.sin(r.wanderAngle) * ROBBER_SPEED * 0.4;
+    function setStatus(msg, kind) {
+      statusEl.textContent = msg || '';
+      statusEl.className = 'status' + (kind ? ' ' + kind : '');
     }
-    if (dist(r, player) < CATCH_RADIUS){
-      gameOver();
-      return;
-    }
-  }
 
-  for (const c of coins){
-    if (dist(c, player) < COLLECT_RADIUS){
-      score++;
-      document.getElementById('score').textContent = score;
-      Object.assign(c, spawnCoin());
+    function updatePreview() {
+      mergeBtn.disabled = packs.length < 1;
     }
-  }
-}
 
-function gameOver(){
-  running = false;
-  clearInterval(tickTimer);
-  if (score > best){
-    best = score;
-    try { localStorage.setItem('heatrun_best', String(best)); } catch(e){}
-    document.getElementById('best').textContent = best;
-  }
-  const overlay = document.getElementById('overlay');
-  overlay.style.display = 'flex';
-  overlay.innerHTML = `
-    <h1>🚨 Caught!</h1>
-    <p>A chaser got you. Final score: <b style="color:var(--coin)">${score}</b></p>
-    <button id="restartBtn">Run Again</button>
-  `;
-  document.getElementById('restartBtn').addEventListener('click', () => {
-    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-    origin = null;
-    score = 0;
-    document.getElementById('score').textContent = 0;
-    overlay.innerHTML = `
-      <h1>🏃 Heat Run</h1>
-      <p>Walk around in real life to collect gold. Blue chasers will come after you if you get close — don't let them catch you.</p>
-      <button id="startBtn2">Enable Location & Start</button>
-      <p id="msg" style="color:var(--danger)"></p>
-    `;
-    document.getElementById('startBtn2').addEventListener('click', () => {
-      watchId = navigator.geolocation.watchPosition(onPosition, onPositionError, {
-        enableHighAccuracy: true, maximumAge: 1000, timeout: 15000
+    function renderList() {
+      packList.innerHTML = '';
+      packs.forEach((p, i) => {
+        const li = document.createElement('li');
+        li.className = 'item';
+        const kb = (p.file.size / 1024).toFixed(1);
+        li.innerHTML = `
+          <div class="ord">${i + 1}</div>
+          <div class="meta">
+            <div class="name" title="${p.name}">${p.name}</div>
+            <div class="size">${kb} KB</div>
+          </div>
+          <button type="button" title="Remove" data-i="${i}">×</button>
+        `;
+        li.querySelector('button').onclick = () => {
+          packs.splice(i, 1);
+          renderList();
+          updatePreview();
+        };
+        packList.appendChild(li);
+      });
+      updatePreview();
+    }
+
+    function addFiles(fileList) {
+      const arr = Array.from(fileList || []);
+      for (const f of arr) {
+        if (!/\.zip$/i.test(f.name) && f.type !== 'application/zip' && f.type !== 'application/x-zip-compressed') {
+          setStatus('Skipped "' + f.name + '" — only .zip texture packs.', 'err');
+          continue;
+        }
+        packs.push({ name: f.name, file: f });
+      }
+      renderList();
+      if (packs.length) setStatus(packs.length + ' pack(s) ready to merge.', 'ok');
+    }
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      addFiles(fileInput.files);
+      fileInput.value = '';
+    });
+    ;['dragenter', 'dragover'].forEach(ev => {
+      dropZone.addEventListener(ev, e => {
+        e.preventDefault();
+        dropZone.classList.add('drag');
       });
     });
-  });
-}
+    ;['dragleave', 'drop'].forEach(ev => {
+      dropZone.addEventListener(ev, e => {
+        e.preventDefault();
+        dropZone.classList.remove('drag');
+      });
+    });
+    dropZone.addEventListener('drop', e => {
+      addFiles(e.dataTransfer.files);
+    });
 
-function worldToScreen(p){
-  const cx = canvas.width/2, cy = canvas.height/2;
-  const dpr = devicePixelRatio;
-  return {
-    x: cx + (p.x - player.x) * PX_PER_M * dpr,
-    y: cy - (p.y - player.y) * PX_PER_M * dpr
-  };
-}
+    clearBtn.addEventListener('click', () => {
+      packs = [];
+      renderList();
+      setStatus('List cleared.');
+    });
 
-// Draws a small arrow at the screen edge pointing toward an off-screen point.
-function drawEdgeArrow(s, color, dpr){
-  const margin = 28 * dpr;
-  const cx = canvas.width/2, cy = canvas.height/2;
-  const inBounds = s.x > margin && s.x < canvas.width - margin &&
-                    s.y > margin && s.y < canvas.height - margin;
-  if (inBounds) return;
-  const angle = Math.atan2(s.y - cy, s.x - cx);
-  const w = canvas.width/2 - margin, h = canvas.height/2 - margin;
-  const scale = Math.min(Math.abs(w / Math.cos(angle)) || Infinity, Math.abs(h / Math.sin(angle)) || Infinity);
-  const ex = cx + Math.cos(angle) * scale;
-  const ey = cy + Math.sin(angle) * scale;
-  ctx.save();
-  ctx.translate(ex, ey);
-  ctx.rotate(angle);
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(11*dpr, 0);
-  ctx.lineTo(-6*dpr, -7*dpr);
-  ctx.lineTo(-6*dpr, 7*dpr);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-function draw(){
-  const dpr = devicePixelRatio;
-  ctx.clearRect(0,0,canvas.width, canvas.height);
-  ctx.fillStyle = '#0e1428';
-  ctx.fillRect(0,0,canvas.width, canvas.height);
-
-  // grid
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-  ctx.lineWidth = 1;
-  const step = 20 * PX_PER_M * dpr;
-  const originScreen = worldToScreen({x:0,y:0});
-  for (let x = originScreen.x % step; x < canvas.width; x += step){
-    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke();
-  }
-  for (let y = originScreen.y % step; y < canvas.height; y += step){
-    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke();
-  }
-
-  if (running){
-    for (const c of coins){
-      const s = worldToScreen(c);
-      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--coin');
-      ctx.beginPath(); ctx.arc(s.x, s.y, 5*dpr, 0, Math.PI*2); ctx.fill();
+    function normalizePath(path) {
+      return path.replace(/\\/g, '/').replace(/^\/+/, '');
     }
-    for (const r of robbers){
-      const s = worldToScreen(r);
-      const chasing = dist(r, player) < CHASE_RADIUS;
-      const color = chasing ? getComputedStyle(document.documentElement).getPropertyValue('--danger')
-                             : getComputedStyle(document.documentElement).getPropertyValue('--robber');
-      drawEdgeArrow(s, color, dpr);
-      ctx.fillStyle = color;
-      ctx.beginPath(); ctx.arc(s.x, s.y, 9*dpr, 0, Math.PI*2); ctx.fill();
-    }
-    const ps = worldToScreen(player);
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--player');
-    ctx.beginPath(); ctx.arc(ps.x, ps.y, 8*dpr, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2*dpr; ctx.stroke();
-  }
 
-  requestAnimationFrame(draw);
-}
-requestAnimationFrame(draw);
-</script>
+    // Prefer pack contents not nested in a single root folder wrongly;
+    // Minecraft resource packs have pack.mcmeta at root (or one folder deep sometimes).
+    async function loadZipEntries(file) {
+      const zip = await JSZip.loadAsync(file);
+      const entries = [];
+      zip.forEach((relativePath, entry) => {
+        if (entry.dir) return;
+        entries.push({ path: normalizePath(relativePath), entry });
+      });
+      return entries;
+    }
+
+    mergeBtn.addEventListener('click', async () => {
+      if (!packs.length) return;
+      mergeBtn.disabled = true;
+      setStatus('Merging packs…', 'busy');
+
+      try {
+        const out = new JSZip();
+        let fileCount = 0;
+        const overrides = [];
+
+        for (let i = 0; i < packs.length; i++) {
+          const p = packs[i];
+          setStatus('Reading ' + p.name + ' (' + (i + 1) + '/' + packs.length + ')…', 'busy');
+          const entries = await loadZipEntries(p.file);
+          for (const { path, entry } of entries) {
+            // Skip junk
+            if (path.startsWith('__MACOSX/') || path.endsWith('.DS_Store')) continue;
+            if (out.file(path)) {
+              overrides.push(path);
+            }
+            const data = await entry.async('uint8array');
+            out.file(path, data);
+            fileCount++;
+          }
+        }
+
+        // Ensure pack.mcmeta exists; if multiple, last one wins (already).
+        const hasMeta = !!out.file('pack.mcmeta');
+        if (!hasMeta) {
+          // Try find nested pack.mcmeta and promote? Optional — warn only.
+          setStatus('Warning: no pack.mcmeta at root. Pack may not load until you fix structure.', 'err');
+        }
+
+        setStatus('Building zip…', 'busy');
+        const blob = await out.generateAsync({
+          type: 'blob',
+          compression: 'DEFLATE',
+          compressionOptions: { level: 6 }
+        });
+
+        const name = FIXED_NAME + '.zip';
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+
+        const uniqOverrides = new Set(overrides).size;
+        setStatus(
+          'Done · ' + name + ' · ' + fileCount + ' files written · ' + uniqOverrides + ' overridden paths. Upload this zip to Aternos as your resource pack.',
+          'ok'
+        );
+      } catch (err) {
+        console.error(err);
+        setStatus('Merge failed: ' + (err && err.message ? err.message : 'unknown error'), 'err');
+      } finally {
+        mergeBtn.disabled = packs.length < 1;
+      }
+    });
+
+    updatePreview();
+  </script>
 </body>
 </html>
