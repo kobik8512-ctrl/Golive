@@ -168,6 +168,28 @@ header .title {
 .msg.me .who, .msg.me .time { color: rgba(255,255,255,0.75); }
 .msg .who { font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 3px; display: flex; align-items: center; gap: 4px; }
 .msg .time { font-size: 10px; color: var(--muted); margin-top: 5px; text-align: right; }
+.msg.sending { opacity: 0.65; }
+.msg .send-status {
+  font-size: 10px; opacity: 0.85; margin-top: 4px;
+  display: flex; align-items: center; gap: 6px;
+}
+.msg .send-status .spin {
+  width: 10px; height: 10px; border: 2px solid rgba(255,255,255,0.35);
+  border-top-color: #fff; border-radius: 50%;
+  animation: zcspin 0.7s linear infinite;
+}
+@keyframes zcspin { to { transform: rotate(360deg); } }
+.msg-menu {
+  position: fixed; z-index: 80; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 12px; padding: 6px; min-width: 140px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+}
+.msg-menu button {
+  display: block; width: 100%; text-align: left; padding: 11px 12px;
+  border-radius: 8px; font-weight: 600; font-size: 13px;
+}
+.msg-menu button:active { background: var(--card); }
+.msg-menu button.danger { color: var(--danger); }
 .msg img.attach, .msg video.attach {
   display: block; border-radius: 10px; margin-top: 6px; max-height: 240px; max-width: 100%;
   cursor: pointer; background: #000;
@@ -332,8 +354,10 @@ body.light .auth-card, body.light .sheet { box-shadow: 0 8px 30px rgba(0,0,0,0.0
   <header class="app-bar">
     <button class="icon-btn" id="chat-back">←</button>
     <img class="avatar sm" id="chat-avatar" alt="" />
-    <div class="title" id="chat-title">Chat</div>
-    <span class="chat-streak" id="chat-streak" style="display:none"></span>
+    <div class="title" id="chat-title-wrap" style="flex:1;min-width:0;display:flex;align-items:center;gap:8px">
+      <span id="chat-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Chat</span>
+      <span class="chat-streak" id="chat-streak" style="display:none;flex-shrink:0"></span>
+    </div>
     <button class="icon-btn" id="chat-info" title="Info">ⓘ</button>
   </header>
   <div id="chat-messages"></div>
@@ -686,8 +710,6 @@ body.light .auth-card, body.light .sheet { box-shadow: 0 8px 30px rgba(0,0,0,0.0
         st = '<span class="streak-pill grace">' + FLAME_GRACE_SVG + ' ' + g.streak + '</span>';
       } else if (g.streak > 0) {
         st = '<span class="streak-pill">' + FLAME_SVG + ' ' + g.streak + '</span>';
-      } else if (g.speakersToday > 0) {
-        st = '<span class="streak-progress">' + g.speakersToday + '/2</span>';
       }
       return '<div class="row" data-gid="' + g.groupId + '">' +
         '<img class="avatar" src="' + av + '" alt="" />' +
@@ -871,22 +893,14 @@ body.light .auth-card, body.light .sheet { box-shadow: 0 8px 30px rgba(0,0,0,0.0
     const st = Number(streak) || 0;
     const sp = Number(speakersToday) || 0;
     const ss = status || (st > 0 ? 'active' : 'none');
-    // Always show something useful in header
-    if (st > 0 && ss === 'grace') {
+    // Only show day count next to group name, e.g. flame + 12
+    if (st > 0) {
       el.style.display = 'inline-flex';
-      el.classList.add('grace');
-      el.innerHTML = FLAME_GRACE_SVG + ' <span>' + st + '</span>';
-      el.title = 'At risk — 2 people must chat today to save streak';
-    } else if (st > 0) {
-      el.style.display = 'inline-flex';
-      el.classList.remove('grace');
-      el.innerHTML = FLAME_SVG + ' <span>' + st + '</span>' + (sp < 2 ? ' <span style="opacity:.7;font-weight:600">· ' + sp + '/2</span>' : '');
-      el.title = sp >= 2 ? 'Streak safe today' : 'Need 2 people to message today';
-    } else if (sp > 0) {
-      el.style.display = 'inline-flex';
-      el.classList.remove('grace');
-      el.innerHTML = '<span class="streak-progress">' + sp + '/2 today</span>';
-      el.title = '2 different people must chat to start a streak';
+      el.classList.toggle('grace', ss === 'grace');
+      el.innerHTML = (ss === 'grace' ? FLAME_GRACE_SVG : FLAME_SVG) + ' <span>' + st + '</span>';
+      el.title = ss === 'grace'
+        ? st + ' day streak at risk — 2 people must chat today to keep it'
+        : st + ' day streak' + (sp < 2 ? ' — need 2 people to chat today' : '');
     } else {
       el.style.display = 'none';
       el.innerHTML = '';
@@ -907,15 +921,50 @@ body.light .auth-card, body.light .sheet { box-shadow: 0 8px 30px rgba(0,0,0,0.0
     if (!data.ok) return;
     const box = $('chat-messages');
     const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
-    state.messages = data.messages || [];
+    const pending = (state.messages || []).filter((m) => m.pending);
+    state.messages = (data.messages || []).concat(pending);
     if (typeof data.streak === 'number') updateStreakUI(data.streak, data.speakersToday || 0, data.streakStatus || 'active');
     renderMessages();
     if (scrollEnd || nearBottom) box.scrollTop = box.scrollHeight;
   }
 
+  function hideMsgMenu() {
+    const m = document.getElementById('msg-action-menu');
+    if (m) m.remove();
+  }
+
+  function showMsgMenu(x, y, messageId) {
+    hideMsgMenu();
+    const menu = document.createElement('div');
+    menu.className = 'msg-menu';
+    menu.id = 'msg-action-menu';
+    menu.innerHTML = '<button type="button" class="danger" id="msg-del-btn">Delete message</button>';
+    document.body.appendChild(menu);
+    const pad = 8;
+    let left = x;
+    let top = y;
+    const rect = menu.getBoundingClientRect();
+    if (left + rect.width > window.innerWidth - pad) left = window.innerWidth - rect.width - pad;
+    if (top + rect.height > window.innerHeight - pad) top = window.innerHeight - rect.height - pad;
+    if (left < pad) left = pad;
+    if (top < pad) top = pad;
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+    document.getElementById('msg-del-btn').onclick = async () => {
+      hideMsgMenu();
+      if (!confirm('Delete this message?')) return;
+      const data = await api('messages_delete', { chatId: state.chatId, messageId });
+      if (!data.ok) { toast(data.error || 'Could not delete'); return; }
+      state.messages = state.messages.filter((m) => m.id !== messageId);
+      renderMessages();
+      toast('Deleted');
+    };
+  }
+
   function renderMessages() {
     const box = $('chat-messages');
     const me = state.myUserId;
+    hideMsgMenu();
     box.innerHTML = state.messages.map((m) => {
       const mine = m.senderId === me;
       const who = m.sender ? (m.sender.displayName || m.sender.username) : '';
@@ -927,17 +976,48 @@ body.light .auth-card, body.light .sheet { box-shadow: 0 8px 30px rgba(0,0,0,0.0
         ? '<video class="attach" src="' + m.videoDataUrl + '" controls playsinline preload="metadata"></video>'
         : '';
       const text = m.text ? esc(m.text) : '';
-      return '<div class="msg ' + (mine ? 'me' : 'them') + '">' +
+      const pending = m.pending
+        ? '<div class="send-status"><span class="spin"></span> Sending…</div>'
+        : '';
+      const time = m.pending ? '' : '<div class="time">' + timeStr(m.at) + '</div>';
+      return '<div class="msg ' + (mine ? 'me' : 'them') + (m.pending ? ' sending' : '') +
+        '" data-mid="' + esc(m.id) + '" data-mine="' + (mine ? '1' : '0') + '">' +
         '<div class="who">' + esc(who) + ' ' + badge(v) + '</div>' +
-        text + img + vid + '<div class="time">' + timeStr(m.at) + '</div></div>';
+        text + img + vid + pending + time + '</div>';
     }).join('');
     box.querySelectorAll('img.attach').forEach((img) => {
-      img.onclick = () => {
+      img.onclick = (e) => {
+        e.stopPropagation();
         $('lightbox-img').src = img.dataset.full;
         $('lightbox').classList.add('open');
       };
     });
+    // Long-press to delete own messages
+    box.querySelectorAll('.msg[data-mine="1"]').forEach((el) => {
+      if (el.classList.contains('sending')) return;
+      let timer = null;
+      const start = (e) => {
+        const mid = el.getAttribute('data-mid');
+        if (!mid || mid.indexOf('temp_') === 0) return;
+        const pt = e.touches ? e.touches[0] : e;
+        timer = setTimeout(() => {
+          timer = null;
+          showMsgMenu(pt.clientX || 80, pt.clientY || 120, mid);
+        }, 480);
+      };
+      const clear = () => { if (timer) { clearTimeout(timer); timer = null; } };
+      el.addEventListener('touchstart', start, { passive: true });
+      el.addEventListener('touchend', clear);
+      el.addEventListener('touchmove', clear);
+      el.addEventListener('mousedown', start);
+      el.addEventListener('mouseup', clear);
+      el.addEventListener('mouseleave', clear);
+    });
   }
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest || !e.target.closest('#msg-action-menu')) hideMsgMenu();
+  });
   $('lightbox').onclick = () => $('lightbox').classList.remove('open');
 
   function startPoll() {
@@ -997,18 +1077,58 @@ body.light .auth-card, body.light .sheet { box-shadow: 0 8px 30px rgba(0,0,0,0.0
     const videoDataUrl = state.pendingVideo;
     if (!text && !imageDataUrl && !videoDataUrl) return;
     if (!state.chatId) return;
+
+    // Optimistic bubble — shows instantly while upload runs
+    const tempId = 'temp_' + Date.now();
+    const optimistic = {
+      id: tempId,
+      senderId: state.myUserId,
+      text: text || '',
+      imageDataUrl: imageDataUrl || null,
+      videoDataUrl: videoDataUrl || null,
+      at: Date.now(),
+      pending: true,
+      sender: state.profile ? {
+        username: state.profile.username,
+        displayName: state.profile.displayName || state.profile.username,
+        verified: !!state.profile.verified,
+      } : { username: 'me', displayName: 'Me', verified: false },
+    };
+    state.messages.push(optimistic);
+    $('composer-input').value = '';
+    clearPendingImage();
+    renderMessages();
+    $('chat-messages').scrollTop = $('chat-messages').scrollHeight;
+
     $('btn-send').disabled = true;
     try {
-      const data = await api('messages_send', { chatId: state.chatId, text, imageDataUrl, videoDataUrl });
-      if (!data.ok) { toast(data.error || 'Send failed'); return; }
-      $('composer-input').value = '';
-      clearPendingImage();
-      if (typeof data.streak === 'number') updateStreakUI(data.streak, data.speakersToday || 0, data.streakStatus || 'active');
+      const data = await api('messages_send', {
+        chatId: state.chatId,
+        text,
+        imageDataUrl,
+        videoDataUrl,
+      });
+      // remove temp
+      state.messages = state.messages.filter((m) => m.id !== tempId);
+      if (!data.ok) {
+        toast(data.error || 'Send failed');
+        renderMessages();
+        return;
+      }
+      if (typeof data.streak === 'number') {
+        updateStreakUI(data.streak, data.speakersToday || 0, data.streakStatus || 'active');
+      }
       if (data.message) {
         state.messages.push(data.message);
         renderMessages();
         $('chat-messages').scrollTop = $('chat-messages').scrollHeight;
-      } else await pullMessages(true);
+      } else {
+        await pullMessages(true);
+      }
+    } catch (e) {
+      state.messages = state.messages.filter((m) => m.id !== tempId);
+      renderMessages();
+      toast('Send failed');
     } finally {
       $('btn-send').disabled = false;
     }
@@ -1027,11 +1147,11 @@ body.light .auth-card, body.light .sheet { box-shadow: 0 8px 30px rgba(0,0,0,0.0
     const sp = data.group.speakersToday || 0;
     const ss = data.group.streakStatus || 'none';
     if (st > 0 && ss === 'grace') {
-      $('gi-streak').innerHTML = FLAME_GRACE_SVG + ' <strong>' + st + '</strong> day streak at risk · ' + sp + '/2 today<br><span style="opacity:.8">Missed a day — 2 members must chat <strong>today</strong> or the streak ends.</span>';
+      $('gi-streak').innerHTML = FLAME_GRACE_SVG + ' <strong>' + st + '</strong> day streak (at risk)<br><span style="opacity:.8">2 members must chat today or this streak ends.</span>';
     } else if (st > 0) {
-      $('gi-streak').innerHTML = FLAME_SVG + ' <strong>' + st + '</strong> day streak · ' + sp + '/2 active today<br><span style="opacity:.8">2 different members must message each day. Miss one day = dimmed flame (grace). Miss again = streak ends.</span>';
+      $('gi-streak').innerHTML = FLAME_SVG + ' <strong>' + st + '</strong> day streak<br><span style="opacity:.8">Keep it by having 2 different members message each day.</span>';
     } else {
-      $('gi-streak').innerHTML = 'No streak yet. When 2+ members chat on the same day, a streak can start. Progress: <strong>' + sp + '/2</strong> today.';
+      $('gi-streak').innerHTML = 'No streak yet. When 2 different members both chat on the same day, the streak becomes <strong>1</strong> and goes up each day you keep it going.';
     }
     const isOwner = !!data.group.isGroupOwner;
     const edit = $('gi-edit');
