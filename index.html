@@ -5990,54 +5990,54 @@ dailySalary = function(){
   return pay;
 };
 
-// ---------- P2P PAY BY CARD ----------
+// ---------- P2P PAY (CLOUD) ----------
 function normalizePan(s){
   return String(s||"").replace(/\D/g,"");
 }
-function findUserByCard(pan){
-  const digits = normalizePan(pan);
-  if (digits.length < 12) return null;
-  const users = allUsers();
-  for (const un of Object.keys(users)) {
-    const st = users[un].state || {};
-    if (!st.cards) continue;
-    const d = normalizePan(st.cards.debit && st.cards.debit.pan);
-    const c = normalizePan(st.cards.credit && st.cards.credit.pan);
-    if (d === digits || c === digits) return { username: un, user: users[un], state: st, via: d===digits?"debit":"credit" };
-  }
-  return null;
-}
-function payByCard(pan, amount, note){
-  amount = Number(amount);
+
+/** Cloud P2P — by card number and/or username */
+async function paySomeoneCloud(opts){
+  opts = opts || {};
+  const amount = Number(opts.amount);
   if (!(amount > 0)) return "Enter a valid amount";
-  if (!S || !sessionUser) return "Not signed in";
-  if ((S.checking||0) < amount) return "Insufficient checking balance";
-  const hit = findUserByCard(pan);
-  if (!hit) return "Card not found — check the number";
-  if (hit.username === sessionUser) return "Cannot pay yourself";
-  // debit sender
-  S.checking -= amount;
-  addTx("transfer", "Card pay to @" + hit.username + (note?(" · "+note):""), -amount, "checking");
-  // credit receiver checking
-  hit.state.checking = (hit.state.checking||0) + amount;
-  if (!hit.state.transactions) hit.state.transactions = [];
-  hit.state.transactions.unshift({
-    id: uid(), day: hit.state.day||1, type:"transfer",
-    label: "Card receive from @" + sessionUser + (note?(" · "+note):""),
-    amount: amount, account:"checking", at: Date.now()
-  });
-  const users = allUsers();
-  users[sessionUser].state = S;
-  users[hit.username].state = hit.state;
-  saveUsers(users);
-  return null;
+  if (!sessionUser || !sessionPassword) return "Not signed in";
+  if (!CLOUD_API) return "Cloud offline";
+  const body = {
+    username: sessionUser,
+    password: sessionPassword,
+    amount: amount,
+    note: opts.note || "",
+    pan: opts.pan || "",
+    toUsername: opts.toUsername || ""
+  };
+  try {
+    const data = await cloudFetch("/pay", body);
+    // sync sender local state from server result
+    if (data.senderChecking != null) S.checking = data.senderChecking;
+    if (typeof addTx === "function") {
+      addTx("transfer", "Pay @" + data.toUsername + (opts.note ? " · " + opts.note : ""), -amount, "checking");
+    }
+    saveGame();
+    return null;
+  } catch (e) {
+    return e.message || String(e);
+  }
+}
+window.paySomeoneCloud = paySomeoneCloud;
+
+// Keep legacy name used by UI
+function payByCard(pan, amount, note){
+  // sync wrapper — UI uses async handler instead
+  return "Use Send payment button";
 }
 window.payByCard = payByCard;
+
+let _payFormBuilt = false;
+let _payFormVals = { pan: "", amt: "25", note: "", user: "" };
 
 const __renderBankMega = renderBank;
 renderBank = function(){
   __renderBankMega();
-  // show/hide pay pane
   const payEl = $("bank-pay");
   if (payEl) payEl.classList.toggle("hidden", bankTab !== "pay");
   ["accounts","transfer","history","bills"].forEach(t => {
@@ -6045,28 +6045,86 @@ renderBank = function(){
     if (el && bankTab === "pay") el.classList.add("hidden");
   });
   if (bankTab !== "pay" || !payEl) return;
+
+  // Preserve values if form already exists (prevents "text goes away" on tick re-render)
+  const existingPan = document.getElementById("pay-pan");
+  if (existingPan) {
+    _payFormVals.pan = existingPan.value;
+    const a = document.getElementById("pay-amt");
+    const n = document.getElementById("pay-note");
+    const u = document.getElementById("pay-user");
+    if (a) _payFormVals.amt = a.value;
+    if (n) _payFormVals.note = n.value;
+    if (u) _payFormVals.user = u.value;
+  }
+
+  // Only rebuild DOM if missing
+  if (payEl.querySelector("#btn-pay-card") && existingPan) {
+    // just update "your card" line
+    const mine = payEl.querySelector("[data-my-card]");
+    if (mine && S.cards && S.cards.debit) mine.textContent = S.cards.debit.pan;
+    return;
+  }
+
   ensureAccountCards();
   const my = S.cards && S.cards.debit ? S.cards.debit.pan : "—";
   payEl.innerHTML =
-    '<div class="card"><h3>Pay someone</h3>' +
-    '<div class="meta mb-8">Enter their debit or credit card number (from Bank → Accounts). Funds leave your checking.</div>' +
-    '<div class="meta mb-8">Your debit card: <span style="font-family:monospace">' + my + '</span></div>' +
-    '<label>Recipient card number</label>' +
-    '<input type="text" id="pay-pan" inputmode="numeric" placeholder="XXXX XXXX XXXX XXXX" maxlength="23">' +
-    '<label>Amount (USD)</label>' +
-    '<input type="number" id="pay-amt" min="1" step="1" placeholder="25">' +
-    '<label>Note (optional)</label>' +
-    '<input type="text" id="pay-note" maxlength="40" placeholder="Rent, lunch, etc.">' +
-    '<button class="btn btn-primary btn-block mt-12" type="button" id="btn-pay-card">Send payment</button></div>' +
-    '<div class="card"><h3>How it works</h3><div class="meta">1. Other player opens Bank → Accounts and shares their card number.<br>2. You enter it here and send.<br>3. Their checking increases; yours decreases. Works across phones with cloud accounts.</div></div>';
+    '<div class="card">' +
+    '<h3>Pay someone</h3>' +
+    '<div class="meta" style="margin-bottom:12px;line-height:1.45">Send from your checking to another player. Use their <b>username</b> or <b>card number</b> (Bank → Accounts).</div>' +
+    '<div class="meta" style="margin-bottom:14px">Your debit card: <span data-my-card style="font-family:ui-monospace,monospace">' + my + '</span></div>' +
+    '<label style="display:block;font-size:11px;color:var(--muted);margin:0 0 4px;text-transform:uppercase;letter-spacing:0.4px">Recipient username</label>' +
+    '<input type="text" id="pay-user" autocomplete="off" placeholder="their_username" ' +
+      'style="display:block;width:100%;padding:12px 14px;margin-bottom:12px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:15px;box-sizing:border-box" value="' +
+      String(_payFormVals.user||"").replace(/"/g,"&quot;") + '">' +
+    '<label style="display:block;font-size:11px;color:var(--muted);margin:0 0 4px;text-transform:uppercase;letter-spacing:0.4px">Or recipient card number</label>' +
+    '<input type="text" id="pay-pan" inputmode="numeric" placeholder="4046 6048 0628 2023" maxlength="23" ' +
+      'style="display:block;width:100%;padding:12px 14px;margin-bottom:12px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:15px;box-sizing:border-box;font-family:ui-monospace,monospace" value="' +
+      String(_payFormVals.pan||"").replace(/"/g,"&quot;") + '">' +
+    '<label style="display:block;font-size:11px;color:var(--muted);margin:0 0 4px;text-transform:uppercase;letter-spacing:0.4px">Amount</label>' +
+    '<input type="number" id="pay-amt" min="1" step="1" placeholder="25" ' +
+      'style="display:block;width:100%;padding:12px 14px;margin-bottom:12px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:15px;box-sizing:border-box" value="' +
+      String(_payFormVals.amt||"25").replace(/"/g,"&quot;") + '">' +
+    '<label style="display:block;font-size:11px;color:var(--muted);margin:0 0 4px;text-transform:uppercase;letter-spacing:0.4px">Note (optional)</label>' +
+    '<input type="text" id="pay-note" maxlength="40" placeholder="Rent, lunch, etc." ' +
+      'style="display:block;width:100%;padding:12px 14px;margin-bottom:14px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:15px;box-sizing:border-box" value="' +
+      String(_payFormVals.note||"").replace(/"/g,"&quot;") + '">' +
+    '<button class="btn btn-primary btn-block" type="button" id="btn-pay-card">Send payment</button>' +
+    '<div class="meta" id="pay-status" style="margin-top:10px;min-height:18px"></div>' +
+    '</div>' +
+    '<div class="card"><h3>How it works</h3>' +
+    '<div class="meta" style="line-height:1.5">1. Friend opens <b>Bank → Accounts</b> and copies their card, or gives you their username.<br>' +
+    '2. Enter username <b>or</b> card number + amount → Send.<br>' +
+    '3. Money moves on the server instantly. They see it after refresh (or right away if online).</div></div>';
+
   const btn = document.getElementById("btn-pay-card");
-  if (btn) btn.onclick = function(){
+  if (btn) btn.onclick = async function(){
     const pan = (document.getElementById("pay-pan")||{}).value;
+    const user = (document.getElementById("pay-user")||{}).value;
     const amt = Number((document.getElementById("pay-amt")||{}).value);
     const note = (document.getElementById("pay-note")||{}).value;
-    const e = payByCard(pan, amt, note);
-    if (e) toast(e);
-    else { toast("Sent " + fmt(amt)); renderBank(); saveGame(); refreshTopbar(); }
+    const st = document.getElementById("pay-status");
+    if (st) st.textContent = "Sending…";
+    btn.disabled = true;
+    const err = await paySomeoneCloud({ pan: pan, toUsername: user, amount: amt, note: note });
+    btn.disabled = false;
+    if (err) {
+      if (st) st.textContent = err;
+      toast(err);
+      return;
+    }
+    if (st) st.textContent = "Sent " + fmt(amt) + " successfully";
+    toast("Sent " + fmt(amt));
+    _payFormVals = { pan: "", amt: "25", note: "", user: "" };
+    const p = document.getElementById("pay-pan");
+    const u = document.getElementById("pay-user");
+    const a = document.getElementById("pay-amt");
+    const n = document.getElementById("pay-note");
+    if (p) p.value = "";
+    if (u) u.value = "";
+    if (a) a.value = "25";
+    if (n) n.value = "";
+    refreshTopbar();
   };
 };
 window.renderBank = renderBank;
@@ -6842,7 +6900,19 @@ async function cloudFetch(path, body) {
     body: JSON.stringify(body || {})
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+  if (!res.ok) {
+    const err = new Error(data.error || ("HTTP " + res.status));
+    err.status = res.status;
+    err.data = data;
+    if (data.conflict && data.state) {
+      // auto-apply server state for conflict
+      S = data.state;
+      S._cloudUpdatedAt = data.updatedAt || Date.now();
+      if (typeof ensureMarket === "function") ensureMarket(S);
+      if (typeof refreshTopbar === "function") refreshTopbar();
+    }
+    throw err;
+  }
   return data;
 }
 
@@ -6886,6 +6956,7 @@ async function loginCloud(username, password) {
   } else {
     S = defaultState("normal", username, data.displayName);
   }
+  S._cloudUpdatedAt = data.updatedAt || Date.now();
   ensureMarket(S);
   if (typeof sanitizeState === "function") sanitizeState();
   try {
@@ -6901,20 +6972,40 @@ const __saveGameLocal = saveGame;
 saveGame = function() {
   __saveGameLocal();
   if (!cloudMode || !CLOUD_API || !sessionUser || !S) return;
-  if (sessionPassword) {
-    cloudFetch("/save", { username: sessionUser, password: sessionPassword, state: S, displayName: S.displayName })
-      .catch(function(e){ console.warn("cloud save failed", e); });
-  } else {
-    // fallback: owner channel not available without password — try session restore
+  if (!sessionPassword) {
     try {
       const sess = JSON.parse(localStorage.getItem("ledger_life_session_v1") || "null");
-      if (sess && sess.password) {
-        sessionPassword = sess.password;
-        cloudFetch("/save", { username: sessionUser, password: sessionPassword, state: S, displayName: S.displayName })
-          .catch(function(e){ console.warn("cloud save failed", e); });
-      }
+      if (sess && sess.password) sessionPassword = sess.password;
     } catch(_){}
   }
+  if (!sessionPassword) return;
+  const payload = {
+    username: sessionUser,
+    password: sessionPassword,
+    state: S,
+    displayName: S.displayName,
+    clientUpdatedAt: S._cloudUpdatedAt || 0
+  };
+  cloudFetch("/save", payload).then(function(data) {
+    if (data && data.updatedAt) S._cloudUpdatedAt = data.updatedAt;
+  }).catch(async function(e) {
+    // 409 conflict — pull server state
+    const msg = e && e.message ? e.message : String(e);
+    if (/newer data|409|conflict/i.test(msg) || true) {
+      try {
+        const data = await cloudFetch("/load", { username: sessionUser, password: sessionPassword });
+        if (data && data.state) {
+          S = data.state;
+          S._cloudUpdatedAt = data.updatedAt || Date.now();
+          if (typeof ensureMarket === "function") ensureMarket(S);
+          refreshTopbar();
+          console.warn("Merged newer cloud state");
+        }
+      } catch (e2) {
+        console.warn("cloud save failed", e, e2);
+      }
+    }
+  });
 };
 window.saveGame = saveGame;
 
