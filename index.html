@@ -8,25 +8,35 @@
 *{box-sizing:border-box;user-select:none;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
 html,body{height:100%;overflow:hidden;background:#05080f;font-family:'Segoe UI',system-ui,sans-serif;color:#e2e8f0}
 body{display:flex;flex-direction:column;align-items:center}
-.header{text-align:center;margin-top:8px;cursor:pointer;padding:12px 16px;border-radius:16px;
+.header{text-align:center;margin-top:8px;cursor:pointer;padding:10px 16px;border-radius:16px;
   background:rgba(15,23,42,.85);border:1px solid rgba(255,255,255,.08);
   box-shadow:0 10px 25px rgba(0,0,0,.5);width:95%;max-width:460px;transition:transform .06s}
+.header.locked{pointer-events:none;opacity:0.6;filter:grayscale(1)}
 .header:active{transform:scale(.98)}
-h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;margin-bottom:2px}
-.balance{font-size:2rem;font-weight:800;color:#22c55e;text-shadow:0 0 15px rgba(34,197,94,.25)}
-.sub-balances{display:flex;justify-content:center;gap:12px;font-size:.78rem;font-weight:600;margin-top:4px;flex-wrap:wrap}
+h1{font-size:.58rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;margin-bottom:1px}
+.balance{font-size:1.8rem;font-weight:800;color:#22c55e;text-shadow:0 0 15px rgba(34,197,94,.25)}
+.sub-balances{display:flex;justify-content:center;gap:12px;font-size:.75rem;font-weight:600;margin-top:2px;flex-wrap:wrap}
 .btc-val{color:#f59e0b}.net-val{color:#38bdf8}.bank-val{color:#a78bfa}
-.stats-row{display:flex;justify-content:space-around;margin-top:6px;font-size:.68rem;color:#94a3b8;flex-wrap:wrap;gap:4px}
+.stats-row{display:flex;justify-content:space-around;margin-top:4px;font-size:.65rem;color:#94a3b8;flex-wrap:wrap;gap:4px}
+.level-bar-container{margin-top:5px;background:rgba(255,255,255,.06);border-radius:6px;padding:4px 8px;font-size:.68rem;text-align:left}
+.level-info{display:flex;justify-content:space-between;margin-bottom:2px;font-weight:600;color:#38bdf8}
+.progress-bg{background:rgba(0,0,0,.4);height:6px;border-radius:3px;overflow:hidden}
+.progress-fill{background:linear-gradient(90deg,#38bdf8,#22c55e);height:100%;width:0%;transition:width .3s}
 .event-bar{width:95%;max-width:460px;margin-top:6px;padding:6px 10px;border-radius:8px;
   background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25);font-size:.72rem;color:#fca5a5;
   text-align:center;display:none}
 .event-bar.show{display:block}
 .event-bar.good{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.25);color:#86efac}
+.utility-alert{width:95%;max-width:460px;margin-top:6px;padding:10px;border-radius:8px;
+  background:rgba(239,68,68,0.25);border:1px solid #ef4444;font-size:.78rem;color:#fff;
+  text-align:center;display:none;animation:pulseAlert 1s infinite alternate;z-index:150}
+.utility-alert.show{display:block}
+@keyframes pulseAlert{from{background:rgba(239,68,68,0.25)}to{background:rgba(239,68,68,0.6)}}
 .tabs{display:flex;width:95%;max-width:460px;margin-top:8px;gap:4px;overflow-x:auto;padding-bottom:2px}
 .tab-btn{flex:1;min-width:58px;padding:7px 4px;background:rgba(15,23,42,.5);border:1px solid rgba(255,255,255,.05);
   border-radius:8px;color:#94a3b8;font-weight:600;cursor:pointer;font-size:.7rem;white-space:nowrap;text-align:center}
 .tab-btn.active{background:#1e40af;color:#fff;border-color:#3b82f6;box-shadow:0 0 10px rgba(30,64,175,.35)}
-.shop-container{width:95%;max-width:460px;margin-top:8px;flex:1;max-height:calc(100vh - 250px);
+.shop-container{width:95%;max-width:460px;margin-top:8px;flex:1;max-height:calc(100vh - 270px);
   overflow-y:auto;padding-bottom:24px;display:flex;flex-direction:column;gap:7px}
 .shop-container::-webkit-scrollbar{width:3px}
 .shop-container::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:2px}
@@ -74,8 +84,18 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
     <span id="taxDisplay">Upkeep: $0.00/s</span>
     <span id="dayDisplay">Day 1</span>
   </div>
+  <div class="level-bar-container">
+    <div class="level-info">
+      <span id="levelTitleDisplay">Level 1: Brokeverse Noob</span>
+      <span id="levelPercentDisplay">0%</span>
+    </div>
+    <div class="progress-bg">
+      <div class="progress-fill" id="levelProgress"></div>
+    </div>
+  </div>
 </div>
 <div class="event-bar" id="eventBar"></div>
+<div class="utility-alert" id="utilityAlert"></div>
 <div class="toolbar">
   <button type="button" id="btnSave">Save</button>
   <button type="button" id="btnLoad">Load</button>
@@ -88,13 +108,14 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
   <div class="tab-btn" data-tab="stocks">Stocks</div>
   <div class="tab-btn" data-tab="invest">Invest</div>
   <div class="tab-btn" data-tab="research">R&D</div>
+  <div class="tab-btn" data-tab="utilities">Bills</div>
 </div>
 <div class="shop-container" id="shopList"></div>
 <div class="toast" id="toast"></div>
 
 <script>
 (function(){
-  const SAVE_KEY = 'hardcore_tycoon_v2';
+  const SAVE_KEY = 'hardcore_tycoon_v9';
 
   let cash = 10;
   let bank = 0;
@@ -119,8 +140,35 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
   let businessBoost = 1;
   let investBoost = 1;
 
+  // Utility Bills System
+  let electricityBillDue = 0;
+  let wifiBillDue = 0;
+  let electricityDeadline = 0;
+  let wifiDeadline = 0;
+  let electricityPaid = true;
+  let wifiPaid = true;
+
+  // Anti-Cheat System
+  let clickTimestamps = [];
+  let isAntiCheatLocked = false;
+  let lockTimerEnd = 0;
+
+  // Levels System
+  const levelThresholds = [
+    { level: 1, name: 'Brokeverse Noob', req: 0 },
+    { level: 2, name: 'Street Hustler', req: 250 },
+    { level: 3, name: 'Side-Hustler', req: 1500 },
+    { level: 4, name: 'Small Business Owner', req: 10000 },
+    { level: 5, name: 'Corporate Manager', req: 50000 },
+    { level: 6, name: 'Tech Entrepreneur', req: 250000 },
+    { level: 7, name: 'Hedge Fund Investor', req: 1200000 },
+    { level: 8, name: 'Crypto Whale', req: 5000000 },
+    { level: 9, name: 'Wall Street Mogul', req: 25000000 },
+    { level: 10, name: 'Tycoon God', req: 100000000 }
+  ];
+
   const items = [
-    // LABOR — slower early game
+    // LABOR
     { id:'l1', name:'Scavenge Trash', desc:'+$0.12 / click', cost:20, power:0.12, type:'labor', count:0, mult:1.65 },
     { id:'l2', name:'Part-Time Shift', desc:'+$0.40 / click', cost:150, power:0.40, type:'labor', count:0, mult:1.7 },
     { id:'l3', name:'Freelance Gig', desc:'+$1.60 / click', cost:1200, power:1.60, type:'labor', count:0, mult:1.75 },
@@ -128,7 +176,7 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
     { id:'l5', name:'Executive Role', desc:'+$28.00 / click', cost:60000, power:28.00, type:'labor', count:0, mult:1.85 },
     { id:'l6', name:'Board Seat', desc:'+$120 / click', cost:400000, power:120, type:'labor', count:0, mult:1.9 },
 
-    // BUSINESS — higher upkeep = harder
+    // BUSINESS
     { id:'b1', name:'Lemonade Stand', desc:'+$0.45/s · upkeep $0.18/s', cost:80, cps:0.45, upkeep:0.18, type:'business', count:0, mult:1.58 },
     { id:'b2', name:'Paper Route', desc:'+$1.60/s · upkeep $0.55/s', cost:520, cps:1.60, upkeep:0.55, type:'business', count:0, mult:1.6 },
     { id:'b3', name:'Local Cafe', desc:'+$7.00/s · upkeep $3.20/s', cost:3500, cps:7.00, upkeep:3.20, type:'business', count:0, mult:1.62 },
@@ -153,7 +201,7 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
     { id:'s3', name:'Sell 1 Share', desc:'Sell at market', type:'stocks', isStockSell:true },
     { id:'s4', name:'Sell All Shares', desc:'Exit position', type:'stocks', isStockSellAll:true },
 
-    // INVEST — slower safer money
+    // INVEST
     { id:'i1', name:'Deposit $50 to Bank', desc:'Bank earns 2%/day interest', type:'invest', isBankDep:true, amt:50 },
     { id:'i2', name:'Deposit $500 to Bank', desc:'Park cash safely', type:'invest', isBankDep:true, amt:500 },
     { id:'i3', name:'Withdraw $100', desc:'Pull from bank', type:'invest', isBankWd:true, amt:100 },
@@ -170,6 +218,10 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
     { id:'r3', name:'AI Optimization', desc:'Business output +20%', cost:35000, effect:'boost', val:1.2, type:'research', count:0, mult:2.6, max:5 },
     { id:'r4', name:'Click Training', desc:'Click power +15%', cost:2000, effect:'click', val:1.15, type:'research', count:0, mult:2.3, max:6 },
     { id:'r5', name:'Market Analyst', desc:'Investment income +25%', cost:28000, effect:'invest', val:1.25, type:'research', count:0, mult:2.5, max:4 },
+
+    // UTILITIES / BILLS
+    { id:'u1', name:'Pay Electricity Bill', desc:'Keep power running', type:'utilities', isPayElec:true },
+    { id:'u2', name:'Pay Wi-Fi Bill', desc:'Keep internet running', type:'utilities', isPayWifi:true },
   ];
 
   const el = {
@@ -183,7 +235,12 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
     day: document.getElementById('dayDisplay'),
     shop: document.getElementById('shopList'),
     event: document.getElementById('eventBar'),
+    utilityAlert: document.getElementById('utilityAlert'),
     toast: document.getElementById('toast'),
+    clickArea: document.getElementById('clickArea'),
+    levelTitle: document.getElementById('levelTitleDisplay'),
+    levelPercent: document.getElementById('levelPercentDisplay'),
+    levelProgress: document.getElementById('levelProgress')
   };
 
   function toast(msg) {
@@ -195,6 +252,20 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
 
   function netWorth() {
     return cash + bank + btc * btcPrice + stockShares * stockPrice - debt;
+  }
+
+  function getCurrentLevelData() {
+    const nw = netWorth();
+    let current = levelThresholds[0];
+    let next = levelThresholds[1];
+    for (let i = levelThresholds.length - 1; i >= 0; i--) {
+      if (nw >= levelThresholds[i].req) {
+        current = levelThresholds[i];
+        next = levelThresholds[i + 1] || null;
+        break;
+      }
+    }
+    return { current, next };
   }
 
   function getCPS() {
@@ -215,7 +286,11 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
     const taxes = grossBiz * taxRate * taxMultiplier;
     const debtInterest = debt > 0 ? debt * 0.0004 : 0;
     const interest = debtInterest + (window._loanInterest || 0);
-    const gross = (grossBiz + grossInv) * cpsMult;
+    
+    const { current } = getCurrentLevelData();
+    const levelMult = 1 + (current.level - 1) * 0.1;
+
+    const gross = (grossBiz + grossInv) * cpsMult * levelMult;
     const upkeep = upkeepBiz + upkeepInv + cryptoCost + taxes + interest;
     return { gross, net: gross - upkeep, upkeep, interest };
   }
@@ -225,7 +300,9 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
   }
 
   function effectiveClick() {
-    return clickPower * clickMult;
+    const { current } = getCurrentLevelData();
+    const levelMult = 1 + (current.level - 1) * 0.1;
+    return clickPower * clickMult * levelMult;
   }
 
   function canBuy(item) {
@@ -239,6 +316,8 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
     if (item.isBankWdAll) return bank > 0;
     if (item.isLoan) return debt < 50000;
     if (item.isRepay) return cash >= item.amt && debt > 0;
+    if (item.isPayElec) return !electricityPaid && cash >= electricityBillDue;
+    if (item.isPayWifi) return !wifiPaid && cash >= wifiBillDue;
     if (item.max != null && item.count >= item.max) return false;
     return cash >= item.cost;
   }
@@ -278,6 +357,12 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
       } else if (item.isRepay) {
         costHtml = `<div class="cost">$${item.amt}</div>`;
         ownedHtml = `<div class="owned">Debt $${fmt(debt)}</div>`;
+      } else if (item.isPayElec) {
+        costHtml = `<div class="cost">$${fmt(electricityBillDue)}</div>`;
+        ownedHtml = `<div class="owned">${electricityPaid ? 'PAID ✓' : 'UNPAID ⚠️'}</div>`;
+      } else if (item.isPayWifi) {
+        costHtml = `<div class="cost">$${fmt(wifiBillDue)}</div>`;
+        ownedHtml = `<div class="owned">${wifiPaid ? 'PAID ✓' : 'UNPAID ⚠️'}</div>`;
       } else {
         costHtml = `<div class="cost">$${fmt(Math.floor(item.cost))}</div>`;
         ownedHtml = `<div class="owned">Owned: ${item.count}${item.max != null ? '/' + item.max : ''}</div>`;
@@ -322,7 +407,7 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
       stockShares = 0;
     } else if (item.isBankDep) {
       cash -= item.amt;
-      bank += item.amt;
+ bank += item.amt;
       toast('Deposited $' + item.amt);
     } else if (item.isBankWd) {
       bank -= item.amt;
@@ -341,6 +426,16 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
       debt -= pay;
       if (debt <= 0) { debt = 0; window._loanInterest = 0; }
       toast('Repaid $' + pay.toFixed(0));
+    } else if (item.isPayElec) {
+      cash -= electricityBillDue;
+      electricityPaid = true;
+      toast('Electricity bill paid!');
+      el.utilityAlert.classList.remove('show');
+    } else if (item.isPayWifi) {
+      cash -= wifiBillDue;
+      wifiPaid = true;
+      toast('Wi-Fi bill paid!');
+      el.utilityAlert.classList.remove('show');
     } else {
       cash -= item.cost;
       item.count += 1;
@@ -356,6 +451,8 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
     renderShop();
   }
 
+  let previousLevel = 1;
+
   function update() {
     const stats = getCPS();
     el.balance.textContent = '$' + cash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -367,6 +464,26 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
     el.tax.textContent = 'Upkeep: $' + stats.upkeep.toFixed(2) + '/s';
     el.day.textContent = 'Day ' + day;
 
+    const nw = netWorth();
+    const levelData = getCurrentLevelData();
+    const curLevel = levelData.current;
+    const nextLevel = levelData.next;
+
+    if (curLevel.level > previousLevel) {
+      previousLevel = curLevel.level;
+      toast(`🎉 LEVEL UP! You are now Level ${curLevel.level}: ${curLevel.name}!`);
+    }
+
+    el.levelTitle.textContent = `Lvl ${curLevel.level}: ${curLevel.name}`;
+    if (nextLevel) {
+      const progress = Math.min(100, Math.max(0, ((nw - curLevel.req) / (nextLevel.req - curLevel.req)) * 100));
+      el.levelPercent.textContent = progress.toFixed(1) + '%';
+      el.levelProgress.style.width = progress + '%';
+    } else {
+      el.levelPercent.textContent = 'MAX';
+      el.levelProgress.style.width = '100%';
+    }
+
     if (Date.now() < eventUntil) {
       el.event.textContent = eventLabel;
       el.event.className = 'event-bar show' + (eventGood ? ' good' : '');
@@ -374,6 +491,23 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
       el.event.className = 'event-bar';
       cpsMult = 1;
       clickMult = Math.max(clickMult, 1);
+    }
+
+    if (isAntiCheatLocked) {
+      const remainingSecs = Math.max(0, Math.ceil((lockTimerEnd - Date.now()) / 1000));
+      el.utilityAlert.textContent = `🚨 ANTI-CHEAT DETECTED! Clicking locked for ${remainingSecs}s & progress reset!`;
+      el.utilityAlert.classList.add('show');
+      el.clickArea.classList.add('locked');
+    } else if (!electricityPaid || !wifiPaid) {
+      let activeBillName = !electricityPaid ? 'Electricity' : 'Wi-Fi';
+      let billAmount = !electricityPaid ? electricityBillDue : wifiBillDue;
+      let timeLeft = Math.max(0, Math.ceil(( (!electricityPaid ? electricityDeadline : wifiDeadline) - Date.now()) / 1000));
+      el.utilityAlert.textContent = `⚠️ UNPAID ${activeBillName} BILL ($${fmt(billAmount)})! Pay in ${timeLeft}s or GAME RESETS!`;
+      el.utilityAlert.classList.add('show');
+      el.clickArea.classList.remove('locked');
+    } else {
+      el.utilityAlert.classList.remove('show');
+      el.clickArea.classList.remove('locked');
     }
 
     const shopItems = el.shop.children;
@@ -399,8 +533,41 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
   let activePointerId = null;
 
   document.getElementById('clickArea').addEventListener('pointerdown', e => {
-    if (activePointerId !== null) return; // ignore extra fingers/pointers
+    if (isAntiCheatLocked) return;
+    if (activePointerId !== null) return;
     activePointerId = e.pointerId;
+
+    const now = Date.now();
+    clickTimestamps.push(now);
+    clickTimestamps = clickTimestamps.filter(t => now - t < 1000);
+
+    if (clickTimestamps.length > 25) {
+      isAntiCheatLocked = true;
+      lockTimerEnd = now + 10000;
+
+      localStorage.removeItem(SAVE_KEY);
+      cash = 10;
+      bank = 0;
+      btc = 0;
+      clickPower = 0.08;
+      stockShares = 0;
+      day = 1;
+      debt = 0;
+      taxMultiplier = 1;
+      cryptoUpkeepMult = 1;
+      businessBoost = 1;
+      investBoost = 1;
+      clickMult = 1;
+      window._loanInterest = 0;
+      electricityPaid = true;
+      wifiPaid = true;
+      items.forEach(i => { if (i.count != null) i.count = 0; if (i.cost != null) i.cost = i.initialCost || i.cost; });
+
+      toast('🚨 Anti-cheat triggered! Resetting progress...');
+      update();
+      renderShop();
+      return;
+    }
 
     const gain = effectiveClick() * (window._eventClick || 1);
     cash += gain;
@@ -424,9 +591,13 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
     };
   });
 
-  // Main loop 20 ticks/s
   setInterval(() => {
     tickCount++;
+
+    if (isAntiCheatLocked && Date.now() >= lockTimerEnd) {
+      isAntiCheatLocked = false;
+    }
+
     const stats = getCPS();
     cash += stats.net / 20;
     btc += getBPS() / 20;
@@ -436,16 +607,37 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
       day++;
       if (bank > 0) bank *= 1.02;
       if (Math.random() < 0.35) triggerEvent();
+
+      if (day % 7 === 0) {
+        let netWorthVal = netWorth();
+        electricityBillDue = Math.max(50, Math.floor(netWorthVal * 0.05 + 80));
+        wifiBillDue = Math.max(30, Math.floor(netWorthVal * 0.03 + 40));
+        electricityPaid = false;
+        wifiPaid = false;
+        electricityDeadline = Date.now() + 60000;
+        wifiDeadline = Date.now() + 60000;
+        toast('⚠️ New Utility Bills issued! Check Bills tab.');
+      }
+    }
+
+    if (!electricityPaid && Date.now() > electricityDeadline) {
+      alert('⚡ Power cut off due to unpaid Electricity Bill! Game Reset.');
+      localStorage.removeItem(SAVE_KEY);
+      location.reload();
+    }
+    if (!wifiPaid && Date.now() > wifiDeadline) {
+      alert('🛜 Internet disconnected due to unpaid Wi-Fi Bill! Game Reset.');
+      localStorage.removeItem(SAVE_KEY);
+      location.reload();
     }
 
     if (tickCount % 5 === 0) update();
   }, 50);
 
-  // Markets
   setInterval(() => {
     stockPrice = Math.max(15, stockPrice + (Math.random() - 0.49) * 5.5);
     btcPrice = Math.max(8000, btcPrice + (Math.random() - 0.48) * 900);
-    if (currentTab === 'stocks' || currentTab === 'crypto') renderShop();
+    if (currentTab === 'stocks' || currentTab === 'crypto' || currentTab === 'utilities') renderShop();
   }, 4000);
 
   function triggerEvent() {
@@ -477,10 +669,12 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
   }
 
   function save() {
+    if (isAntiCheatLocked) return;
     const data = {
       cash, bank, btc, btcPrice, clickPower, stockPrice, stockShares, taxRate, day, debt,
       taxMultiplier, cryptoUpkeepMult, businessBoost, investBoost, clickMult,
       loanInterest: window._loanInterest || 0,
+      electricityBillDue, wifiBillDue, electricityDeadline, wifiDeadline, electricityPaid, wifiPaid,
       items: items.map(i => ({ id: i.id, cost: i.cost, count: i.count })),
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -499,10 +693,18 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
       businessBoost = d.businessBoost; investBoost = d.investBoost || 1;
       clickMult = d.clickMult || 1;
       window._loanInterest = d.loanInterest || 0;
+      electricityBillDue = d.electricityBillDue || 0;
+      wifiBillDue = d.wifiBillDue || 0;
+      electricityDeadline = d.electricityDeadline || 0;
+      wifiDeadline = d.wifiDeadline || 0;
+      electricityPaid = d.electricityPaid ?? true;
+      wifiPaid = d.wifiPaid ?? true;
       (d.items || []).forEach(s => {
         const it = items.find(x => x.id === s.id);
         if (it) { it.cost = s.cost; it.count = s.count; }
       });
+      const { current } = getCurrentLevelData();
+      previousLevel = current.level;
       toast('Game loaded');
       update();
       renderShop();
@@ -524,7 +726,12 @@ h1{font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:1.4px;
   setInterval(save, 30000);
 
   if (localStorage.getItem(SAVE_KEY)) load();
-  else { renderShop(); update(); }
+  else {
+    const { current } = getCurrentLevelData();
+    previousLevel = current.level;
+    renderShop();
+    update();
+  }
 })();
 </script>
 </body>
