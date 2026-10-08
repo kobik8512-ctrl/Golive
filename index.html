@@ -210,7 +210,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 .credit-label { font-size: 12px; color: var(--muted); }
 
 /* Life event banner */
-.life-banner { background: rgba(179,136,255,0.12); border: 1px solid rgba(179,136,255,0.3);
+.life-banner { background: rgba(255,255,255,0.04); border: 1px solid var(--border);
   border-radius: 12px; padding: 12px; margin-bottom: 10px; font-size: 13px; }
 .life-banner.urgent { background: rgba(255,82,82,0.12); border-color: rgba(255,82,82,0.35); }
 
@@ -298,6 +298,37 @@ h3 .v-badge {
   border-radius: 14px !important;
 }
 
+
+/* Bank-style home overview */
+.home-greet { font-size: 15px; color: var(--muted); margin-bottom: 4px; }
+.home-greet strong { color: var(--text); font-weight: 700; }
+.home-avail-label { font-size: 12px; color: var(--muted); margin-top: 12px; }
+.home-avail { font-size: 36px; font-weight: 800; letter-spacing: -1.2px; margin: 2px 0 4px; }
+.home-nw-line { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+.home-nw-line b { color: var(--text); font-weight: 600; }
+.acct-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0; border-top: 1px solid var(--border);
+}
+.acct-row:first-of-type { border-top: none; }
+.acct-icon {
+  width: 40px; height: 40px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700; flex-shrink: 0;
+}
+.acct-body { flex: 1; min-width: 0; }
+.acct-body .n { font-size: 14px; font-weight: 600; }
+.acct-body .s { font-size: 12px; color: var(--muted); margin-top: 1px; }
+.acct-amt { font-size: 15px; font-weight: 700; text-align: right; }
+.util-bar {
+  height: 4px; border-radius: 2px; background: rgba(255,255,255,0.08);
+  margin-top: 10px; overflow: hidden;
+}
+.util-bar > i { display: block; height: 100%; border-radius: 2px; background: var(--blue); }
+.spark {
+  width: 100%; height: 48px; margin: 8px 0 4px;
+}
+
 </style>
 </head>
 <body>
@@ -336,33 +367,23 @@ h3 .v-badge {
   <!-- MAIN -->
   <div id="main-app" class="hidden" style="display:flex;flex-direction:column;height:100%">
     <div class="topbar">
-      <div class="net">Net worth<br><b id="top-net">$0</b></div>
+      <div class="net">Total balance<br><b id="top-net">$0</b></div>
       <div>
-        <div class="day" id="top-day">Day 1 · Age 18</div>
-        <div class="credit" id="top-credit">Credit 650</div>
+        <div class="day" id="top-day"></div>
+        <div class="credit" id="top-credit" style="display:none"></div>
       </div>
     </div>
 
     <div class="screens" id="screens">
       <!-- HOME -->
       <div class="screen active" id="screen-home" data-screen="home">
-        <div class="hero">
-          <div class="label">Net worth</div>
-          <div class="amount" id="home-net">$0</div>
-          <div class="change" id="home-change">Today +$0.00</div>
-          <div class="hero-grid">
-            <div class="hero-stat"><div class="l">Cash</div><div class="v" id="home-cash">$0</div></div>
-            <div class="hero-stat"><div class="l">Investments</div><div class="v" id="home-invest">$0</div></div>
-            <div class="hero-stat"><div class="l">Property equity</div><div class="v" id="home-prop">$0</div></div>
-            <div class="hero-stat"><div class="l">Debt</div><div class="v neg" id="home-debt">$0</div></div>
-          </div>
-        </div>
+        <div id="home-hero"></div>
         <div id="home-alerts"></div>
-        <div class="section-title">Quick actions</div>
+        <div class="section-title">Actions</div>
         <div class="grid2" id="home-actions"></div>
         <div class="section-title">Recent activity</div>
         <div class="card" id="home-activity"></div>
-        <div class="section-title">Market snapshot</div>
+        <div class="section-title">Markets</div>
         <div id="home-markets"></div>
       </div>
 
@@ -518,7 +539,7 @@ function fmt(n, dec){
   const neg = n < 0;
   let v = Math.abs(toDisplay(n));
   const d = (dec == null) ? 2 : dec;
-  const s = v.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+  const s = v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
   return (neg ? "-" : "") + currencySymbol() + s;
 }
 function fmtPct(n){ return (n>=0?"+":"") + n.toFixed(2) + "%"; }
@@ -1670,9 +1691,16 @@ $("modal-bg").addEventListener("click", e => { if (e.target.id === "modal-bg") c
 
 function refreshTopbar(){
   if (!S) return;
-  $("top-net").textContent = fmt(netWorth(), 0);
-  $("top-day").textContent = "Day "+S.day+" · Age "+S.age;
-  $("top-credit").textContent = "Credit "+S.creditScore+" · "+creditLabel(S.creditScore);
+  try { if (typeof syncRealCalendar === "function") syncRealCalendar(); } catch(_){}
+  const netEl = $("top-net");
+  if (netEl) netEl.textContent = fmt(netWorth(), 0);
+  const dayEl = $("top-day");
+  if (dayEl) {
+    const now = new Date();
+    dayEl.textContent = now.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  }
+  const cr = $("top-credit");
+  if (cr) { cr.textContent = ""; cr.style.display = "none"; }
 }
 
 function renderScreen(name){
@@ -1690,33 +1718,91 @@ function renderScreen(name){
 function renderHome(){
   const nw = netWorth();
   const dayChg = nw - (S.dayStartNet || nw);
-  $("home-net").textContent = fmt(nw);
-  const ch = $("home-change");
-  ch.textContent = (dayChg>=0?"Today +":"Today ")+fmt(dayChg);
-  ch.className = "change "+(dayChg>=0?"pos":"neg");
-  $("home-cash").textContent = fmt(S.checking + S.savings, 0);
-  $("home-invest").textContent = fmt(investTotal(), 0);
-  $("home-prop").textContent = fmt(propertyEquity(), 0);
-  $("home-debt").textContent = fmt(totalDebt(), 0);
+  const cash = (S.checking || 0) + (S.savings || 0);
+  const inv = investTotal();
+  const prop = propertyEquity();
+  const debt = totalDebt();
+  const hour = new Date().getHours();
+  const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const nm = esc(S.displayName || S.username || "there");
+  const vBadge = (typeof isVerifiedUser === "function" && isVerifiedUser(S) && typeof verifiedBadgeHtml === "function") ? verifiedBadgeHtml() : "";
+  const cardLast = (S.cards && S.cards.debit && S.cards.debit.pan) ? String(S.cards.debit.pan).replace(/\s/g,"").slice(-4) : "····";
+  const util = S.creditLimit ? Math.min(100, (S.creditBalance || 0) / S.creditLimit * 100) : 0;
 
-  // alerts
+  // sparkline from net history
+  let spark = "";
+  const hist = (S.netHistory || S.netWorthHistory || []).slice(-24);
+  if (hist.length >= 2) {
+    const vals = hist.map(function(h){ return typeof h === "number" ? h : (h.nw || h.v || 0); });
+    const min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+    const span = (max - min) || 1;
+    const w = 280, h = 48, step = w / (vals.length - 1);
+    let pts = vals.map(function(v, i) {
+      const x = i * step;
+      const y = h - ((v - min) / span) * (h - 6) - 3;
+      return x.toFixed(1) + "," + y.toFixed(1);
+    }).join(" ");
+    spark = '<svg class="spark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none"><polyline fill="none" stroke="#00c853" stroke-width="2" points="'+pts+'"/></svg>';
+  }
+
+  const hero = document.getElementById("home-hero");
+  if (hero) {
+    hero.innerHTML =
+      '<div class="card" style="padding:18px 16px 8px">' +
+      '<div class="home-greet">' + greet + ', <strong class="name-row">' + nm + vBadge + '</strong></div>' +
+      '<div class="home-avail-label">Available in checking</div>' +
+      '<div class="home-avail">' + fmt(S.checking || 0) + '</div>' +
+      '<div class="home-nw-line">All accounts <b>' + fmt(nw) + '</b> · ' +
+        (dayChg >= 0 ? '<span class="pos">+' : '<span class="neg">') + fmt(dayChg) + '</span> today</div>' +
+      spark +
+      '<div class="acct-row" data-go="bank" style="cursor:pointer">' +
+        '<div class="acct-icon" style="background:rgba(68,138,255,0.15);color:var(--blue)">C</div>' +
+        '<div class="acct-body"><div class="n">Checking</div><div class="s">Debit ··' + cardLast + '</div></div>' +
+        '<div class="acct-amt">' + fmt(S.checking || 0) + '</div></div>' +
+      '<div class="acct-row" data-go="bank" style="cursor:pointer">' +
+        '<div class="acct-icon" style="background:rgba(0,200,83,0.12);color:var(--green)">S</div>' +
+        '<div class="acct-body"><div class="n">Savings</div><div class="s">' + ((S.savingsAPY || 0.042) * 100).toFixed(2) + '% APY</div></div>' +
+        '<div class="acct-amt">' + fmt(S.savings || 0) + '</div></div>' +
+      '<div class="acct-row" data-go="invest" style="cursor:pointer">' +
+        '<div class="acct-icon" style="background:rgba(255,193,7,0.12);color:var(--gold)">B</div>' +
+        '<div class="acct-body"><div class="n">Brokerage</div><div class="s">Investing · ' + fmt(inv, 0) + ' invested</div></div>' +
+        '<div class="acct-amt">' + fmt(S.brokerage || 0) + '</div></div>' +
+      (debt > 0 || (S.creditBalance || 0) > 0 ?
+      '<div class="acct-row" data-go="life" style="cursor:pointer">' +
+        '<div class="acct-icon" style="background:rgba(255,82,82,0.12);color:var(--red)">R</div>' +
+        '<div class="acct-body"><div class="n">Credit card</div><div class="s">Limit ' + fmt(S.creditLimit || 0, 0) + '</div></div>' +
+        '<div class="acct-amt neg">' + fmt(S.creditBalance || 0) + '</div></div>' +
+        '<div class="util-bar"><i style="width:' + util.toFixed(1) + '%;background:' + (util > 70 ? 'var(--red)' : 'var(--blue)') + '"></i></div>'
+      : '') +
+      (prop > 0 ?
+      '<div class="acct-row" data-go="life" style="cursor:pointer">' +
+        '<div class="acct-icon" style="background:rgba(179,136,255,0.12);color:#b388ff">H</div>' +
+        '<div class="acct-body"><div class="n">Property equity</div><div class="s">Real estate</div></div>' +
+        '<div class="acct-amt">' + fmt(prop) + '</div></div>'
+      : '') +
+      '</div>';
+    hero.querySelectorAll("[data-go]").forEach(function(row) {
+      row.addEventListener("click", function() {
+        showScreen(row.getAttribute("data-go"));
+      });
+    });
+  }
+
+  // alerts — only real account issues
   const alerts = [];
   S.bills.filter(b=>b.overdue).forEach(b => {
-    alerts.push(`<div class="life-banner urgent">Overdue bill: <b>${b.name}</b> (${fmt(b.amount)}) — pay in Bank → Bills</div>`);
+    alerts.push(`<div class="life-banner urgent">Overdue: ${esc(b.name)} · ${fmt(b.amount)}</div>`);
   });
   if (S.creditBalance > S.creditLimit * 0.8) {
-    alerts.push(`<div class="life-banner urgent">Credit utilization high (${fmt(S.creditBalance)} / ${fmt(S.creditLimit)})</div>`);
-  }
-  if (!S.jobId) {
-    alerts.push(`<div class="life-banner">No job — visit Work to apply and earn a salary.</div>`);
+    alerts.push(`<div class="life-banner urgent">Credit utilization ${fmt(S.creditBalance)} of ${fmt(S.creditLimit)}</div>`);
   }
   $("home-alerts").innerHTML = alerts.join("");
 
   $("home-actions").innerHTML = `
-    <button class="btn btn-primary btn-block" onclick="showScreen('bank')">Transfer money</button>
-    <button class="btn btn-blue btn-block" onclick="showScreen('invest')">Trade markets</button>
-    <button class="btn btn-secondary btn-block" onclick="showScreen('work')">Career hub</button>
-    <button class="btn btn-secondary btn-block" onclick="showScreen('life')">Property & credit</button>
+    <button class="btn btn-primary btn-block" onclick="showScreen('bank');bankTab='pay';renderBank();">Send money</button>
+    <button class="btn btn-blue btn-block" onclick="showScreen('invest')">Invest</button>
+    <button class="btn btn-secondary btn-block" onclick="showScreen('bank')">Accounts</button>
+    <button class="btn btn-secondary btn-block" onclick="showScreen('work')">Employment</button>
   `;
 
   const txs = (S.transactions||[]).slice(0, 8);
@@ -7024,7 +7110,7 @@ refreshTopbar = function(){
     const now = new Date();
     const label = now.toLocaleDateString(undefined, { weekday:"short", month:"short", day:"numeric", year:"numeric" });
     const el = $("top-day");
-    if (el) el.textContent = label + " · Age " + S.age;
+    if (el) el.textContent = label;
   } catch(_){}
 };
 window.refreshTopbar = refreshTopbar;
@@ -7551,10 +7637,9 @@ renderHome = function() {
       if (first && first.parentNode) first.parentNode.insertBefore(el, first.nextSibling);
       else return;
     }
-    el.innerHTML = "<div class=\"card-row\"><div class=\"meta\">Login streak</div><div class=\"val gold\">" +
-      ((S.streak && S.streak.count) || 0) + " day" + (((S.streak && S.streak.count) === 1) ? "" : "s") +
-      "</div></div><div class=\"card-row\"><div class=\"meta\">Career tokens</div><div class=\"val\">" +
-      (S.careerTokens || 0) + " <span class=\"meta\">(skill train discount)</span></div></div>";
+    // Keep progression off the main home — looks gamey
+    el.remove();
+    return;
   } catch(_){}
 };
 window.renderHome = renderHome;
@@ -7868,9 +7953,90 @@ renderBank = function() {
 };
 window.renderBank = renderBank;
 
-console.log("[Ledger Life] v9: payment inbox + history UI");
+
+console.log("[Ledger Life] v9 ok");
+
+// v10 — bank-app tone (strip game chrome on home)
+(function polishHomeBankTone(){
+  // Nav labels
+  try {
+    document.querySelectorAll(".nav-item").forEach(function(n) {
+      const k = n.dataset.nav;
+      const lab = n.querySelector("span, .nav-label") || n.childNodes[n.childNodes.length-1];
+      if (k === "work") {
+        // Employment
+        const spans = n.querySelectorAll("div, span");
+        spans.forEach(function(s) {
+          if (/work/i.test(s.textContent) && s.children.length === 0) s.textContent = "Jobs";
+        });
+      }
+      if (k === "life") {
+        const spans = n.querySelectorAll("div, span");
+        spans.forEach(function(s) {
+          if (/life/i.test(s.textContent) && s.children.length === 0) s.textContent = "Home";
+        });
+      }
+    });
+  } catch(_){}
+
+  const __rh = renderHome;
+  renderHome = function() {
+    __rh();
+    try {
+      // Remove any leftover streak / token cards
+      document.querySelectorAll("[data-streak]").forEach(function(el){ el.remove(); });
+      // Quieter section titles
+      document.querySelectorAll("#screen-home .section-title, .screen[data-screen='home'] .section-title").forEach(function(t) {
+        const x = (t.textContent || "").trim().toLowerCase();
+        if (x === "quick actions") t.textContent = "Actions";
+        if (x === "recent activity") t.textContent = "Activity";
+        if (x === "market snapshot") t.textContent = "Markets";
+      });
+    } catch(_){}
+  };
+  window.renderHome = renderHome;
+
+  // Work screen header copy softener
+  const __rw = renderWork;
+  renderWork = function() {
+    __rw();
+    try {
+      document.querySelectorAll(".empty-state p, .meta").forEach(function(el) {
+        if (/unemployed/i.test(el.textContent || "")) {
+          el.textContent = "No active employment. Browse open roles below.";
+        }
+      });
+    } catch(_){}
+  };
+  window.renderWork = renderWork;
+})();
+
+
+console.log("[Ledger Life] v10 ok");
+
+// Anti-sim HUD: never show age/credit in chrome
+(function(){
+  const _rt = refreshTopbar;
+  refreshTopbar = function() {
+    _rt();
+    try {
+      const cr = document.getElementById("top-credit");
+      if (cr) { cr.style.display = "none"; cr.textContent = ""; }
+      const day = document.getElementById("top-day");
+      if (day && /Age|Credit|Day \d/i.test(day.textContent || "")) {
+        day.textContent = new Date().toLocaleDateString(undefined, { weekday:"short", month:"short", day:"numeric" });
+      }
+      // multi-currency kept (USD, EUR, GEL ₾, etc.)
+    } catch(_){}
+  };
+  window.refreshTopbar = refreshTopbar;
+})();
+
+console.log("[Ledger Life] v11: real bank chrome (no age/credit HUD, $ USD)");
 
 })();
+
+
 
 
 
