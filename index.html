@@ -224,6 +224,57 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 .trade-bs .sell-btn { background:rgba(255,82,82,0.2); color:var(--red); border:1px solid rgba(255,82,82,0.4); }
 .trade-bs .buy-btn { background:rgba(0,200,83,0.2); color:var(--green); border:1px solid rgba(0,200,83,0.4); }
 
+
+/* Verified badge */
+.v-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; margin-left: 4px; vertical-align: -2px;
+  border-radius: 50%; background: #1d9bf0; color: #fff;
+  flex-shrink: 0;
+}
+.v-badge svg { width: 10px; height: 10px; display: block; }
+.name-row { display: inline-flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+
+/* Pay app style */
+.pay-hero {
+  text-align: center; padding: 8px 0 18px;
+}
+.pay-hero .pay-amount-wrap {
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  margin: 12px 0 6px;
+}
+.pay-hero .pay-currency {
+  font-size: 28px; font-weight: 700; color: var(--muted); margin-top: 8px;
+}
+.pay-hero input#pay-amt {
+  font-size: 48px !important; font-weight: 800 !important; text-align: center !important;
+  border: none !important; background: transparent !important; color: var(--text) !important;
+  width: 100%; max-width: 280px; padding: 0 !important; outline: none !important;
+  font-variant-numeric: tabular-nums;
+}
+.pay-field {
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 12px 14px; margin-bottom: 10px;
+}
+.pay-field label {
+  display: block; font-size: 11px; color: var(--muted); margin-bottom: 6px;
+  text-transform: none; letter-spacing: 0; font-weight: 500;
+}
+.pay-field input {
+  display: block; width: 100%; border: none; background: transparent;
+  color: var(--text); font-size: 16px; padding: 0; outline: none;
+  font-family: inherit; box-sizing: border-box;
+}
+.pay-chip-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 10px 0 4px; }
+.pay-chip {
+  padding: 8px 14px; border-radius: 20px; border: 1px solid var(--border);
+  background: var(--card); color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.pay-send {
+  margin-top: 16px; width: 100%; padding: 16px !important; font-size: 16px !important;
+  border-radius: 14px !important;
+}
+
 </style>
 </head>
 <body>
@@ -6068,34 +6119,41 @@ renderBank = function(){
 
   ensureAccountCards();
   const my = S.cards && S.cards.debit ? S.cards.debit.pan : "—";
+  const meName = esc(S.displayName || sessionUser || "");
+  const meV = isVerifiedUser(S) ? verifiedBadgeHtml() : "";
   payEl.innerHTML =
-    '<div class="card">' +
-    '<h3>Pay someone</h3>' +
-    '<div class="meta" style="margin-bottom:12px;line-height:1.45">Send from your checking to another player. Use their <b>username</b> or <b>card number</b> (Bank → Accounts).</div>' +
-    '<div class="meta" style="margin-bottom:14px">Your debit card: <span data-my-card style="font-family:ui-monospace,monospace">' + my + '</span></div>' +
-    '<label style="display:block;font-size:11px;color:var(--muted);margin:0 0 4px;text-transform:uppercase;letter-spacing:0.4px">Recipient username</label>' +
-    '<input type="text" id="pay-user" autocomplete="off" placeholder="their_username" ' +
-      'style="display:block;width:100%;padding:12px 14px;margin-bottom:12px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:15px;box-sizing:border-box" value="' +
-      String(_payFormVals.user||"").replace(/"/g,"&quot;") + '">' +
-    '<label style="display:block;font-size:11px;color:var(--muted);margin:0 0 4px;text-transform:uppercase;letter-spacing:0.4px">Or recipient card number</label>' +
-    '<input type="text" id="pay-pan" inputmode="numeric" placeholder="4046 6048 0628 2023" maxlength="23" ' +
-      'style="display:block;width:100%;padding:12px 14px;margin-bottom:12px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:15px;box-sizing:border-box;font-family:ui-monospace,monospace" value="' +
-      String(_payFormVals.pan||"").replace(/"/g,"&quot;") + '">' +
-    '<label style="display:block;font-size:11px;color:var(--muted);margin:0 0 4px;text-transform:uppercase;letter-spacing:0.4px">Amount</label>' +
-    '<input type="number" id="pay-amt" min="1" step="1" placeholder="25" ' +
-      'style="display:block;width:100%;padding:12px 14px;margin-bottom:12px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:15px;box-sizing:border-box" value="' +
-      String(_payFormVals.amt||"25").replace(/"/g,"&quot;") + '">' +
-    '<label style="display:block;font-size:11px;color:var(--muted);margin:0 0 4px;text-transform:uppercase;letter-spacing:0.4px">Note (optional)</label>' +
-    '<input type="text" id="pay-note" maxlength="40" placeholder="Rent, lunch, etc." ' +
-      'style="display:block;width:100%;padding:12px 14px;margin-bottom:14px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:15px;box-sizing:border-box" value="' +
-      String(_payFormVals.note||"").replace(/"/g,"&quot;") + '">' +
-    '<button class="btn btn-primary btn-block" type="button" id="btn-pay-card">Send payment</button>' +
-    '<div class="meta" id="pay-status" style="margin-top:10px;min-height:18px"></div>' +
-    '</div>' +
-    '<div class="card"><h3>How it works</h3>' +
-    '<div class="meta" style="line-height:1.5">1. Friend opens <b>Bank → Accounts</b> and copies their card, or gives you their username.<br>' +
-    '2. Enter username <b>or</b> card number + amount → Send.<br>' +
-    '3. Money moves on the server instantly. They see it after refresh (or right away if online).</div></div>';
+    '<div class="card" style="padding:18px 16px 20px">' +
+    '<div class="pay-hero">' +
+    '<div class="meta">Send money</div>' +
+    '<div class="pay-amount-wrap"><span class="pay-currency">' + currencySymbol() + '</span>' +
+    '<input type="number" id="pay-amt" min="1" step="0.01" inputmode="decimal" value="' + String(_payFormVals.amt||"25").replace(/"/g,"&quot;") + '"></div>' +
+    '<div class="pay-chip-row">' +
+    '<button type="button" class="pay-chip" data-pamt="10">10</button>' +
+    '<button type="button" class="pay-chip" data-pamt="25">25</button>' +
+    '<button type="button" class="pay-chip" data-pamt="50">50</button>' +
+    '<button type="button" class="pay-chip" data-pamt="100">100</button>' +
+    '<button type="button" class="pay-chip" data-pamt="500">500</button>' +
+    '</div></div>' +
+    '<div class="pay-field"><label>To · card number</label>' +
+    '<input type="text" id="pay-pan" inputmode="numeric" placeholder="Card number from their Bank → Accounts" maxlength="23" value="' + String(_payFormVals.pan||"").replace(/"/g,"&quot;") + '" style="font-family:ui-monospace,monospace"></div>' +
+    '<div class="pay-field"><label>Or account username</label>' +
+    '<input type="text" id="pay-user" autocomplete="off" placeholder="@username" value="' + String(_payFormVals.user||"").replace(/"/g,"&quot;") + '"></div>' +
+    '<div class="pay-field"><label>Memo</label>' +
+    '<input type="text" id="pay-note" maxlength="40" placeholder="What\'s it for?" value="' + String(_payFormVals.note||"").replace(/"/g,"&quot;") + '"></div>' +
+    '<div class="meta" style="margin:8px 0 0;font-size:12px">From <span class="name-row">' + meName + meV + '</span> · Debit <span style="font-family:ui-monospace,monospace" data-my-card>' + my + '</span></div>' +
+    '<div class="meta" style="margin-top:4px">Available ' + fmt(S.checking||0) + '</div>' +
+    '<button class="btn btn-primary pay-send" type="button" id="btn-pay-card">Pay</button>' +
+    '<div class="meta" id="pay-status" style="margin-top:12px;min-height:18px;text-align:center"></div>' +
+    '</div>';
+
+  payEl.querySelectorAll("[data-pamt]").forEach(function(b){
+    b.onclick = function(){
+      const v = b.getAttribute("data-pamt");
+      const el = document.getElementById("pay-amt");
+      if (el) el.value = v;
+      _payFormVals.amt = v;
+    };
+  });
 
   const btn = document.getElementById("btn-pay-card");
   if (btn) btn.onclick = async function(){
@@ -7441,9 +7499,220 @@ window.renderHome = renderHome;
   if (!JOB_TREE.some(function(x) { return x.id === j.id; })) JOB_TREE.push(j);
 });
 
-console.log("[Ledger Life] v7: streak=tokens, real date, billionaire biz x10, jobs", JOB_TREE.length, "biz", BUSINESS_DEFS.length);
+
+console.log("[Ledger Life] v7 ok");
+
+// ============================================================
+// v8 — payment-app UI, verified badges, owner verify
+// ============================================================
+function isVerifiedUser(st) {
+  if (!st) st = S;
+  return !!(st && (st.verified || st._verified));
+}
+function verifiedBadgeHtml() {
+  return '<span class="v-badge" title="Verified" aria-label="Verified"><svg viewBox="0 0 24 24" fill="none"><path d="M9 12.5l2 2 4.5-4.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="10" stroke="#fff" stroke-width="0" fill="none"/></svg></span>';
+}
+function nameWithVerified(display, st) {
+  const n = esc(display || "");
+  return '<span class="name-row">' + n + (isVerifiedUser(st) ? verifiedBadgeHtml() : "") + "</span>";
+}
+window.isVerifiedUser = isVerifiedUser;
+window.verifiedBadgeHtml = verifiedBadgeHtml;
+window.nameWithVerified = nameWithVerified;
+
+// Apply verified from login payload
+const __loginCloudV = loginCloud;
+loginCloud = async function(username, password) {
+  const data = await __loginCloudV(username, password);
+  if (data && (data.verified || (data.state && data.state.verified))) {
+    S.verified = true;
+  }
+  return data;
+};
+window.loginCloud = loginCloud;
+
+// Profile shows verified
+const __renderProfileV = renderProfile;
+renderProfile = function() {
+  __renderProfileV();
+  try {
+    const host = document.getElementById("profile-content");
+    if (!host || !S) return;
+    const h3 = host.querySelector("h3");
+    if (h3 && isVerifiedUser(S) && !h3.querySelector(".v-badge")) {
+      h3.innerHTML = esc(S.displayName || sessionUser) + verifiedBadgeHtml();
+    }
+    // status line
+    if (!host.querySelector("[data-v-status]")) {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.setAttribute("data-v-status", "1");
+      card.innerHTML = isVerifiedUser(S)
+        ? '<div class="card-row"><div class="meta">Account status</div><div class="val name-row">Verified ' + verifiedBadgeHtml() + "</div></div>"
+        : '<div class="card-row"><div class="meta">Account status</div><div class="val">Standard</div></div>';
+      host.appendChild(card);
+    }
+  } catch(_){}
+};
+window.renderProfile = renderProfile;
+
+// Topbar / home net label optional
+const __refreshTopV = refreshTopbar;
+refreshTopbar = function() {
+  __refreshTopV();
+  try {
+    const top = document.querySelector(".topbar .net");
+    // leave net worth alone
+  } catch(_){}
+};
+
+// Owner CMS: verify toggle
+const __openOwnerCMS = openOwnerCMS;
+openOwnerCMS = function() {
+  ownerGate(async function() {
+    // reuse list then inject verify UI by wrapping apply path
+    // Call original body via re-fetch pattern: open modal ourselves with verify
+    let names = [];
+    let cloudUsers = {};
+    try {
+      const data = await cloudFetch("/owner/list", { ownerPassword: "kobiTheowner" });
+      (data.users || []).forEach(function(u) {
+        names.push(u.username);
+        cloudUsers[u.username] = u;
+      });
+    } catch (e) { console.warn(e); }
+    try {
+      Object.keys(allUsers()).forEach(function(u) {
+        if (names.indexOf(u) < 0) names.push(u);
+      });
+    } catch(_){}
+    if (sessionUser && names.indexOf(sessionUser) < 0) names.unshift(sessionUser);
+
+    let options = names.map(function(u) {
+      const cu = cloudUsers[u];
+      const v = cu && cu.verified ? " ✓" : "";
+      const chk = cu && cu.checking != null ? Math.round(cu.checking) : "?";
+      return '<option value="' + u + '"' + (u === sessionUser ? " selected" : "") + ">@" + u + v + " · " + chk + "</option>";
+    }).join("") || '<option value="">No accounts</option>';
+
+    openModal(
+      '<h2>Owner CMS</h2>' +
+      '<div class="meta mb-8">Cloud account tools</div>' +
+      "<label>Account</label><select id=\"own-user\">" + options + "</select>" +
+      "<label>Set checking</label><input type=\"number\" id=\"own-checking\" placeholder=\"blank = no change\">" +
+      "<label>Add / remove checking</label><input type=\"number\" id=\"own-delta\" placeholder=\"e.g. 500\">" +
+      "<label>Set savings</label><input type=\"number\" id=\"own-savings\" placeholder=\"blank = no change\">" +
+      "<label>Set brokerage</label><input type=\"number\" id=\"own-brokerage\" placeholder=\"blank = no change\">" +
+      "<label>Credit score</label><input type=\"number\" id=\"own-credit\" min=\"300\" max=\"850\">" +
+      '<div class="modal-actions" style="flex-wrap:wrap;gap:8px;margin-top:12px">' +
+      '<button class="btn btn-primary" type="button" id="own-apply">Apply + save</button>' +
+      '<button class="btn btn-blue" type="button" id="own-verify">Grant verified</button>' +
+      '<button class="btn btn-secondary" type="button" id="own-unverify">Remove verified</button>' +
+      '<button class="btn btn-secondary" type="button" id="own-load">Load session</button>' +
+      '</div><div class="meta mt-8" id="own-status"></div>'
+    );
+
+    setTimeout(function() {
+      function un() { return ((document.getElementById("own-user") || {}).value || "").trim().toLowerCase(); }
+      function num(id) {
+        const el = document.getElementById(id);
+        if (!el || el.value === "") return null;
+        const n = Number(el.value);
+        return isNaN(n) ? null : n;
+      }
+      async function apply() {
+        const username = un();
+        if (!username) return;
+        const stEl = document.getElementById("own-status");
+        if (stEl) stEl.textContent = "Saving…";
+        const payload = { ownerPassword: "kobiTheowner", username: username };
+        const chk = num("own-checking"), delta = num("own-delta"), sav = num("own-savings"), bro = num("own-brokerage"), cr = num("own-credit");
+        if (chk != null) payload.checking = chk;
+        if (delta != null) payload.delta = delta;
+        if (sav != null) payload.savings = sav;
+        if (bro != null) payload.brokerage = bro;
+        if (cr != null) payload.creditScore = cr;
+        try {
+          const data = await cloudFetch("/owner/money", payload);
+          if (username === sessionUser && data.state) {
+            S.checking = data.state.checking;
+            S.savings = data.state.savings;
+            S.brokerage = data.state.brokerage;
+            if (data.state.creditScore != null) S.creditScore = data.state.creditScore;
+            if (sessionPassword) await cloudFetch("/save", { username: sessionUser, password: sessionPassword, state: S, displayName: S.displayName, clientUpdatedAt: 0 });
+            refreshTopbar();
+          }
+          if (stEl) stEl.textContent = "Saved @" + username + (data.checking != null ? (" · checking " + data.checking) : "");
+          toast("Saved @" + username);
+        } catch (e) {
+          if (stEl) stEl.textContent = e.message || String(e);
+          toast(e.message || String(e));
+        }
+      }
+      async function setVerify(on) {
+        const username = un();
+        if (!username) return;
+        try {
+          await cloudFetch("/owner/verify", { ownerPassword: "kobiTheowner", username: username, verified: on });
+          if (username === sessionUser) {
+            S.verified = !!on;
+            if (sessionPassword) await cloudFetch("/save", { username: sessionUser, password: sessionPassword, state: S, displayName: S.displayName, clientUpdatedAt: 0 });
+          }
+          toast((on ? "Verified " : "Unverified ") + "@" + username);
+          const stEl = document.getElementById("own-status");
+          if (stEl) stEl.textContent = (on ? "Granted verified" : "Removed verified") + " @" + username;
+        } catch (e) {
+          toast(e.message || String(e));
+        }
+      }
+      async function load() {
+        const username = un();
+        if (!username) return;
+        try {
+          const data = await cloudFetch("/owner/money", { ownerPassword: "kobiTheowner", username: username });
+          if (!data.state) return;
+          sessionUser = username;
+          S = data.state;
+          if (data.state.verified) S.verified = true;
+          if (typeof ensureMarket === "function") ensureMarket(S);
+          closeModal();
+          const auth = document.getElementById("auth-screen");
+          const main = document.getElementById("main-app");
+          if (auth) auth.classList.add("hidden");
+          if (main) { main.classList.remove("hidden"); main.style.display = "flex"; }
+          showScreen("home");
+          refreshTopbar();
+          toast("Loaded @" + username);
+        } catch (e) { toast(e.message || String(e)); }
+      }
+      const a = document.getElementById("own-apply");
+      const v = document.getElementById("own-verify");
+      const uv = document.getElementById("own-unverify");
+      const l = document.getElementById("own-load");
+      if (a) a.onclick = function(){ apply(); };
+      if (v) v.onclick = function(){ setVerify(true); };
+      if (uv) uv.onclick = function(){ setVerify(false); };
+      if (l) l.onclick = function(){ load(); };
+    }, 0);
+  });
+};
+window.openOwnerCMS = openOwnerCMS;
+
+// Transaction labels: show verified on outbound pays when we are verified
+const __addTxV = typeof addTx === "function" ? addTx : null;
+if (__addTxV) {
+  addTx = function(type, label, amount, account) {
+    if (type === "transfer" && amount < 0 && isVerifiedUser(S) && /Pay @/.test(label || "")) {
+      label = label + " ✓";
+    }
+    return __addTxV(type, label, amount, account);
+  };
+}
+
+console.log("[Ledger Life] v8: pay-app UI, verified badges, owner verify");
 
 })();
+
 
 
 
