@@ -1485,14 +1485,11 @@ function buyInsurance(type){
 
 // ---------- DAY / TICK ----------
 function onNewDay(){
-  S.day++;
-  if (S.day % 365 === 0) {
-    S.age++;
-    S._iraYear = 0;
-    S.ytdIncome = 0;
-    S.ytdTaxPaid = 0;
-    toast("Happy birthday — you are now "+S.age);
-  }
+  // Calendar day/age are driven by real time (syncRealCalendar)
+  try { syncRealCalendar(); } catch(_){}
+  const todayKey = new Date().toDateString();
+  if (S._lastCalDay === todayKey) return; // already ran real daily once
+  S._lastCalDay = todayKey;
 
   // wages accrue in real time via accrueRealSalary() — not per game day
   if (S.jobId) S.jobDays = (S.jobDays || 0) + 1;
@@ -1726,7 +1723,7 @@ function renderHome(){
   if (!txs.length) $("home-activity").innerHTML = '<div class="empty-state text-sm">No activity yet</div>';
   else $("home-activity").innerHTML = txs.map(t => `
     <div class="tx-item">
-      <div><div class="tx-name">${esc(t.label)}</div><div class="tx-date">Day ${t.day}</div></div>
+      <div><div class="tx-name">${esc(t.label)}</div><div class="tx-date">${esc(formatWhen(t))}</div></div>
       <div class="${t.amount>=0?'pos':'neg'} fw-700">${t.amount>=0?'+':''}${fmt(t.amount)}</div>
     </div>
   `).join("");
@@ -1748,6 +1745,31 @@ function renderHome(){
 }
 
 function esc(s){ return String(s||"").replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]); }
+function formatWhen(t){
+  const ts = (t && t.at) ? t.at : null;
+  if (ts) {
+    try {
+      const d = new Date(ts);
+      const now = new Date();
+      const sameDay = d.toDateString() === now.toDateString();
+      if (sameDay) return d.toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit" });
+      return d.toLocaleString(undefined, { month:"short", day:"numeric", hour:"numeric", minute:"2-digit" });
+    } catch(_){}
+  }
+  return "Recently";
+}
+function syncRealCalendar(){
+  if (!S) return;
+  // Account age from real createdAt — day/year track real time
+  const created = S.createdAt || Date.now();
+  const ms = Date.now() - created;
+  const daysAlive = Math.max(1, Math.floor(ms / 86400000) + 1);
+  S.day = daysAlive;
+  // age: start 18 + full real years since create
+  const years = Math.floor(ms / (365.25 * 86400000));
+  S.age = Math.min(100, 18 + years);
+}
+
 
 // ---------- BANK UI ----------
 let bankTab = "accounts";
@@ -1806,11 +1828,53 @@ function renderBank(){
       </div>
     `;
   } else if (bankTab === "history") {
-    const txs = (S.transactions||[]).slice(0, 40);
-    $("bank-history").innerHTML = `<div class="card">${txs.length?txs.map(t=>`
-      <div class="tx-item"><div><div class="tx-name">${esc(t.label)}</div><div class="tx-date">Day ${t.day} · ${t.account}</div></div>
-      <div class="${t.amount>=0?'pos':'neg'}">${t.amount>=0?'+':''}${fmt(t.amount)}</div></div>
-    `).join(""):'<div class="empty-state">No transactions</div>'}</div>`;
+    const txs = (S.transactions||[]).slice(0, 50);
+    function txWhen(t){
+      if (t.at) {
+        try {
+          const d = new Date(t.at);
+          return d.toLocaleString(undefined, { month:"short", day:"numeric", hour:"numeric", minute:"2-digit" });
+        } catch(_){}
+      }
+      return "Posted";
+    }
+    function txTitle(t){
+      const lab = String(t.label||"");
+      if (/^From @/i.test(lab) || /Card receive/i.test(lab)) return lab.replace(/^Card receive from /i, "From ");
+      if (/^Pay @/i.test(lab) || /Card pay to/i.test(lab)) return lab.replace(/^Card pay to /i, "To ");
+      return lab;
+    }
+    function txIcon(t){
+      if (t.amount > 0) return '<div style="width:40px;height:40px;border-radius:50%;background:rgba(0,200,83,0.15);color:var(--green);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;flex-shrink:0">↓</div>';
+      return '<div style="width:40px;height:40px;border-radius:50%;background:rgba(255,82,82,0.12);color:var(--red);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;flex-shrink:0">↑</div>';
+    }
+    const incoming = txs.filter(t => t.amount > 0 && (/From @/i.test(t.label||"") || /receive/i.test(t.label||"")));
+    let html = "";
+    if (incoming.length) {
+      html += '<div class="card" style="border:1px solid rgba(0,200,83,0.25)"><div class="meta" style="margin-bottom:8px;font-weight:600;color:var(--green)">Money received</div>';
+      html += incoming.slice(0, 5).map(t =>
+        '<div class="tx-item" style="align-items:center;gap:12px">' + txIcon(t) +
+        '<div style="flex:1;min-width:0"><div class="tx-name">' + esc(txTitle(t)) + '</div>' +
+        '<div class="tx-date">' + esc(txWhen(t)) + ' · Checking</div></div>' +
+        '<div class="pos" style="font-weight:700;font-size:15px">+' + fmt(t.amount) + '</div></div>'
+      ).join("");
+      html += "</div>";
+    }
+    html += '<div class="section-title">All activity</div>';
+    html += '<div class="card">';
+    if (!txs.length) {
+      html += '<div class="empty-state" style="padding:24px;text-align:center"><div class="meta">No payments yet</div><div class="meta" style="margin-top:6px">When someone pays your card or username, it shows here and your checking balance goes up.</div></div>';
+    } else {
+      html += txs.map(t =>
+        '<div class="tx-item" style="align-items:center;gap:12px">' + txIcon(t) +
+        '<div style="flex:1;min-width:0"><div class="tx-name">' + esc(txTitle(t)) + '</div>' +
+        '<div class="tx-date">' + esc(txWhen(t)) + ' · ' + esc(t.account || "checking") + '</div></div>' +
+        '<div class="' + (t.amount >= 0 ? "pos" : "neg") + '" style="font-weight:700;font-size:15px">' +
+        (t.amount >= 0 ? "+" : "") + fmt(t.amount) + "</div></div>"
+      ).join("");
+    }
+    html += "</div>";
+    $("bank-history").innerHTML = html;
   } else if (bankTab === "bills") {
     $("bank-bills").innerHTML = S.bills.map(b => `
       <div class="list-item">
@@ -2254,7 +2318,7 @@ function renderProfile(){
   $("profile-content").innerHTML = `
     <div class="card">
       <h3>${esc(S.displayName)}</h3>
-      <div class="meta">@${esc(S.username)} · Age ${S.age} · Day ${S.day}</div>
+      <div class="meta">@${esc(S.username)} · Age ${S.age} · Since ${S.createdAt?new Date(S.createdAt).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}):"—"}</div>
       <div class="meta">Difficulty: ${esc(S.diff)}</div>
     </div>
     <div class="hero">
@@ -2452,9 +2516,11 @@ function checkGoals(){
     try {
       if (g.check(S)) {
         S.achievements.push(g.id);
-        S.checking += g.reward;
-        addTx("goal", "Goal: "+g.name, g.reward, "checking");
-        toast("Goal unlocked: "+g.name+" (+"+fmt(g.reward)+")");
+        // No free cash — career tokens only
+        if (!S.careerTokens) S.careerTokens = 0;
+        const tok = Math.max(1, Math.min(15, Math.round((g.reward || 100) / 100)));
+        S.careerTokens += tok;
+        toast("Goal: " + g.name + " · +" + tok + " career token" + (tok > 1 ? "s" : ""));
       }
     } catch(_){}
   });
@@ -3171,7 +3237,7 @@ renderProfile = function(){
     <div class="card">
       <input type="text" id="note-input" placeholder="Write a money note..." maxlength="280">
       <button class="btn btn-secondary btn-sm mt-8" onclick="const e=addNote($('note-input').value);if(e)toast(e);else{toast('Saved');renderProfile();saveGame();}">Add note</button>
-      ${(S.notes||[]).slice(0,8).map(n=>`<div class="tx-item"><div><div class="tx-name">${esc(n.text)}</div><div class="tx-date">Day ${n.day}</div></div></div>`).join("")}
+      ${(S.notes||[]).slice(0,8).map(n=>`<div class="tx-item"><div><div class="tx-name">${esc(n.text)}</div><div class="tx-date">${n.at?new Date(n.at).toLocaleDateString():""}</div></div></div>`).join("")}
     </div>
   `);
 };
@@ -6951,6 +7017,7 @@ window.renderProfile = renderProfile;
 // Top bar uses REAL calendar date (not Jan 1 fantasy)
 const __refreshTopbarDay = refreshTopbar;
 refreshTopbar = function(){
+  try { syncRealCalendar(); } catch(_){}
   __refreshTopbarDay();
   if (!S) return;
   try {
@@ -7736,9 +7803,75 @@ if (__addTxV) {
   };
 }
 
-console.log("[Ledger Life] v8: pay-app UI, verified badges, owner verify");
+
+console.log("[Ledger Life] v8 ok");
+
+// Poll cloud for incoming payments (balance + history) without full reload
+if (!window._inboxPoll) {
+  window._inboxPoll = setInterval(async function() {
+    try {
+      if (!sessionUser || !sessionPassword || !S || !CLOUD_API) return;
+      const data = await cloudFetch("/load", { username: sessionUser, password: sessionPassword });
+      if (!data || !data.state) return;
+      const remote = data.state;
+      const remoteChk = Number(remote.checking) || 0;
+      const localChk = Number(S.checking) || 0;
+      // if server checking is higher, merge inbound (someone paid us / owner added)
+      if (remoteChk > localChk + 0.009) {
+        const diff = remoteChk - localChk;
+        S.checking = remoteChk;
+        if (remote.transactions) S.transactions = remote.transactions;
+        S._cloudUpdatedAt = data.updatedAt || Date.now();
+        refreshTopbar();
+        toast("Payment received · +" + fmt(diff));
+        if (typeof bankTab !== "undefined" && bankTab === "history") renderBank();
+        if (typeof bankTab !== "undefined" && bankTab === "accounts") renderBank();
+      } else if (data.updatedAt && S._cloudUpdatedAt && data.updatedAt > S._cloudUpdatedAt + 2000) {
+        // general newer state (owner edits etc.)
+        if (remote.transactions && remote.transactions.length > (S.transactions||[]).length) {
+          S.transactions = remote.transactions;
+        }
+        S._cloudUpdatedAt = data.updatedAt;
+      }
+    } catch(_){}
+  }, 12000);
+}
+
+// Accounts tab tip about history
+const __renderBankInbox = renderBank;
+renderBank = function() {
+  __renderBankInbox();
+  try {
+    if (bankTab !== "accounts") return;
+    const host = $("bank-accounts");
+    if (!host || host.querySelector("[data-inbox-tip]")) return;
+    const tip = document.createElement("div");
+    tip.setAttribute("data-inbox-tip", "1");
+    tip.className = "card";
+    const recentIn = (S.transactions || []).filter(function(t) {
+      return t.amount > 0 && (/From @/i.test(t.label || "") || /receive/i.test(t.label || ""));
+    }).slice(0, 3);
+    if (recentIn.length) {
+      tip.innerHTML = '<div class="meta" style="font-weight:600;margin-bottom:8px;color:var(--green)">Recently received</div>' +
+        recentIn.map(function(t) {
+          return '<div class="card-row"><div class="meta">' + esc(t.label) + '</div><div class="val pos">+' + fmt(t.amount) + '</div></div>';
+        }).join("") +
+        '<button class="btn btn-secondary btn-sm btn-block mt-8" type="button" id="btn-open-history">View all activity</button>';
+      host.insertBefore(tip, host.firstChild);
+      const b = document.getElementById("btn-open-history");
+      if (b) b.onclick = function() { bankTab = "history"; renderBank(); };
+    } else {
+      tip.innerHTML = '<div class="meta">Incoming payments appear under <b>History</b> and increase your <b>Checking</b> balance.</div>';
+      host.appendChild(tip);
+    }
+  } catch(_){}
+};
+window.renderBank = renderBank;
+
+console.log("[Ledger Life] v9: payment inbox + history UI");
 
 })();
+
 
 
 
