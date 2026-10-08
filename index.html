@@ -225,45 +225,37 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 .trade-bs .buy-btn { background:rgba(0,200,83,0.2); color:var(--green); border:1px solid rgba(0,200,83,0.4); }
 
 
-/* Verified badge — solid cyan circle, clear size */
+/* Verified — inline with name size (Twitter-style) */
 .v-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  margin-left: 6px;
-  vertical-align: middle;
+  display: inline-block;
+  width: 1.05em;
+  height: 1.05em;
+  margin-left: 0.28em;
+  vertical-align: -0.12em;
   border-radius: 50%;
-  background: #4fc3f7;
+  background: #1d9bf0;
   flex-shrink: 0;
+  position: relative;
   box-shadow: none;
   border: none;
 }
 .v-badge svg {
-  width: 14px;
-  height: 14px;
+  position: absolute;
+  inset: 18%;
+  width: 64%;
+  height: 64%;
   display: block;
 }
-.v-badge.lg {
-  width: 28px;
-  height: 28px;
-  margin-left: 8px;
-}
-.v-badge.lg svg { width: 18px; height: 18px; }
 .name-row {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
   flex-wrap: wrap;
 }
-h3 .v-badge, .profile-name .v-badge {
-  width: 26px;
-  height: 26px;
-}
-h3 .v-badge svg, .profile-name .v-badge svg {
-  width: 16px;
-  height: 16px;
+/* profile h3 is ~18–20px so badge ~18–20px via em */
+h3 .v-badge {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.1em;
 }
 
 /* Pay app style */
@@ -7540,12 +7532,11 @@ function isVerifiedUser(st) {
   if (!st) st = S;
   return !!(st && (st.verified || st._verified));
 }
-function verifiedBadgeHtml(size) {
-  const cls = size === "lg" ? "v-badge lg" : "v-badge";
-  // solid cyan circle + white check (not shiny)
-  return '<span class="' + cls + '" title="Verified" aria-label="Verified">' +
+function verifiedBadgeHtml() {
+  // size follows parent font (1em) so it matches the name
+  return '<span class="v-badge" title="Verified" aria-label="Verified">' +
     '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-    '<path d="M6.5 12.2l3.4 3.4 7.6-7.6" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<path d="M6.8 12.3l3.2 3.2 7.2-7.2" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>' +
     '</svg></span>';
 }
 function nameWithVerified(display, st) {
@@ -7576,7 +7567,7 @@ renderProfile = function() {
     if (!host || !S) return;
     const h3 = host.querySelector("h3");
     if (h3 && isVerifiedUser(S) && !h3.querySelector(".v-badge")) {
-      h3.innerHTML = esc(S.displayName || sessionUser) + verifiedBadgeHtml('lg');
+      h3.innerHTML = esc(S.displayName || sessionUser) + verifiedBadgeHtml();
     }
     // status line
     if (!host.querySelector("[data-v-status]")) {
@@ -7584,7 +7575,7 @@ renderProfile = function() {
       card.className = "card";
       card.setAttribute("data-v-status", "1");
       card.innerHTML = isVerifiedUser(S)
-        ? '<div class="card-row"><div class="meta">Account status</div><div class="val name-row">Verified ' + verifiedBadgeHtml('lg') + "</div></div>"
+        ? '<div class="card-row"><div class="meta">Account status</div><div class="val name-row">Verified ' + verifiedBadgeHtml() + "</div></div>"
         : '<div class="card-row"><div class="meta">Account status</div><div class="val">Standard</div></div>';
       host.appendChild(card);
     }
