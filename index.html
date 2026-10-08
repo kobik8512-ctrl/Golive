@@ -6744,15 +6744,14 @@ window.renderProfile = renderProfile;
   { id:"tutoring_co", name:"Tutoring Agency", desc:"Match tutors to students", cost:5000, income:110, upkeep:30, req:{admin:1, sales:1} },
 ].forEach(b => { if (!BUSINESS_DEFS.some(x => x.id === b.id)) BUSINESS_DEFS.push(b); });
 
-// Day label more real-looking (calendar style)
+// Top bar uses REAL calendar date (not Jan 1 fantasy)
 const __refreshTopbarDay = refreshTopbar;
 refreshTopbar = function(){
   __refreshTopbarDay();
   if (!S) return;
   try {
-    const start = new Date(2026, 0, 1);
-    const d = new Date(start.getTime() + (S.day - 1) * 86400000);
-    const label = d.toLocaleDateString(undefined, { weekday:"short", month:"short", day:"numeric", year:"numeric" });
+    const now = new Date();
+    const label = now.toLocaleDateString(undefined, { weekday:"short", month:"short", day:"numeric", year:"numeric" });
     const el = $("top-day");
     if (el) el.textContent = label + " · Age " + S.age;
   } catch(_){}
@@ -7104,18 +7103,22 @@ window.renderProfile = renderProfile;
 function checkDailyStreak() {
   if (!S) return;
   const today = new Date().toDateString();
-  if (!S.streak) S.streak = { count: 0, last: null };
+  if (!S.streak) S.streak = { count: 0, last: null, tokens: 0 };
   if (S.streak.last === today) return;
   const yday = new Date(Date.now() - 86400000).toDateString();
   if (S.streak.last === yday) S.streak.count += 1;
   else S.streak.count = 1;
   S.streak.last = today;
-  // small checking bonus scales with streak, caps
-  const bonus = Math.min(50, 5 * S.streak.count);
-  S.checking = (S.checking || 0) + bonus;
-  S.totalEarned = (S.totalEarned || 0) + bonus;
-  if (typeof addTx === "function") addTx("income", "Daily streak x" + S.streak.count, bonus, "checking");
-  toast("Day " + S.streak.count + " streak · +" + fmt(bonus));
+  // NO free cash — streak grants Career Tokens (spend on skill training discount) + tiny credit hygiene
+  if (!S.careerTokens) S.careerTokens = 0;
+  const tokens = Math.min(5, 1 + Math.floor(S.streak.count / 3));
+  S.careerTokens += tokens;
+  S.streak.tokens = (S.streak.tokens || 0) + tokens;
+  // credit: +1 every 3-day streak milestone only
+  if (S.streak.count % 3 === 0) {
+    if (typeof adjustCredit === "function") adjustCredit(1);
+  }
+  toast("Streak day " + S.streak.count + " · +" + tokens + " Career Token" + (tokens > 1 ? "s" : "") + " (not cash)");
   saveGame();
 }
 const __enterGameStreak = enterGame;
@@ -7177,9 +7180,104 @@ renderHome = function() {
 };
 window.renderHome = renderHome;
 
-console.log("[Ledger Life] v6: auto-login session, streak, savings interest, jobs");
+
+console.log("[Ledger Life] v6 ok");
+
+// ============================================================
+// v7 — streak tokens (no free cash), real date, mega businesses
+// ============================================================
+
+// Career tokens spend: 1 token = 10% off next skill train (stack max 5 = 50% off)
+window.useCareerTokensOnTrain = true;
+const __trainSkillTok = typeof trainSkill === "function" ? trainSkill : null;
+if (__trainSkillTok) {
+  trainSkill = function(skillId) {
+    const def = SKILL_DEFS.find(s => s.id === skillId);
+    if (!def) return "Unknown skill";
+    const level = S.skills[skillId] || 0;
+    if (level >= def.max) return "Already maxed";
+    let cost = Math.floor(def.costBase * Math.pow(1.55, level));
+    let used = 0;
+    if (S.careerTokens > 0) {
+      used = Math.min(5, S.careerTokens);
+      cost = Math.floor(cost * (1 - used * 0.1));
+    }
+    if (S.checking < cost) return "Need " + fmt(cost) + " in checking";
+    S.checking -= cost;
+    S.skills[skillId] = level + 1;
+    S.educationSpent = (S.educationSpent || 0) + cost;
+    if (used > 0) {
+      S.careerTokens -= used;
+      toast("Trained " + def.name + " · " + used + " token" + (used > 1 ? "s" : "") + " applied (−" + (used * 10) + "%)");
+    } else {
+      toast(def.name + " → level " + (level + 1));
+    }
+    if (typeof addTx === "function") addTx("education", "Train " + def.name, -cost, "checking");
+    saveGame();
+    return null;
+  };
+  window.trainSkill = trainSkill;
+}
+
+// Show career tokens on streak card
+const __renderHomeTok = renderHome;
+renderHome = function() {
+  __renderHomeTok();
+  try {
+    if (!S) return;
+    const home = document.querySelector('.screen[data-screen="home"]');
+    if (!home) return;
+    let el = home.querySelector("[data-streak]");
+    if (!el) {
+      el = document.createElement("div");
+      el.setAttribute("data-streak", "1");
+      el.className = "card";
+      const first = home.querySelector(".card, .hero");
+      if (first && first.parentNode) first.parentNode.insertBefore(el, first.nextSibling);
+      else return;
+    }
+    el.innerHTML = "<div class=\"card-row\"><div class=\"meta\">Login streak</div><div class=\"val gold\">" +
+      ((S.streak && S.streak.count) || 0) + " day" + (((S.streak && S.streak.count) === 1) ? "" : "s") +
+      "</div></div><div class=\"card-row\"><div class=\"meta\">Career tokens</div><div class=\"val\">" +
+      (S.careerTokens || 0) + " <span class=\"meta\">(skill train discount)</span></div></div>";
+  } catch(_){}
+};
+window.renderHome = renderHome;
+
+// Billionaire / high-capital businesses (expensive, real cashflow)
+[
+  { id: "regional_bank", name: "Regional Bank Charter", desc: "Deposit franchise · regulated", cost: 25000000, income: 45000, upkeep: 18000, req: { finance: 8, admin: 7 } },
+  { id: "data_center", name: "Hyperscale Data Center", desc: "Colocation + power contracts", cost: 80000000, income: 120000, upkeep: 55000, req: { tech: 7, admin: 5 } },
+  { id: "airline_route", name: "Airline Route Authority", desc: "Long-haul slots + fleet lease", cost: 120000000, income: 200000, upkeep: 110000, req: { admin: 8, finance: 6 } },
+  { id: "pharma_plant", name: "Pharma Manufacturing Plant", desc: "FDA-track production line", cost: 95000000, income: 160000, upkeep: 70000, req: { health: 7, admin: 5 } },
+  { id: "sports_franchise", name: "Pro Sports Minority Stake", desc: "League franchise equity slice", cost: 200000000, income: 90000, upkeep: 40000, req: { finance: 6, sales: 5 } },
+  { id: "shipping_line", name: "Container Shipping Line", desc: "Panamax vessels + port rights", cost: 150000000, income: 175000, upkeep: 95000, req: { admin: 6, strength: 2 } },
+  { id: "luxury_hotel", name: "Flagship Luxury Hotel", desc: "5-star urban property", cost: 60000000, income: 85000, upkeep: 42000, req: { admin: 5, sales: 4 } },
+  { id: "vc_fund", name: "Venture Fund (GP seat)", desc: "2-and-20 on committed capital", cost: 50000000, income: 70000, upkeep: 25000, req: { finance: 9, investing: 6 } },
+  { id: "satellite_co", name: "LEO Satellite Operator", desc: "Constellation ops + spectrum", cost: 300000000, income: 250000, upkeep: 140000, req: { tech: 9, finance: 7 } },
+  { id: "energy_utility", name: "Regional Power Utility", desc: "Generation + grid distribution", cost: 400000000, income: 320000, upkeep: 180000, req: { admin: 8, finance: 8 } },
+].forEach(function(b) {
+  if (!BUSINESS_DEFS.some(function(x) { return x.id === b.id; })) BUSINESS_DEFS.push(b);
+});
+
+// New mid/high jobs
+[
+  { id: "actuary", title: "Actuary", company: "RiskForm", salary: 125000, req: { finance: 5, tech: 2 }, tier: 3 },
+  { id: "anesthesiologist", title: "Anesthesiologist", company: "City Hospital", salary: 310000, req: { health: 9 }, tier: 5 },
+  { id: "federal_judge", title: "Federal Judge", company: "U.S. Courts", salary: 230000, req: { admin: 9 }, tier: 5 },
+  { id: "airline_captain", title: "Airline Captain", company: "SkyHub", salary: 195000, req: { strength: 3, admin: 3 }, tier: 4 },
+  { id: "oil_trader", title: "Commodities Trader", company: "BlackRiver", salary: 160000, req: { finance: 6, investing: 4 }, tier: 4 },
+  { id: "union_lead", title: "Union Organizer", company: "Labor United", salary: 48000, req: { sales: 2, admin: 1 }, tier: 2 },
+  { id: "filmmaker", title: "Indie Producer", company: "FrameWorks", salary: 55000, req: { sales: 2 }, tier: 2 },
+  { id: "diplomat", title: "Foreign Service Officer", company: "State Dept", salary: 78000, req: { admin: 4, sales: 2 }, tier: 3 },
+].forEach(function(j) {
+  if (!JOB_TREE.some(function(x) { return x.id === j.id; })) JOB_TREE.push(j);
+});
+
+console.log("[Ledger Life] v7: streak=tokens, real date, billionaire biz x10, jobs", JOB_TREE.length, "biz", BUSINESS_DEFS.length);
 
 })();
+
 
 
 
