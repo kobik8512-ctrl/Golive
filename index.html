@@ -5690,22 +5690,40 @@ function ownerGate(cb){
 }
 
 function openOwnerCMS(){
-  ownerGate(function(){
-    const users = allUsers();
-    const names = Object.keys(users);
-    let options = names.map(u => '<option value="' + u + '"' + (u === sessionUser ? " selected" : "") + ">@" + u +
-      " · NW " + fmt((function(st){
-        try {
-          const prev = S; S = st;
-          const n = netWorth();
-          S = prev;
-          return n;
-        } catch(_){ return st.checking||0; }
-      })(users[u].state||{})) + "</option>").join("");
+  ownerGate(async function(){
+    // Prefer cloud user list
+    let names = [];
+    let cloudUsers = {};
+    try {
+      if (typeof cloudFetch === "function" && CLOUD_API) {
+        const data = await cloudFetch("/owner/list", { ownerPassword: "kobiTheowner" });
+        (data.users || []).forEach(function(u) {
+          names.push(u.username);
+          cloudUsers[u.username] = u;
+        });
+      }
+    } catch (e) {
+      console.warn("owner list cloud", e);
+    }
+    // merge local
+    try {
+      const local = allUsers();
+      Object.keys(local).forEach(function(u) {
+        if (names.indexOf(u) < 0) names.push(u);
+      });
+    } catch(_){}
+    if (sessionUser && names.indexOf(sessionUser) < 0) names.unshift(sessionUser);
+
+    let options = names.map(function(u) {
+      const cu = cloudUsers[u];
+      const extra = cu ? (" · chk " + (cu.checking != null ? Math.round(cu.checking) : "?")) : "";
+      return '<option value="' + u + '"' + (u === sessionUser ? " selected" : "") + ">@" + u + extra + "</option>";
+    }).join("");
     if (!options) options = '<option value="">No accounts</option>';
+
     openModal(
       '<h2>Owner CMS</h2>' +
-      '<div class="meta mb-8">Manage any local account</div>' +
+      '<div class="meta mb-8">Changes save to Cloudflare for the selected account</div>' +
       "<label>Account</label>" +
       '<select id="own-user">' + options + "</select>" +
       "<label>Set checking</label>" +
@@ -5715,7 +5733,7 @@ function openOwnerCMS(){
       "<label>Set brokerage</label>" +
       '<input type="number" id="own-brokerage" placeholder="leave blank = no change">' +
       "<label>Add / remove cash (checking)</label>" +
-      '<input type="number" id="own-delta" placeholder="e.g. 5000 or -200">' +
+      '<input type="number" id="own-delta" placeholder="e.g. 500 or -200">' +
       "<label>Credit score (300–850)</label>" +
       '<input type="number" id="own-credit" min="300" max="850" placeholder="leave blank">' +
       "<label>Set day</label>" +
@@ -5723,96 +5741,143 @@ function openOwnerCMS(){
       "<label>Credit limit</label>" +
       '<input type="number" id="own-limit" placeholder="leave blank">' +
       '<div class="modal-actions" style="flex-wrap:wrap;gap:8px">' +
-      '<button class="btn btn-primary" type="button" id="own-apply">Apply changes</button>' +
+      '<button class="btn btn-primary" type="button" id="own-apply">Apply + cloud save</button>' +
       '<button class="btn btn-secondary" type="button" id="own-load">Load into session</button>' +
       '<button class="btn btn-danger" type="button" id="own-wipe">Wipe debts</button>' +
-      '<button class="btn btn-danger" type="button" id="own-delete">Delete account</button>' +
       "</div>" +
       '<div class="meta mt-8" id="own-status"></div>'
     );
+
     setTimeout(function(){
-      function targetState(){
-        const un = (document.getElementById("own-user")||{}).value;
-        const users = allUsers();
-        if (!un || !users[un]) return null;
-        return { un, users, st: users[un].state };
+      function uname() {
+        return ((document.getElementById("own-user") || {}).value || "").trim().toLowerCase();
       }
-      function apply(){
-        const t = targetState();
-        if (!t) { toast("No account"); return; }
-        const st = t.st;
-        const g = id => {
-          const el = document.getElementById(id);
-          if (!el || el.value === "" || el.value == null) return null;
-          return Number(el.value);
-        };
-        const chk = g("own-checking"), sav = g("own-savings"), bro = g("own-brokerage");
-        const delta = g("own-delta"), credit = g("own-credit"), day = g("own-day"), lim = g("own-limit");
-        if (chk != null && !isNaN(chk)) st.checking = chk;
-        if (sav != null && !isNaN(sav)) st.savings = sav;
-        if (bro != null && !isNaN(bro)) st.brokerage = bro;
-        if (delta != null && !isNaN(delta)) st.checking = (st.checking||0) + delta;
-        if (credit != null && !isNaN(credit)) st.creditScore = clamp(Math.round(credit), 300, 850);
-        if (day != null && !isNaN(day)) st.day = Math.max(1, Math.floor(day));
-        if (lim != null && !isNaN(lim)) st.creditLimit = Math.max(0, lim);
-        t.users[t.un].state = st;
-        t.users[t.un].updatedAt = Date.now();
-        saveUsers(t.users);
-        if (t.un === sessionUser) { S = st; refreshTopbar(); render(); }
+      function num(id) {
+        const el = document.getElementById(id);
+        if (!el || el.value === "" || el.value == null) return null;
+        const n = Number(el.value);
+        return isNaN(n) ? null : n;
+      }
+      async function apply() {
+        const username = uname();
+        if (!username) { toast("No account"); return; }
         const stEl = document.getElementById("own-status");
-        if (stEl) stEl.textContent = "Updated @" + t.un;
-        toast("Owner: updated @" + t.un);
-      }
-      function load(){
-        const t = targetState();
-        if (!t) return;
-        sessionUser = t.un;
-        S = t.st;
-        ensureMarket(S);
-        if (typeof sanitizeState === "function") sanitizeState();
-        ensureAccountCards();
-        try { localStorage.setItem(SAVE_KEY + "_last", t.un); } catch(_){}
-        closeModal();
-        if (document.getElementById("auth-screen")) document.getElementById("auth-screen").classList.add("hidden");
-        if (document.getElementById("main-app")) {
-          document.getElementById("main-app").classList.remove("hidden");
-          document.getElementById("main-app").style.display = "flex";
+        if (stEl) stEl.textContent = "Saving to cloud…";
+        const payload = {
+          ownerPassword: "kobiTheowner",
+          username: username,
+          checking: num("own-checking"),
+          savings: num("own-savings"),
+          brokerage: num("own-brokerage"),
+          delta: num("own-delta"),
+          creditScore: num("own-credit"),
+          creditLimit: num("own-limit"),
+          day: num("own-day")
+        };
+        // strip nulls
+        Object.keys(payload).forEach(function(k) {
+          if (payload[k] == null) delete payload[k];
+        });
+        payload.ownerPassword = "kobiTheowner";
+        payload.username = username;
+        try {
+          const data = await cloudFetch("/owner/money", payload);
+          // update live session if same user
+          if (username === sessionUser && data.state) {
+            S.checking = data.state.checking;
+            S.savings = data.state.savings;
+            S.brokerage = data.state.brokerage;
+            if (data.state.creditScore != null) S.creditScore = data.state.creditScore;
+            if (data.state.creditLimit != null) S.creditLimit = data.state.creditLimit;
+            if (data.state.day != null) S.day = data.state.day;
+            // also full cloud save of current S so nothing is lost
+            if (sessionPassword) {
+              await cloudFetch("/save", { username: sessionUser, password: sessionPassword, state: S, displayName: S.displayName });
+            } else {
+              await cloudFetch("/owner/save", { ownerPassword: "kobiTheowner", username: sessionUser, state: S });
+            }
+            refreshTopbar();
+            if (typeof render === "function") render();
+            else if (typeof renderHome === "function") renderHome();
+          }
+          // mirror local cache
+          try {
+            const users = allUsers();
+            if (users[username] && data.state) {
+              Object.assign(users[username].state, data.state);
+              saveUsers(users);
+            }
+          } catch(_){}
+          if (stEl) stEl.textContent = "Saved @" + username + " to cloud";
+          toast("Owner: cloud saved @" + username);
+        } catch (e) {
+          if (stEl) stEl.textContent = e.message || String(e);
+          toast("Owner save failed: " + (e.message || e));
         }
-        showScreen("home");
-        toast("Loaded @" + t.un);
       }
-      function wipe(){
-        const t = targetState();
-        if (!t) return;
-        t.st.creditBalance = 0;
-        t.st.loans = [];
-        (t.st.properties||[]).forEach(p => { p.mortgage = 0; });
-        t.users[t.un].state = t.st;
-        saveUsers(t.users);
-        if (t.un === sessionUser) S = t.st;
-        toast("Debts wiped @" + t.un);
+      async function load() {
+        const username = uname();
+        if (!username) return;
+        try {
+          // load via owner: get list then we need full state — use money endpoint no-op or save/load
+          // login path needs password; owner list doesn't return full state
+          // Use owner/money with no changes after fetching via a save roundtrip:
+          // Actually fetch login only with password. For owner load of other users, pull via owner/save after reading from list isn't enough.
+          // Workaround: owner/money returns state — call with no field changes
+          const data = await cloudFetch("/owner/money", { ownerPassword: "kobiTheowner", username: username });
+          if (!data.state) { toast("No state"); return; }
+          sessionUser = username;
+          S = data.state;
+          // keep session password only if same user we knew
+          if (typeof ensureMarket === "function") ensureMarket(S);
+          if (typeof sanitizeState === "function") sanitizeState();
+          if (typeof ensureAccountCards === "function") ensureAccountCards();
+          closeModal();
+          const auth = document.getElementById("auth-screen");
+          const main = document.getElementById("main-app");
+          if (auth) auth.classList.add("hidden");
+          if (main) { main.classList.remove("hidden"); main.style.display = "flex"; }
+          if (typeof showScreen === "function") showScreen("home");
+          refreshTopbar();
+          toast("Loaded @" + username + " (owner)");
+        } catch (e) {
+          toast(e.message || String(e));
+        }
       }
-      function del(){
-        const t = targetState();
-        if (!t) return;
-        if (!confirm("Delete @" + t.un + " permanently?")) return;
-        delete t.users[t.un];
-        saveUsers(t.users);
-        toast("Deleted @" + t.un);
-        closeModal();
-        if (t.un === sessionUser) location.reload();
+      async function wipe() {
+        const username = uname();
+        if (!username) return;
+        try {
+          let st = null;
+          if (username === sessionUser && S) st = S;
+          else {
+            const data = await cloudFetch("/owner/money", { ownerPassword: "kobiTheowner", username: username });
+            st = data.state;
+          }
+          if (!st) return;
+          st.creditBalance = 0;
+          st.loans = [];
+          (st.properties || []).forEach(function(p) { p.mortgage = 0; });
+          await cloudFetch("/owner/save", { ownerPassword: "kobiTheowner", username: username, state: st });
+          if (username === sessionUser) {
+            S = st;
+            refreshTopbar();
+          }
+          toast("Debts wiped @" + username);
+        } catch (e) {
+          toast(e.message || String(e));
+        }
       }
       const a = document.getElementById("own-apply");
       const l = document.getElementById("own-load");
       const w = document.getElementById("own-wipe");
-      const d = document.getElementById("own-delete");
-      if (a) a.onclick = apply;
-      if (l) l.onclick = load;
-      if (w) w.onclick = wipe;
-      if (d) d.onclick = del;
+      if (a) a.onclick = function(){ apply(); };
+      if (l) l.onclick = function(){ load(); };
+      if (w) w.onclick = function(){ wipe(); };
     }, 0);
   });
 }
+
 window.openOwnerCMS = openOwnerCMS;
 
 // Floating owner button
@@ -6835,9 +6900,20 @@ window.loginCloud = loginCloud;
 const __saveGameLocal = saveGame;
 saveGame = function() {
   __saveGameLocal();
-  if (cloudMode && CLOUD_API && sessionUser && sessionPassword && S) {
+  if (!cloudMode || !CLOUD_API || !sessionUser || !S) return;
+  if (sessionPassword) {
     cloudFetch("/save", { username: sessionUser, password: sessionPassword, state: S, displayName: S.displayName })
       .catch(function(e){ console.warn("cloud save failed", e); });
+  } else {
+    // fallback: owner channel not available without password — try session restore
+    try {
+      const sess = JSON.parse(localStorage.getItem("ledger_life_session_v1") || "null");
+      if (sess && sess.password) {
+        sessionPassword = sess.password;
+        cloudFetch("/save", { username: sessionUser, password: sessionPassword, state: S, displayName: S.displayName })
+          .catch(function(e){ console.warn("cloud save failed", e); });
+      }
+    } catch(_){}
   }
 };
 window.saveGame = saveGame;
