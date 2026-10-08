@@ -6766,9 +6766,9 @@ console.log("[Ledger Life] v3 ok");
 // CLOUD ACCOUNTS + stake fix already applied
 // Set your Worker URL after deploying ledger-life-worker.js
 // ============================================================
-const CLOUD_API = localStorage.getItem("ledger_cloud_api") || "https://ledger-life-worker.kobik8512.workers.dev";
-let sessionPassword = null; // kept in memory for cloud save
-let cloudMode = true; // always use cloud worker
+const CLOUD_API = "https://ledger-life-worker.kobik8512.workers.dev";
+let sessionPassword = null;
+let cloudMode = true;
 
 async function cloudFetch(path, body) {
   if (!CLOUD_API) throw new Error("No cloud API URL set");
@@ -6782,14 +6782,7 @@ async function cloudFetch(path, body) {
   return data;
 }
 
-function setCloudApi(url) {
-  url = String(url || "").trim().replace(/\/$/, "");
-  if (url) localStorage.setItem("ledger_cloud_api", url);
-  else localStorage.removeItem("ledger_cloud_api");
-  cloudMode = !!url;
-  toast(url ? "Cloud API set" : "Cloud API cleared (local only)");
-  return null;
-}
+function setCloudApi(){ toast("Server is fixed"); return null; }
 window.setCloudApi = setCloudApi;
 
 // Wrap register/login/save for cloud
@@ -6911,22 +6904,8 @@ window.saveGame = saveGame;
 })();
 
 // Cloud API field on auth + profile
-(function injectCloudUi(){
-  const auth = document.getElementById("auth-login");
-  if (auth && !document.getElementById("cloud-api-input")) {
-    const box = document.createElement("div");
-    box.style.cssText = "margin-top:12px;padding-top:12px;border-top:1px solid var(--border)";
-    box.innerHTML = '<div class="meta" style="font-size:11px;margin-bottom:6px">Cloud server (optional)</div>' +
-      '<input type="url" id="cloud-api-input" placeholder="https://ledger-life.xxx.workers.dev" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:13px;margin-bottom:8px" value="'+(CLOUD_API||'')+'">' +
-      '<button type="button" class="auth-btn secondary" id="btn-save-cloud-api" style="margin-top:0">Save server URL</button>';
-    auth.appendChild(box);
-    const b = document.getElementById("btn-save-cloud-api");
-    if (b) b.onclick = function(){
-      const v = (document.getElementById("cloud-api-input")||{}).value;
-      setCloudApi(v);
-    };
-  }
-})();
+/* cloud URL hardcoded — no UI */
+
 
 // Extra jobs this update
 [
@@ -6942,12 +6921,7 @@ window.saveGame = saveGame;
 console.log("[Ledger Life] v4 base");
 
 // Final: force cloud URL + real wages + no file transfer
-(function(){
-  const URL = "https://ledger-life-worker.kobik8512.workers.dev";
-  try { localStorage.setItem("ledger_cloud_api", URL); } catch(_){}
-  // redefine const binding via window
-  window.LEDGER_CLOUD_URL = URL;
-})();
+window.LEDGER_CLOUD_URL = "https://ledger-life-worker.kobik8512.workers.dev";
 
 window.exportSave = function(){ toast("Cloud sync is on — no file export needed"); };
 window.exportSaveFull = function(){ toast("Cloud sync is on — no file export needed"); };
@@ -7004,9 +6978,209 @@ if (!window._sideBizTimer) {
   }, 3000);
 }
 
-console.log("[Ledger Life] v5: cloud URL locked, real 24h wages, no file import/export");
+
+console.log("[Ledger Life] v5 ok");
+
+// ============================================================
+// v6 — persistent session (auto-login like Luba) + extras
+// ============================================================
+const SESSION_KEY = "ledger_life_session_v1";
+
+function saveSession(username, password) {
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      username: String(username).trim().toLowerCase(),
+      password: String(password),
+      at: Date.now()
+    }));
+    localStorage.setItem(SAVE_KEY + "_last", String(username).trim().toLowerCase());
+  } catch (_) {}
+}
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s || !s.username || !s.password) return null;
+    return s;
+  } catch (_) { return null; }
+}
+function clearSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch (_) {}
+}
+window.clearSession = clearSession;
+window.saveSession = saveSession;
+
+// Patch cloud register/login to persist session
+const __registerCloudS = registerCloud;
+registerCloud = async function(username, password, displayName) {
+  const data = await __registerCloudS(username, password, displayName);
+  saveSession(username, password);
+  return data;
+};
+window.registerCloud = registerCloud;
+
+const __loginCloudS = loginCloud;
+loginCloud = async function(username, password) {
+  const data = await __loginCloudS(username, password);
+  saveSession(username, password);
+  return data;
+};
+window.loginCloud = loginCloud;
+
+// Local login path also saves session
+const __loginLocalS = login;
+login = function(username, password) {
+  const err = __loginLocalS(username, password);
+  if (!err) {
+    sessionPassword = password;
+    saveSession(username, password);
+  }
+  return err;
+};
+
+// Sign out must clear session
+const __origSignOutHint = true;
+// Hook deleteLife / reload sign out buttons via global
+window.signOutLedger = function() {
+  try { saveGame(); } catch(_){}
+  clearSession();
+  sessionUser = null;
+  sessionPassword = null;
+  S = null;
+  location.reload();
+};
+
+// Replace inline sign-out if present when profile renders
+const __renderProfileSession = renderProfile;
+renderProfile = function() {
+  __renderProfileSession();
+  try {
+    const host = document.getElementById("profile-content");
+    if (!host) return;
+    host.querySelectorAll("button").forEach(function(btn) {
+      const t = (btn.textContent || "").toLowerCase();
+      if (t.indexOf("sign out") >= 0) {
+        btn.onclick = function() {
+          if (confirm("Sign out? You can sign back in anytime.")) window.signOutLedger();
+        };
+      }
+    });
+  } catch(_){}
+};
+window.renderProfile = renderProfile;
+
+// Auto-login on boot
+(function autoLoginBoot() {
+  const sess = loadSession();
+  if (!sess) return;
+  // show brief restoring state on auth screen
+  const auth = document.getElementById("auth-screen");
+  const err = document.getElementById("login-err");
+  if (err) err.textContent = "Restoring session…";
+  (async function() {
+    try {
+      if (cloudMode && CLOUD_API) {
+        await loginCloud(sess.username, sess.password);
+      } else {
+        const e = login(sess.username, sess.password);
+        if (e) throw new Error(e);
+      }
+      if (err) err.textContent = "";
+      enterGame();
+      toast("Welcome back, @" + sess.username);
+    } catch (e) {
+      console.warn("auto-login failed", e);
+      clearSession();
+      if (err) err.textContent = "Session expired — sign in again";
+      const u = document.getElementById("login-user");
+      if (u) u.value = sess.username;
+    }
+  })();
+})();
+
+// ---------- NEW FEATURES ----------
+// Daily login streak (real calendar day)
+function checkDailyStreak() {
+  if (!S) return;
+  const today = new Date().toDateString();
+  if (!S.streak) S.streak = { count: 0, last: null };
+  if (S.streak.last === today) return;
+  const yday = new Date(Date.now() - 86400000).toDateString();
+  if (S.streak.last === yday) S.streak.count += 1;
+  else S.streak.count = 1;
+  S.streak.last = today;
+  // small checking bonus scales with streak, caps
+  const bonus = Math.min(50, 5 * S.streak.count);
+  S.checking = (S.checking || 0) + bonus;
+  S.totalEarned = (S.totalEarned || 0) + bonus;
+  if (typeof addTx === "function") addTx("income", "Daily streak x" + S.streak.count, bonus, "checking");
+  toast("Day " + S.streak.count + " streak · +" + fmt(bonus));
+  saveGame();
+}
+const __enterGameStreak = enterGame;
+enterGame = function() {
+  __enterGameStreak();
+  try { checkDailyStreak(); } catch(_){}
+  try { ensureAccountCards(); } catch(_){}
+};
+
+// Interest on savings — real-time fraction of APY
+function accrueSavingsInterest() {
+  if (!S || !(S.savings > 0)) return;
+  const apy = S.savingsAPY || 0.042;
+  const now = Date.now();
+  if (!S.lastSavingsAt) S.lastSavingsAt = now;
+  const elapsed = now - S.lastSavingsAt;
+  if (elapsed < 5000) return;
+  S.lastSavingsAt = now;
+  // continuous compound approximation
+  const interest = S.savings * (apy / 365.25 / 86400000) * elapsed;
+  if (interest > 0) {
+    S.savings += interest;
+    S.totalEarned = (S.totalEarned || 0) + interest;
+  }
+}
+if (!window._savingsTimer) {
+  window._savingsTimer = setInterval(function() {
+    try { accrueSavingsInterest(); } catch(_){}
+  }, 10000);
+}
+
+// Push a few more entry jobs
+[
+  { id: "cart_attendant", title: "Cart Attendant", company: "FreshMart", salary: 22000, req: {}, tier: 0 },
+  { id: "line_cook_jr", title: "Prep Cook", company: "NightFork", salary: 27000, req: {}, tier: 0 },
+  { id: "package_handler", title: "Package Handler", company: "ShipFast", salary: 29000, req: { strength: 1 }, tier: 1 },
+  { id: "bank_teller", title: "Bank Teller", company: "Hometown Bank", salary: 36000, req: { admin: 1 }, tier: 1 },
+  { id: "junior_pm", title: "Junior PM", company: "SoftPeak", salary: 72000, req: { admin: 2, tech: 1 }, tier: 2 },
+].forEach(function(j) {
+  if (!JOB_TREE.some(function(x) { return x.id === j.id; })) JOB_TREE.push(j);
+});
+
+// Show streak on home if possible
+const __renderHomeStreak = renderHome;
+renderHome = function() {
+  __renderHomeStreak();
+  try {
+    if (!S || !S.streak) return;
+    const home = document.querySelector('.screen[data-screen="home"]');
+    if (!home || home.querySelector("[data-streak]")) return;
+    const el = document.createElement("div");
+    el.setAttribute("data-streak", "1");
+    el.className = "card";
+    el.innerHTML = "<div class=\"card-row\"><div class=\"meta\">Login streak</div><div class=\"val gold\">" +
+      (S.streak.count || 0) + " day" + (S.streak.count === 1 ? "" : "s") + "</div></div>";
+    const first = home.querySelector(".card, .hero");
+    if (first && first.parentNode) first.parentNode.insertBefore(el, first.nextSibling);
+  } catch(_){}
+};
+window.renderHome = renderHome;
+
+console.log("[Ledger Life] v6: auto-login session, streak, savings interest, jobs");
 
 })();
+
 
 
 
