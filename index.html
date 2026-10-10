@@ -2386,15 +2386,29 @@ function renderWork(){
     }
     $("work-job").innerHTML = html;
   } else if (workTab === "skills") {
-    $("work-skills").innerHTML = SKILL_DEFS.map(sk => {
+    try { if (typeof settleTraining === "function") settleTraining(); } catch(_){}
+    const training = S.training;
+    $("work-skills").innerHTML = (training ? `<div class="card" style="border-color:var(--accent)"><div class="name">Training in progress</div>
+      <div class="meta">${esc(training.skillName)} · Lv ${training.from} → ${training.to}</div>
+      <div class="meta">Time left: ${formatTrainLeft(training.endsAt - Date.now())}</div>
+      <div class="meta">Paid ${fmt(training.cost||0)} · level unlocks when the timer finishes</div></div>` : "") +
+    SKILL_DEFS.map(sk => {
       const lvl = S.skills[sk.id]||0;
-      const cost = Math.floor(sk.costBase * Math.pow(1.55, lvl));
-      const pct = (lvl/sk.max)*100;
+      let cost = Math.floor((sk.costBase||200) * Math.pow(1.55, lvl));
+      if (lvl === 0 && sk.id === "physical") cost = 0;
+      const pct = (lvl/(sk.max||10))*100;
+      const maxed = lvl >= (sk.max||10);
+      const busy = !!training;
+      const broke = (S.checking||0) < cost;
+      const mins = Math.min(20 + lvl * 25, 8 * 60);
+      let label = maxed ? "Maxed" : (busy ? "Busy" : (cost === 0 ? "Free · " + mins + "m" : "Train " + fmt(cost,0) + " · " + mins + "m"));
+      const dis = maxed || busy || broke ? "disabled" : "";
       return `<div class="card">
-        <div class="card-row"><div><h3>${esc(sk.name)} · Lv ${lvl}/${sk.max}</h3>
-          <div class="meta">${esc(sk.desc)}</div></div>
-          <button class="btn btn-sm btn-primary" ${lvl>=sk.max?'disabled':''}
-            onclick="const e=trainSkill('${sk.id}');if(e)toast(e);renderWork();saveGame()">Train ${fmt(cost,0)}</button>
+        <div class="card-row"><div><h3>${esc(sk.name)} · Lv ${lvl}/${sk.max||10}</h3>
+          <div class="meta">${esc(sk.desc)}</div>
+          <div class="meta">${maxed ? "Complete" : (broke && !busy ? "Need " + fmt(cost) + " in checking" : "Study time ~" + mins + " min real time")}</div></div>
+          <button class="btn btn-sm btn-primary" ${dis}
+            onclick="const e=trainSkill('${sk.id}');if(e)toast(e);renderWork();saveGame()">${label}</button>
         </div>
         <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
       </div>`;
@@ -6588,6 +6602,7 @@ function pushCandleTick(){
 const __gameTickMega = gameTick;
 gameTick = function(){
   __gameTickMega();
+  try { if (typeof settleTraining === "function") settleTraining(); } catch(_){}
   if (S && S.tick % 2 === 0) pushCandleTick();
   if (S && investTab === "charts" && S.tick % 3 === 0) {
     try {
@@ -7753,35 +7768,86 @@ console.log("[Ledger Life] v6 ok");
 
 // Career tokens spend: 1 token = 10% off next skill train (stack max 5 = 50% off)
 window.useCareerTokensOnTrain = true;
-const __trainSkillTok = typeof trainSkill === "function" ? trainSkill : null;
-if (__trainSkillTok) {
-  trainSkill = function(skillId) {
-    const def = SKILL_DEFS.find(s => s.id === skillId);
-    if (!def) return "Unknown skill";
-    const level = S.skills[skillId] || 0;
-    if (level >= def.max) return "Already maxed";
-    let cost = Math.floor(def.costBase * Math.pow(1.55, level));
-    let used = 0;
-    if (S.careerTokens > 0) {
-      used = Math.min(5, S.careerTokens);
-      cost = Math.floor(cost * (1 - used * 0.1));
-    }
-    if (S.checking < cost) return "Need " + fmt(cost) + " in checking";
-    S.checking -= cost;
-    S.skills[skillId] = level + 1;
-    S.educationSpent = (S.educationSpent || 0) + cost;
-    if (used > 0) {
-      S.careerTokens -= used;
-      toast("Trained " + def.name + " · " + used + " token" + (used > 1 ? "s" : "") + " applied (−" + (used * 10) + "%)");
-    } else {
-      toast(def.name + " → level " + (level + 1));
-    }
-    if (typeof addTx === "function") addTx("education", "Train " + def.name, -cost, "checking");
-    saveGame();
-    return null;
-  };
-  window.trainSkill = trainSkill;
+// Skill training: must afford cost + real-time study (not instant)
+function formatTrainLeft(ms) {
+  ms = Math.max(0, ms);
+  const s = Math.ceil(ms / 1000);
+  if (s < 60) return s + "s";
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + "m " + (s % 60) + "s";
+  const h = Math.floor(m / 60);
+  return h + "h " + (m % 60) + "m";
 }
+function trainDurationMs(level) {
+  // Level 0→1: 20 min, then +25 min per level (real wall-clock)
+  // Cap 8 hours so high levels still finish in a day
+  const mins = Math.min(20 + level * 25, 8 * 60);
+  return mins * 60 * 1000;
+}
+function trainSkillCost(def, level) {
+  let cost = Math.floor((def.costBase || 200) * Math.pow(1.55, level));
+  // First level of basic physical only: free tuition, still takes time
+  if (level === 0 && def.id === "physical") cost = 0;
+  let used = 0;
+  if ((S.careerTokens || 0) > 0) {
+    used = Math.min(5, S.careerTokens);
+    cost = Math.floor(cost * (1 - used * 0.1));
+  }
+  return { cost: Math.max(0, cost), tokensUsed: used };
+}
+function settleTraining() {
+  if (!S || !S.training) return;
+  if (Date.now() < S.training.endsAt) return;
+  const t = S.training;
+  S.skills[t.skillId] = t.to;
+  S.training = null;
+  toast(t.skillName + " → level " + t.to + " (training complete)");
+  if (typeof saveGame === "function") saveGame();
+}
+trainSkill = function(skillId) {
+  if (!S) return "Not signed in";
+  settleTraining();
+  const def = SKILL_DEFS.find(s => s.id === skillId);
+  if (!def) return "Unknown skill";
+  const level = S.skills[skillId] || 0;
+  if (level >= (def.max || 10)) return "Already maxed";
+  if (S.training) {
+    const left = formatTrainLeft(S.training.endsAt - Date.now());
+    return "Still training " + S.training.skillName + " (" + left + " left)";
+  }
+  const { cost, tokensUsed } = trainSkillCost(def, level);
+  const bal = Number(S.checking) || 0;
+  if (bal < cost) return "Need " + fmt(cost) + " in checking (you have " + fmt(bal) + ")";
+  // charge first, then start timer — skill does NOT increase until done
+  S.checking = bal - cost;
+  if (S.checking < 0) S.checking = 0; // never go negative from train
+  // re-check edge case
+  if (cost > 0 && bal < cost) {
+    S.checking = bal;
+    return "Need " + fmt(cost) + " in checking";
+  }
+  S.educationSpent = (S.educationSpent || 0) + cost;
+  if (tokensUsed > 0) S.careerTokens = Math.max(0, (S.careerTokens || 0) - tokensUsed);
+  const ms = trainDurationMs(level);
+  S.training = {
+    skillId: skillId,
+    skillName: def.name,
+    from: level,
+    to: level + 1,
+    startedAt: Date.now(),
+    endsAt: Date.now() + ms,
+    cost: cost
+  };
+  if (typeof addTx === "function") {
+    addTx("education", "Train " + def.name + " (in progress)", cost ? -cost : 0, "checking");
+  }
+  toast(def.name + " training started · " + formatTrainLeft(ms) + (cost ? "" : " · free intro lesson"));
+  saveGame();
+  return null;
+};
+window.trainSkill = trainSkill;
+window.settleTraining = settleTraining;
+window.formatTrainLeft = formatTrainLeft;
 
 // Show career tokens on streak card
 const __renderHomeTok = renderHome;
