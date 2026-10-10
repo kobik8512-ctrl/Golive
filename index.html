@@ -332,10 +332,36 @@ h3 .v-badge {
 
 
 /* Luba AI */
-#luba-root { display:flex; flex-direction:column; height:100%; min-height:0; }
+#screen-luba {
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  /* keep space above bottom nav (nav is position:absolute) */
+  padding: 0 0 calc(64px + env(safe-area-inset-bottom)) 0 !important;
+}
+#screen-luba.hidden, #screen-luba:not(.active) {
+  display: none !important;
+}
+#luba-root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
 .luba-head {
-  padding: 12px 16px; border-bottom: 1px solid var(--border);
-  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  flex-shrink: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--bg);
+  z-index: 5;
 }
 .luba-head .id { display:flex; align-items:center; gap:10px; min-width:0; }
 .luba-head .avatar {
@@ -354,7 +380,14 @@ h3 .v-badge {
   white-space:nowrap;
 }
 .luba-msgs {
-  flex:1; overflow-y:auto; padding:14px 16px 12px; display:flex; flex-direction:column; gap:10px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 .luba-bubble {
   max-width:88%; padding:10px 12px; border-radius:14px; font-size:14px; line-height:1.45;
@@ -369,9 +402,14 @@ h3 .v-badge {
   border-bottom-right-radius:4px;
 }
 .luba-compose {
-  padding:10px 12px max(10px, env(safe-area-inset-bottom));
-  border-top:1px solid var(--border); display:flex; gap:8px; align-items:flex-end;
+  flex-shrink: 0;
+  padding: 10px 12px max(10px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
   background: var(--bg);
+  z-index: 5;
 }
 .luba-compose textarea {
   flex:1; min-height:42px; max-height:110px; resize:none;
@@ -1785,12 +1823,19 @@ function refreshTopbar(){
 function renderScreen(name){
   if (!S) return;
   refreshTopbar();
+  try {
+    const sc = document.getElementById("screens");
+    if (sc && name !== "luba") sc.style.overflow = "";
+  } catch(_){}
   if (name === "home") renderHome();
   else if (name === "bank") renderBank();
   else if (name === "invest") renderInvest();
   else if (name === "work") renderWork();
   else if (name === "life") renderLife();
-  else if (name === "luba") renderLuba();
+  else if (name === "luba") {
+    try { const sc = document.getElementById("screens"); if (sc) sc.style.overflow = "hidden"; } catch(_){}
+    renderLuba();
+  }
   else if (name === "profile") renderProfile();
 }
 
@@ -6474,7 +6519,7 @@ const CANDLE_THEMES = {
   mono: { up:"#e8eaed", down:"#5c6370", bg:"#12141a", grid:"#2a2e3a", wick:"#8b92a5" },
   gold: { up:"#ffc107", down:"#ff6f00", bg:"#120e08", grid:"#2a2218", wick:"#c9a227" },
 };
-let candleState = { symbol:"AAPL", kind:"stock", tf:"1D", theme:"classic", limit:60, stake:25 };
+let candleState = { symbol:"AAPL", kind:"stock", tf:"10s", theme:"classic", limit:60, stake:25 };
 
 function ensureCandles(sym, kind){
   kind = kind || "stock";
@@ -6513,7 +6558,7 @@ function pushCandleTick(){
     const last = asset.candles[asset.candles.length-1];
     const vol = (asset.vol || 0.02) * (pick.k==="crypto"?1.8:1);
     // continue or new candle based on tf simulation: every few ticks new candle
-    const newBar = (S.tick % (candleState.tf === "1H" ? 2 : candleState.tf === "4H" ? 5 : 10) === 0);
+    const newBar = (S.tick % (["3s","5s","10s","15s"].indexOf(candleState.tf)>=0 ? 1 : candleState.tf==="30s" ? 2 : candleState.tf==="60s" ? 3 : 5) === 0);
     if (newBar || !last) {
       const o = asset.price;
       const ch = o * rnd(-vol, vol);
@@ -6545,7 +6590,11 @@ gameTick = function(){
   __gameTickMega();
   if (S && S.tick % 2 === 0) pushCandleTick();
   if (S && investTab === "charts" && S.tick % 3 === 0) {
-    try { renderCandlePanel(); } catch(_){}
+    try {
+      if (typeof softUpdateCandlePanel === "function") softUpdateCandlePanel();
+      else if (document.activeElement && document.activeElement.id === "c-amt") { /* don't wipe stake */ }
+      else renderCandlePanel();
+    } catch(_){}
   }
 };
 
@@ -6601,7 +6650,7 @@ function renderCandlePanel(){
     '<button type="button" class="chip '+(kind==='crypto'?'on':'')+'" data-k="crypto">Crypto</button>' +
     '</div>' +
     '<div class="candle-toolbar">' +
-    ['1H','4H','1D'].map(tf => '<button type="button" class="chip '+(candleState.tf===tf?'on':'')+'" data-tf="'+tf+'">'+tf+'</button>').join('') +
+    ['3s','5s','10s','15s','30s','60s','30m','1h','24h'].map(tf => '<button type="button" class="chip '+(candleState.tf===tf?'on':'')+'" data-tf="'+tf+'">'+tf+'</button>').join('') +
     '</div>' +
     '<div class="candle-toolbar">' +
     Object.keys(CANDLE_THEMES).map(t => '<button type="button" class="chip '+(candleState.theme===t?'on':'')+'" data-theme="'+t+'">'+t+'</button>').join('') +
@@ -6902,9 +6951,9 @@ function placeTimedTrade(side){
   const stake = Number(candleState.stake || (amtEl && amtEl.value));
   if (!(stake > 0)) return "Enter order size";
   if ((S.checking||0) < stake) return "Need " + fmt(stake) + " in checking";
-  const durSec = { "1H": 60, "4H": 180, "1D": 300, "30S": 30, "5M": 300, "15M": 900 }[candleState.tf] || 60;
+  const durSec = { "3s": 3, "5s": 5, "10s": 10, "15s": 15, "30s": 30, "60s": 60, "30m": 1800, "1h": 3600, "24h": 86400 }[candleState.tf] || 10;
   // Map UI tf to real-seconds duration for the timed trade
-  const tfDur = { "1H": 60, "4H": 120, "1D": 180 };
+  const tfDur = { "3s": 3, "5s": 5, "10s": 10, "15s": 15, "30s": 30, "60s": 60, "30m": 1800, "1h": 3600, "24h": 86400 };
   const seconds = tfDur[candleState.tf] || 60;
   const book = candleState.kind === "crypto" ? S.cryptos : S.stocks;
   const asset = book && book[candleState.symbol];
@@ -6970,9 +7019,18 @@ renderCandleSVG = function(candles, themeName){
     '<svg class="candle-chart" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" style="background:'+th.bg+';display:block;min-width:100%">'+body+'</svg></div>';
 };
 
-renderCandlePanel = function(){
+renderCandlePanel = function(force){
   const host = $("invest-charts");
   if (!host || !S) return;
+  // Never rebuild whole panel while user is typing a custom stake
+  const focused = document.activeElement && document.activeElement.id === "c-amt";
+  if (focused && !force) {
+    try { if (typeof softUpdateCandlePanel === "function") softUpdateCandlePanel(); } catch(_){}
+    return;
+  }
+  // preserve typed stake before wipe
+  const prevAmt = document.getElementById("c-amt");
+  if (prevAmt && prevAmt.value !== "") candleState.stake = Number(prevAmt.value) || candleState.stake;
   ensureCandles(candleState.symbol, candleState.kind);
   const sym = candleState.symbol;
   const kind = candleState.kind;
@@ -6998,8 +7056,8 @@ renderCandlePanel = function(){
     '<button type="button" class="chip '+(kind==='stock'?'on':'')+'" data-k="stock">Stocks</button>' +
     '<button type="button" class="chip '+(kind==='crypto'?'on':'')+'" data-k="crypto">Crypto</button></div>' +
     '<div class="candle-toolbar">' +
-    [['1H','60s'],['4H','2m'],['1D','3m']].map(function(x){
-      return '<button type="button" class="chip '+(candleState.tf===x[0]?'on':'')+'" data-tf="'+x[0]+'">'+x[0]+' · '+x[1]+'</button>';
+    [['3s','3 sec'],['5s','5 sec'],['10s','10 sec'],['15s','15 sec'],['30s','30 sec'],['60s','1 min'],['30m','30 min'],['1h','1 hour'],['24h','24 hours']].map(function(x){
+      return '<button type="button" class="chip '+(candleState.tf===x[0]?'on':'')+'" data-tf="'+x[0]+'">'+x[1]+'</button>';
     }).join('') + '</div>' +
     '<div class="candle-toolbar">' +
     Object.keys(CANDLE_THEMES).map(t => '<button type="button" class="chip '+(candleState.theme===t?'on':'')+'" data-theme="'+t+'">'+t+'</button>').join('') +
@@ -7009,7 +7067,7 @@ renderCandlePanel = function(){
     (asset ? renderCandleSVG(asset.candles, candleState.theme) : '<div class="empty-state">No data</div>') +
     '<div class="meta mt-8">Checking ' + fmt(S.checking||0) + ' · scroll chart for history</div>' +
     '<label>Stake</label>' +
-    '<input type="number" id="c-amt" value="' + (candleState.stake || 25) + '" min="1" step="1">' +
+    '<input type="number" id="c-amt" value="' + (candleState.stake || 25) + '" min="1" step="any" inputmode="decimal" style="font-size:16px">' +
     '<div class="btn-row mt-8" style="gap:6px;flex-wrap:wrap">' +
     '<button class="btn btn-secondary btn-sm" type="button" data-stake="10">10</button>' +
     '<button class="btn btn-secondary btn-sm" type="button" data-stake="25">25</button>' +
@@ -8180,19 +8238,40 @@ function lubaStarSvg() {
   return '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l2.2 4.5 5 .7-3.6 3.5.9 5.1L12 14.8 7.5 16.8l.9-5.1L4.8 8.2l5-.7L12 3z"/></svg>';
 }
 
-function lubaSystemPrompt() {
+function lubaSystemPrompt(userText) {
   const name = (S && (S.displayName || S.username)) || sessionUser || "user";
   const ver = S && S.verified ? " Verified member." : "";
-  return (
-    "You are Luba AI inside Ledger Life, a finance life app. " +
-    "You help with investing, banking, jobs/careers, credit, taxes basics, money management, and related legal/finance context in plain language. " +
-    "You MAY answer normal greetings and small talk briefly (hi, hello, hey, how are you) then offer to help with money topics. " +
-    "If asked something totally unrelated (coding games, random trivia, etc.), politely say you focus on finance in Ledger Life and invite a money-related question. " +
-    "You are talking to \"" + name + "\"." + ver + " " +
-    "Be clear and practical. This is a simulation app — not licensed financial or legal advice. " +
-    "When useful, refer to in-app places: Bank, Invest, Work, Pay someone. Keep answers concise unless they ask for detail."
-  );
+  const t = String(userText || "").toLowerCase();
+  const wantsCode = /\b(html|css|javascript|js|code|script|game|app|program|build|create|make|write|fix|bug|feature|function|class|canvas|react)\b/.test(t);
+  const wantsTrade = /\b(buy|sell|long|short|chart|candle|trade|entry|aapl|stock|crypto|price)\b/.test(t);
+  let base =
+    "You are Luba AI inside Ledger Life. Primary focus: investing, banking, jobs, credit, taxes, money management.\n" +
+    "Talking to \"" + name + "\"." + ver + "\n" +
+    "Not licensed financial advice. Ledger Life markets are a SIMULATION.\n\n";
+
+  base +=
+    "TRADE / CHART ANALYSIS RULES (critical):\n" +
+    "- NEVER give a single definitive 'BUY' or 'SELL' as if it is certain. Short timed trades are near-random noise.\n" +
+    "- Always present BOTH sides (bull case and bear case) with probabilities in plain language (e.g. lean 55/45, not 'definitely sell').\n" +
+    "- After a steep spike, say mean-reversion AND momentum are both possible; do not push one as the answer.\n" +
+    "- Explicitly warn that 5s–60s timed trades are high-variance speculation, not investing.\n" +
+    "- Prefer risk framing: stake size, when NOT to trade, waiting for structure (range, retest) vs chasing candles.\n" +
+    "- If user pastes/shows a chart photo: describe what you see, list scenarios, then say 'I cannot predict the next candle; any call can lose.'\n" +
+    "- Never sound responsible for their PnL. End trade takes with: simulation only, size small, no certainty.\n" +
+    "- Do not use heavy markdown bold spam; keep clear short paragraphs.\n\n";
+
+  if (wantsCode) {
+    base +=
+      "CODE MODE: Complete working code, no TODO stubs. Single-file HTML when asked for games/apps. Continue same file if truncated.\n";
+  }
+  if (wantsTrade) {
+    base +=
+      "User is asking about a trade/chart now — apply TRADE rules strictly. Refuse certainty.\n";
+  }
+  base += "Greetings are fine. Off-topic non-finance non-code: briefly redirect to money/Ledger topics.\n";
+  return base;
 }
+
 
 function buyLubaCoins(packIndex) {
   ensureLubaState();
@@ -8254,8 +8333,8 @@ function renderLuba() {
     return;
   }
 
-  // Chat shell — only rebuild if structure missing (keeps typing focus)
-  if (!root.querySelector("#luba-input")) {
+  // Chat shell — rebuild if input missing (compose must always show)
+  if (!root.querySelector("#luba-input") || !root.querySelector(".luba-compose")) {
     root.innerHTML =
       '<div class="luba-head"><div class="id"><div class="avatar">' + lubaStarSvg() + '</div>' +
       '<div class="titles"><div class="n">Luba AI <span class="meta" style="font-weight:600;font-size:12px">Finance</span></div>' +
@@ -8320,7 +8399,15 @@ async function sendLubaMessage() {
     return;
   }
 
-  S.luba.coins -= 1;
+  const heavy = /(html|css|javascript|js|code|script|game|app|program|build|create|make|write|fix|5k|5000|lines)/i.test(text || "") || !!img;
+  const cost = heavy ? 2 : 1;
+  if ((S.luba.coins || 0) < cost) {
+    S.luba.messages.push({ role: "bot", text: "Not enough coins (need " + cost + "). Buy more or wait for the 24h refresh.", at: Date.now() });
+    saveGame();
+    lubaRenderMessagesOnly();
+    return;
+  }
+  S.luba.coins -= cost;
   S.luba.messages.push({ role: "me", text: text || "(photo)", image: img || null, at: Date.now() });
   if (input) input.value = "";
   lubaPendingImage = null;
@@ -8356,49 +8443,95 @@ async function sendLubaMessage() {
       } catch(_){}
     }
 
-    const payload = {
-      contents: contents,
-      systemInstruction: { parts: [{ text: lubaSystemPrompt() }] },
-      generationConfig: { temperature: 0.55, maxOutputTokens: 1024 }
-    };
-
+    const wantsCode = /\b(html|css|javascript|js|code|script|game|app|program|build|create|make|write|fix|bug|feature|canvas|react|5k|5000|lines)\b/i.test(text || "");
+    const maxOut = wantsCode ? 8192 : 2048;
+    const maxContinues = wantsCode ? 10 : 2;
     const modelChain = [
       "gemini-3.8-flash",
       "gemini-3.5-flash",
-      "gemini-3.1-flash-lite",
-      "gemini-3.5-flash-lite",
       "gemini-3.6-flash",
       "gemini-3.7-flash",
+      "gemini-3.1-flash-lite",
+      "gemini-3.5-flash-lite",
       "gemini-2.5-flash-lite",
       "gemini-2.5-flash"
     ];
-    let data = null;
+
+    let accumulated = "";
     let lastErr = "";
-    for (let mi = 0; mi < modelChain.length; mi++) {
-      const res = await fetch(LUBA_WORKER, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: modelChain[mi],
-          payload: payload,
-          username: sessionUser || (S && S.username) || ""
-        })
-      });
-      data = await res.json().catch(function() { return {}; });
-      if (data && !data.error && data.candidates) break;
-      const msg = (data && data.error && (data.error.message || data.error)) || ("HTTP " + res.status);
-      lastErr = String(msg);
-      if (/not found|no longer available|not available|invalid model/i.test(lastErr)) continue;
-      if (/high demand|overloaded|429|503|quota|rate limit/i.test(lastErr)) continue;
+    let modelIndex = 0;
+    let continueCount = 0;
+    let guard = 0;
+    const workContents = contents.slice();
+
+    while (guard < 16) {
+      guard++;
+      const payload = {
+        contents: workContents,
+        systemInstruction: { parts: [{ text: lubaSystemPrompt(text) }] },
+        generationConfig: {
+          temperature: wantsCode ? 0.35 : 0.55,
+          maxOutputTokens: maxOut
+        }
+      };
+      let data = null;
+      let gotModel = false;
+      for (; modelIndex < modelChain.length; modelIndex++) {
+        try {
+          const res = await fetch(LUBA_WORKER, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: modelChain[modelIndex],
+              payload: payload,
+              username: sessionUser || (S && S.username) || ""
+            })
+          });
+          data = await res.json().catch(function() { return {}; });
+          if (data && !data.error && data.candidates && data.candidates[0]) {
+            gotModel = true;
+            break;
+          }
+          const msg = (data && data.error && (data.error.message || data.error)) || ("HTTP " + res.status);
+          lastErr = String(msg);
+          if (/not found|no longer available|not available|invalid model/i.test(lastErr)) continue;
+          if (/high demand|overloaded|429|503|quota|rate limit/i.test(lastErr)) continue;
+          break;
+        } catch (fe) {
+          lastErr = fe.message || String(fe);
+          continue;
+        }
+      }
+      if (!gotModel || !data) {
+        if (!accumulated) accumulated = lastErr || "Luba is busy. Try again.";
+        break;
+      }
+      const candidate = data.candidates[0];
+      const parts = candidate.content && candidate.content.parts;
+      if (!parts || !parts.length) {
+        if (!accumulated) accumulated = "Empty reply — try again.";
+        break;
+      }
+      const chunk = parts.map(function(p) { return p.text || ""; }).join("");
+      accumulated += chunk;
+      const wasCut = candidate.finishReason === "MAX_TOKENS";
+      if (wasCut && continueCount < maxContinues) {
+        continueCount++;
+        workContents.push({ role: "model", parts: parts });
+        workContents.push({
+          role: "user",
+          parts: [{ text: "Continue EXACTLY where you left off. Do not repeat prior text. Do not say 'continuing'. If writing code, keep implementing the same project until it is complete and robust." }]
+        });
+        // soft status
+        if (sendBtn) sendBtn.textContent = "…" + (continueCount + 1);
+        lubaRenderMessagesOnly();
+        continue;
+      }
       break;
     }
-    let reply = "";
-    if (!data || data.error) {
-      reply = lastErr || "Luba is busy. Try again.";
-    } else {
-      const parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
-      reply = parts ? parts.map(function(p) { return p.text || ""; }).join("") : "";
-      if (!reply) reply = "Empty reply — try again.";
+    let reply = accumulated || lastErr || "Empty reply — try again.";
+    if (wantsCode && continueCount > 0) {
+      reply += "\n\n— (auto-continued " + continueCount + "× for length) —";
     }
     S.luba.messages.push({ role: "bot", text: reply, at: Date.now() });
     if (S.luba.messages.length > 100) S.luba.messages = S.luba.messages.slice(-100);
