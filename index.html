@@ -2706,7 +2706,7 @@ function enterGame(){
   $("auth-screen").classList.add("hidden");
   $("main-app").classList.remove("hidden");
   $("main-app").style.display = "flex";
-  showScreen("home");
+  if (!tryOpenLubaBuyShop()) showScreen("home");
   if (!window._ledgerTimer) {
     window._ledgerTimer = setInterval(gameTick, TICK_MS);
   }
@@ -7681,6 +7681,41 @@ renderProfile = function() {
   } catch(_){}
 };
 window.renderProfile = renderProfile;
+
+
+// Deep link: ?lubaBuy=1 or #luba-buy → open Luba AI coin shop after login
+// Public app: https://ledger-life-ashen.vercel.app/
+// Buy-coins entry (from Luba out-of-messages): https://kobik8512-ctrl.github.io/Golive/?lubaBuy=1
+function consumeLubaBuyDeepLink() {
+  try {
+    const q = new URLSearchParams(location.search || "");
+    const hash = (location.hash || "").replace(/^#/, "");
+    if (q.get("lubaBuy") === "1" || hash === "luba-buy") {
+      sessionStorage.setItem("pendingLubaBuy", "1");
+      try {
+        const clean = location.pathname + (location.search ? location.search.replace(/[?&]lubaBuy=1/, "").replace(/^\?$/, "").replace(/\?&/, "?").replace(/\?$/, "") : "");
+        history.replaceState({}, "", clean || location.pathname);
+      } catch (_) {}
+    }
+  } catch (_) {}
+}
+function tryOpenLubaBuyShop() {
+  try {
+    if (sessionStorage.getItem("pendingLubaBuy") !== "1") return false;
+    if (!S || !sessionUser) return false;
+    sessionStorage.removeItem("pendingLubaBuy");
+    if (typeof lubaView !== "undefined") lubaView = "buy";
+    if (typeof showScreen === "function") showScreen("luba");
+    else if (typeof renderLuba === "function") renderLuba();
+    if (typeof toast === "function") toast("Luba coins — pay from checking");
+    return true;
+  } catch (_) { return false; }
+}
+window.tryOpenLubaBuyShop = tryOpenLubaBuyShop;
+window.consumeLubaBuyDeepLink = consumeLubaBuyDeepLink;
+consumeLubaBuyDeepLink();
+setTimeout(function(){ try { tryOpenLubaBuyShop(); } catch(_){} }, 800);
+setTimeout(function(){ try { tryOpenLubaBuyShop(); } catch(_){} }, 2000);
 
 // Auto-login on boot
 (function autoLoginBoot() {
