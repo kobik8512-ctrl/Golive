@@ -7011,27 +7011,41 @@ function settleTimedOrders(){
   if (!S || !S.timedTrades) return;
   const now = Date.now();
   const left = [];
+  let changed = false;
   S.timedTrades.forEach(tr => {
     if (now < tr.expiresAt) { left.push(tr); return; }
+    changed = true;
     const book = tr.kind === "crypto" ? S.cryptos : S.stocks;
     const asset = book && book[tr.symbol];
-    const exit = asset ? asset.price : tr.entry;
-    const up = exit >= tr.entry;
+    const exit = asset ? Number(asset.price) : Number(tr.entry);
+    const entry = Number(tr.entry);
+    const stake = Number(tr.stake) || 0;
+    const up = exit >= entry;
     const win = (tr.side === "buy" && up) || (tr.side === "sell" && !up);
-    // payout 85% profit on win, lose stake on loss
-    let payout = 0;
+    // Ensure stake was held: if open failed to deduct, deduct now before resolve
+    if (!tr.deducted && stake > 0) {
+      S.checking = Number(S.checking || 0) - stake;
+      tr.deducted = true;
+    }
     if (win) {
-      payout = Math.round(tr.stake * 1.85 * 100) / 100; // full return (stake + profit)
-      const profit = Math.round((payout - tr.stake) * 100) / 100;
-      S.checking = (S.checking||0) + payout;
-      if (typeof addTx === "function") addTx("invest", "Timed "+tr.side.toUpperCase()+" WIN "+tr.symbol+" (+"+profit+")", payout, "checking");
-      toast("WIN " + fmt(payout) + " back · profit " + fmt(profit) + " · " + tr.symbol);
+      // Return stake + profit (1.85× total)
+      const payout = stake * 1.85;
+      const profit = payout - stake;
+      S.checking = Number(S.checking || 0) + payout;
+      if (typeof addTx === "function") addTx("invest", "Timed "+tr.side.toUpperCase()+" WIN "+tr.symbol, payout, "checking");
+      toast("WIN +" + fmt(profit) + " profit · " + fmt(payout) + " back · " + tr.symbol);
     } else {
-      if (typeof addTx === "function") addTx("invest", "Timed "+tr.side.toUpperCase()+" LOSS "+tr.symbol, -tr.stake, "checking");
-      toast("LOSS −" + fmt(tr.stake) + " · " + tr.symbol);
+      // Stake stays gone — real loss
+      if (typeof addTx === "function") addTx("invest", "Timed "+tr.side.toUpperCase()+" LOSS "+tr.symbol, -stake, "checking");
+      toast("LOSS −" + fmt(stake) + " · " + tr.symbol);
     }
   });
   S.timedTrades = left;
+  if (changed) {
+    try { if (typeof saveGame === "function") saveGame(); } catch(_){}
+    try { if (typeof refreshTopbar === "function") refreshTopbar(); } catch(_){}
+    try { if (typeof renderHome === "function" && document.querySelector('.screen[data-screen="home"]:not(.hidden)')) renderHome(); } catch(_){}
+  }
 }
 
 function placeTimedTrade(side){
@@ -7039,9 +7053,10 @@ function placeTimedTrade(side){
   const amtEl = document.getElementById("c-amt");
   if (amtEl && amtEl.value) candleState.stake = Number(amtEl.value);
   const stake = Number(candleState.stake || (amtEl && amtEl.value));
-  if (!(stake > 0)) return "Enter order size";
+  if (!(stake > 0) || !Number.isFinite(stake)) return "Enter order size";
   if (stake < MIN_TRADE_STAKE) return "Minimum stake is " + fmt(MIN_TRADE_STAKE);
-  if ((S.checking||0) < stake) return "Need " + fmt(stake) + " in checking";
+  const bal = Number(S.checking || 0);
+  if (bal < stake) return "Need " + fmt(stake) + " in checking (you have " + fmt(bal) + ")";
   const durSec = { "3s": 3, "5s": 5, "10s": 10, "15s": 15, "30s": 30, "60s": 60, "30m": 1800, "1h": 3600, "24h": 86400 }[candleState.tf] || 10;
   // Map UI tf to real-seconds duration for the timed trade
   const tfDur = { "3s": 3, "5s": 5, "10s": 10, "15s": 15, "30s": 30, "60s": 60, "30m": 1800, "1h": 3600, "24h": 86400 };
@@ -7049,22 +7064,25 @@ function placeTimedTrade(side){
   const book = candleState.kind === "crypto" ? S.cryptos : S.stocks;
   const asset = book && book[candleState.symbol];
   if (!asset) return "Unknown symbol";
-  S.checking -= stake;
-  if (typeof addTx === "function") addTx("invest", "Timed "+side.toUpperCase()+" "+candleState.symbol, -stake, "checking");
+  // Lock stake immediately — win/loss must move real balance
+  S.checking = Number(S.checking || 0) - stake;
+  if (typeof addTx === "function") addTx("invest", "Timed "+side.toUpperCase()+" "+candleState.symbol+" (open)", -stake, "checking");
   if (!S.timedTrades) S.timedTrades = [];
   S.timedTrades.push({
-    id: uid(),
+    id: (typeof uid === "function" ? uid() : String(Date.now())),
     symbol: candleState.symbol,
     kind: candleState.kind,
-    side: side, // buy = call (win if up), sell = put (win if down)
+    side: side,
     stake: stake,
-    entry: asset.price,
+    entry: Number(asset.price),
     openedAt: Date.now(),
     expiresAt: Date.now() + seconds * 1000,
-    seconds: seconds
+    seconds: seconds,
+    deducted: true
   });
   saveGame();
-  toast(side.toUpperCase() + " " + fmt(stake) + " · closes in " + seconds + "s");
+  try { if (typeof refreshTopbar === "function") refreshTopbar(); } catch(_){}
+  toast(side.toUpperCase() + " −" + fmt(stake) + " locked · closes in " + seconds + "s");
   return null;
 }
 window.placeTimedTrade = placeTimedTrade;
@@ -7139,7 +7157,7 @@ renderCandlePanel = function(force){
   });
   host.innerHTML =
     '<div class="card"><h3>Live chart · timed trades</h3>' +
-    '<div class="meta mb-8">Pick duration, stake from checking (min $5). BUY wins if price rises at close; SELL wins if price falls. Payout 1.85× on win.</div>' +
+    '<div class="meta mb-8">Pick duration, stake from checking (min $5). Stake is locked on open. WIN returns 1.85×; LOSS keeps the stake gone.</div>' +
     '<div class="candle-toolbar">' +
     '<select id="c-sym" style="flex:1;min-width:90px;padding:8px;border-radius:8px;background:var(--card);color:var(--text);border:1px solid var(--border)">' +
     symbols.map(s => '<option value="'+s+'"'+(s===sym?' selected':'')+'>'+s+'</option>').join('') +
