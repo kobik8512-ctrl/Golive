@@ -8408,19 +8408,87 @@ function lubaSystemPrompt(userText) {
 }
 
 
+const LUBA_REAL_WORKER = "https://luba-ai-proxy.kobik8512.workers.dev";
+const LUBA_OWNER_PASS = "kobiTheowner"; // same as Luba owner cmds — grants message packs
+
+async function grantRealLubaMessages(username, amount) {
+  username = String(username || "").trim().replace(/^@/, "");
+  if (!username) return { ok: false, error: "Enter Luba username" };
+  amount = Math.floor(Number(amount) || 0);
+  if (amount < 1) return { ok: false, error: "Invalid amount" };
+  try {
+    const res = await fetch(LUBA_REAL_WORKER, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "owner_set_coins",
+        ownerPassword: LUBA_OWNER_PASS,
+        username: username,
+        mode: "add",
+        amount: amount
+      })
+    });
+    const data = await res.json().catch(function() { return null; });
+    if (!data || data.ok === false) {
+      return { ok: false, error: (data && (data.error || data.message)) || ("HTTP " + res.status) };
+    }
+    return { ok: true, left: data.left, limit: data.limit, data: data };
+  } catch (e) {
+    return { ok: false, error: e.message || String(e) };
+  }
+}
+
 function buyLubaCoins(packIndex) {
+  // sync path kept for safety — prefer buyLubaCoinsAsync
   ensureLubaState();
   const pack = LUBA_PACKS[packIndex];
   if (!pack) return "Invalid pack";
   if ((S.checking || 0) < pack.price) return "Not enough checking (" + fmt(pack.price) + " required)";
-  if (!confirm("Pay " + fmt(pack.price) + " from checking for " + pack.coins + " Luba coins?")) return "Cancelled";
+  if (!confirm("Pay " + fmt(pack.price) + " from checking for " + pack.coins + " Ledger Luba coins?")) return "Cancelled";
   S.checking -= pack.price;
   S.luba.coins = (S.luba.coins || 0) + pack.coins;
-  if (typeof addTx === "function") addTx("purchase", "Luba AI coins ×" + pack.coins, -pack.price, "checking");
+  if (typeof addTx === "function") addTx("purchase", "Ledger Luba coins ×" + pack.coins, -pack.price, "checking");
   saveGame();
-  toast("+" + pack.coins + " coins");
+  toast("+" + pack.coins + " Ledger Luba coins");
   return null;
 }
+
+async function buyLubaCoinsAsync(packIndex, dest, lubaUsername) {
+  ensureLubaState();
+  const pack = LUBA_PACKS[packIndex];
+  if (!pack) return "Invalid pack";
+  dest = dest === "real" ? "real" : "ledger";
+  if ((S.checking || 0) < pack.price) return "Not enough checking (" + fmt(pack.price) + " required)";
+  if (dest === "real") {
+    const u = String(lubaUsername || "").trim().replace(/^@/, "");
+    if (!u) return "Type your real Luba AI username";
+    if (!confirm("Pay " + fmt(pack.price) + " from checking\n→ +" + pack.coins + " messages on real Luba AI\n→ @" + u + " ?")) return "Cancelled";
+    // Charge only after successful grant attempt structure: try grant first then charge? 
+    // Safer: charge then grant, refund on failure
+    S.checking -= pack.price;
+    saveGame();
+    const grant = await grantRealLubaMessages(u, pack.coins);
+    if (!grant.ok) {
+      S.checking += pack.price; // refund
+      saveGame();
+      return "Luba grant failed: " + (grant.error || "error") + " — money refunded";
+    }
+    if (typeof addTx === "function") addTx("purchase", "Real Luba @" + u + " +" + pack.coins + " msgs", -pack.price, "checking");
+    saveGame();
+    toast("+" + pack.coins + " on real Luba @" + u + (grant.left != null ? (" · now " + grant.left + " left") : ""));
+    return null;
+  }
+  if (!confirm("Pay " + fmt(pack.price) + " for " + pack.coins + " coins on Ledger Life Luba?")) return "Cancelled";
+  S.checking -= pack.price;
+  S.luba.coins = (S.luba.coins || 0) + pack.coins;
+  if (typeof addTx === "function") addTx("purchase", "Ledger Luba coins ×" + pack.coins, -pack.price, "checking");
+  saveGame();
+  toast("+" + pack.coins + " Ledger Luba coins");
+  return null;
+}
+window.buyLubaCoinsAsync = buyLubaCoinsAsync;
+window.grantRealLubaMessages = grantRealLubaMessages;
+
 
 function lubaRenderMessagesOnly() {
   const box = document.getElementById("luba-msgs");
@@ -8447,22 +8515,58 @@ function renderLuba() {
   const coins = S.luba.coins | 0;
 
   if (lubaView === "buy") {
+    const defaultUser = (sessionUser || S.username || "").replace(/^@/, "");
     root.innerHTML =
       '<div class="luba-head"><div class="id"><div class="avatar">' + lubaStarSvg() + '</div>' +
-      '<div class="titles"><div class="n">Buy coins</div><div class="t">From checking · in-app only</div></div></div>' +
+      '<div class="titles"><div class="n">Buy coins</div><div class="t">From checking · pick where they go</div></div></div>' +
       '<button type="button" class="btn btn-secondary btn-sm" id="luba-back-chat">Back</button></div>' +
-      '<div class="luba-msgs"><div class="luba-buy-grid">' +
+      '<div class="luba-msgs" style="overflow-y:auto">' +
+      '<div class="card" style="margin-bottom:12px">' +
+      '<div class="meta mb-8">Where should messages go?</div>' +
+      '<div class="btn-row" style="gap:8px;margin-bottom:12px">' +
+      '<button type="button" class="btn btn-secondary btn-sm" id="dest-ledger" style="flex:1">Ledger Luba</button>' +
+      '<button type="button" class="btn btn-primary btn-sm" id="dest-real" style="flex:1">Real Luba AI</button>' +
+      '</div>' +
+      '<div id="real-user-wrap">' +
+      '<label class="meta">Real Luba username</label>' +
+      '<input type="text" id="luba-buy-user" placeholder="your Luba @username" value="' + (defaultUser.replace(/"/g, "") || "") + '" ' +
+      'style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);margin-top:6px">' +
+      '<div class="meta mt-8">Coins buy <b>messages</b> on luba-ai.vercel.app for that username.</div>' +
+      '</div></div>' +
+      '<div class="luba-buy-grid">' +
       LUBA_PACKS.map(function(p, i) {
         const feat = (p.coins === 100 || p.coins === 1000) ? " featured" : "";
         return '<div class="luba-buy-card' + feat + '" data-pack="' + i + '"><div class="amt">' + p.coins.toLocaleString() +
           '</div><div class="meta">' + p.label + '</div><div class="price">' + fmt(p.price) + "</div></div>";
-      }).join("") + "</div></div>";
+      }).join("") + "</div>" +
+      '<div class="meta mt-12" style="text-align:center">Checking: ' + fmt(S.checking || 0) + "</div></div>";
+
+    let buyDest = "real"; // default real Luba since deep-link is for that
+    function syncDestUI() {
+      const lg = document.getElementById("dest-ledger");
+      const rl = document.getElementById("dest-real");
+      const wrap = document.getElementById("real-user-wrap");
+      if (lg) { lg.className = "btn btn-sm " + (buyDest === "ledger" ? "btn-primary" : "btn-secondary"); lg.style.flex = "1"; }
+      if (rl) { rl.className = "btn btn-sm " + (buyDest === "real" ? "btn-primary" : "btn-secondary"); rl.style.flex = "1"; }
+      if (wrap) wrap.style.display = buyDest === "real" ? "block" : "none";
+    }
     document.getElementById("luba-back-chat").onclick = function() { lubaView = "chat"; renderLuba(); };
+    document.getElementById("dest-ledger").onclick = function() { buyDest = "ledger"; syncDestUI(); };
+    document.getElementById("dest-real").onclick = function() { buyDest = "real"; syncDestUI(); };
+    syncDestUI();
     root.querySelectorAll("[data-pack]").forEach(function(el) {
-      el.onclick = function() {
-        const err = buyLubaCoins(Number(el.getAttribute("data-pack")));
+      el.onclick = async function() {
+        const userEl = document.getElementById("luba-buy-user");
+        const uname = userEl ? userEl.value : "";
+        el.style.opacity = "0.6";
+        const err = await buyLubaCoinsAsync(Number(el.getAttribute("data-pack")), buyDest, uname);
+        el.style.opacity = "1";
         if (err && err !== "Cancelled") toast(err);
-        else if (!err) { lubaView = "chat"; renderLuba(); refreshTopbar(); }
+        else if (!err) {
+          if (buyDest === "ledger") { lubaView = "chat"; renderLuba(); }
+          else { renderLuba(); } // stay on buy so they can buy more / see checking
+          refreshTopbar();
+        }
       };
     });
     return;
@@ -8723,28 +8827,8 @@ renderProfile = function() {
 };
 window.renderProfile = renderProfile;
 
-console.log("[Ledger Life] Luba real AI + coins + photo");
 
-})();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-</script>
-</body>
-</html>
-
-<script>
+// Min $5 invest buys
 (function(){
   if (typeof buyStock === "function") {
     const _bs = buyStock;
@@ -8767,4 +8851,24 @@ console.log("[Ledger Life] Luba real AI + coins + photo");
     window.buyCrypto = buyCrypto;
   }
 })();
+
+console.log("[Ledger Life] Luba real AI + coins + photo");
+
+})();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 </script>
+</body>
+</html>
