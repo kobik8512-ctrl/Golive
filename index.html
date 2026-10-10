@@ -2416,7 +2416,18 @@ function renderWork(){
     }
     $("work-job").innerHTML = html;
   } else if (workTab === "skills") {
-    try { if (typeof settleTraining === "function") settleTraining(); } catch(_){}
+    try {
+    if (typeof settleTraining === "function") settleTraining();
+    // training-countdown-refresh: update Skills UI if training active
+    if (S && S.training && typeof workTab !== "undefined" && workTab === "skills") {
+      const card = document.querySelector("#work-skills .card");
+      if (card && /Training in progress/i.test(card.textContent || "")) {
+        const left = formatTrainLeft(S.training.endsAt - Date.now());
+        const metas = card.querySelectorAll(".meta");
+        if (metas[1]) metas[1].textContent = "Time left: " + left;
+      }
+    }
+  } catch(_){}
     const training = S.training;
     $("work-skills").innerHTML = (training ? `<div class="card" style="border-color:var(--accent)"><div class="name">Training in progress</div>
       <div class="meta">${esc(training.skillName)} · Lv ${training.from} → ${training.to}</div>
@@ -4159,13 +4170,31 @@ const INSURANCE_PRODUCTS = [
 ];
 
 function buyInsurance(productId) {
-  ensureWatchlist();
-  const p = INSURANCE_PRODUCTS.find(x => x.id === productId);
+  // Life tab uses simple types: health, auto, home, life
+  const simpleCosts = { health: 280, auto: 120, home: 90, life: 40 };
+  if (simpleCosts[productId] != null) {
+    if (!S.insurance) S.insurance = { health: false, auto: false, home: false, life: false };
+    if (S.insurance[productId]) return "Already covered";
+    const cost = simpleCosts[productId];
+    if ((S.checking || 0) < cost) return "Need " + fmt(cost) + " for first month";
+    S.checking -= cost;
+    S.insurance[productId] = true;
+    if (typeof addTx === "function") addTx("insurance", "Insured: " + productId, -cost, "checking");
+    if (typeof saveGame === "function") saveGame();
+    else if (typeof save === "function") save();
+    toast(productId.charAt(0).toUpperCase() + productId.slice(1) + " insurance active");
+    return null;
+  }
+  // Extended catalog
+  try { if (typeof ensureWatchlist === "function") ensureWatchlist(); } catch(_){}
+  if (!S.insurancePolicies) S.insurancePolicies = [];
+  const p = (typeof INSURANCE_PRODUCTS !== "undefined") ? INSURANCE_PRODUCTS.find(x => x.id === productId) : null;
   if (!p) return "Unknown product";
   if (S.insurancePolicies.find(x => x.id === productId)) return "Already owned";
-  if (S.checking < p.monthly) return "Not enough checking for first premium";
+  if ((S.checking || 0) < p.monthly) return "Not enough checking for first premium";
   S.checking -= p.monthly;
-  logTx(-p.monthly, "Insurance premium: " + p.name, "checking");
+  if (typeof addTx === "function") addTx("insurance", "Insurance: " + p.name, -p.monthly, "checking");
+  else if (typeof logTx === "function") logTx(-p.monthly, "Insurance premium: " + p.name, "checking");
   S.insurancePolicies.push({
     id: p.id,
     name: p.name,
@@ -4176,9 +4205,11 @@ function buyInsurance(productId) {
     incomeReplace: p.incomeReplace || 0,
     sinceDay: S.day
   });
-  save();
-  return "Policy active: " + p.name;
+  if (typeof saveGame === "function") saveGame();
+  else if (typeof save === "function") save();
+  return null;
 }
+window.buyInsurance = buyInsurance;
 
 function cancelInsurance(productId) {
   ensureWatchlist();
@@ -6634,7 +6665,18 @@ function pushCandleTick(){
 const __gameTickMega = gameTick;
 gameTick = function(){
   __gameTickMega();
-  try { if (typeof settleTraining === "function") settleTraining(); } catch(_){}
+  try {
+    if (typeof settleTraining === "function") settleTraining();
+    // training-countdown-refresh: update Skills UI if training active
+    if (S && S.training && typeof workTab !== "undefined" && workTab === "skills") {
+      const card = document.querySelector("#work-skills .card");
+      if (card && /Training in progress/i.test(card.textContent || "")) {
+        const left = formatTrainLeft(S.training.endsAt - Date.now());
+        const metas = card.querySelectorAll(".meta");
+        if (metas[1]) metas[1].textContent = "Time left: " + left;
+      }
+    }
+  } catch(_){}
   if (S && S.tick % 2 === 0) pushCandleTick();
   if (S && investTab === "charts" && S.tick % 3 === 0) {
     try {
@@ -7864,10 +7906,18 @@ function trainSkillCost(def, level) {
   }
   return { cost: Math.max(0, cost), tokensUsed: used };
 }
+function ensureTrainingState() {
+  if (!S) return;
+  // keep training object intact across screens
+  if (S.training && S.training.endsAt && Date.now() >= S.training.endsAt) {
+    settleTraining();
+  }
+}
 function settleTraining() {
   if (!S || !S.training) return;
-  if (Date.now() < S.training.endsAt) return;
   const t = S.training;
+  if (!t.endsAt || Date.now() < t.endsAt) return;
+  if (!S.skills) S.skills = {};
   S.skills[t.skillId] = t.to;
   S.training = null;
   toast(t.skillName + " → level " + t.to + " (training complete)");
