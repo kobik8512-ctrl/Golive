@@ -1347,6 +1347,8 @@ function dailySalary(){
   if (!job) return 0;
   // annual salary → real 24h day rate
   let mult = (S._raiseMult || 1);
+  // Entry service roles: modest tips (still realistic, not free cash)
+  if ((job.tier || 0) === 0) mult *= 1.12;
   return (job.salary / 365) * mult;
 }
 function hourlySalary(){
@@ -1370,8 +1372,15 @@ function accrueRealSalary(){
   if (!S._salaryBuf) S._salaryBuf = 0;
   S._salaryBuf += pay;
   if (S._salaryBuf >= Math.max(0.5, dailySalary() / 48)) {
-    if (typeof addTx === "function") addTx("income", "Wages (" + (currentJob()||{}).title + ")", S._salaryBuf, "checking");
+    if (typeof addTx === "function") addTx("income", "Wages (" + ((currentJob()||{}).title || "Job") + ")", S._salaryBuf, "checking");
     S._salaryBuf = 0;
+  }
+  // soft progress ping every ~$1 so grind feels alive
+  if (!S._wagePing) S._wagePing = 0;
+  S._wagePing += pay;
+  if (S._wagePing >= 1) {
+    S._wagePing = 0;
+    try { if (typeof refreshTopbar === "function") refreshTopbar(); } catch(_){}
   }
 }
 function trainSkill(skillId){
@@ -1402,6 +1411,26 @@ function toggleSide(id){
     toast("Started: " + def.name);
   }
   return null;
+}
+function accrueRealSide(){
+  if (!S) return;
+  const daily = (typeof sideDailyIncome === "function") ? sideDailyIncome() : 0;
+  if (!(daily > 0)) return;
+  const now = Date.now();
+  if (!S.lastSideAt) S.lastSideAt = now;
+  const elapsed = now - S.lastSideAt;
+  if (elapsed < 1000) return;
+  const pay = (daily / 86400000) * elapsed;
+  if (pay < 0.0001) return;
+  S.lastSideAt = now;
+  S.checking = (S.checking || 0) + pay;
+  S.totalEarned = (S.totalEarned || 0) + pay;
+  if (!S._sideBuf) S._sideBuf = 0;
+  S._sideBuf += pay;
+  if (S._sideBuf >= 0.5) {
+    if (typeof addTx === "function") addTx("income", "Side hustle pay", S._sideBuf, "checking");
+    S._sideBuf = 0;
+  }
 }
 function sideDailyIncome(){
   let total = 0;
@@ -1777,6 +1806,7 @@ function gameTick(){
   S.tick++;
   // real-time wages (24h real clock)
   if (typeof accrueRealSalary === "function") accrueRealSalary();
+  try { if (typeof accrueRealSide === "function") accrueRealSide(); } catch(_){}
   // markets every tick
   if (S.tick % 3 === 0) tickMarkets();
   // new day
@@ -2357,7 +2387,7 @@ function renderWork(){
         <div class="card-row mt-8"><div class="meta">Pay / real 24h</div><div class="val pos">${fmt(dayPay)}</div></div>
         <div class="card-row"><div class="meta">Pay / real hour</div><div class="val pos">${fmt(hourPay)}</div></div>
         <div class="card-row"><div class="meta">Annual salary</div><div class="val">${fmt(job.salary*(S._raiseMult||1),0)}</div></div>
-        <div class="meta mt-8">Wages deposit continuously in real time while employed.</div>
+        <div class="meta mt-8">Wages deposit continuously in real time while employed.</div><div class="meta" id="live-wage-rate">Live rate updates on Home / Work</div>
         <button class="btn btn-danger btn-sm mt-12" onclick="quitJob();renderWork();saveGame()">Resign</button>
       </div>`;
     } else {
@@ -2369,7 +2399,7 @@ function renderWork(){
       return `<div class="list-item">
         <div class="list-body">
           <div class="name">${esc(j.title)} ${have?'<span class="badge badge-green">CURRENT</span>':''}</div>
-          <div class="sub">${esc(j.company)} · ${fmt(j.salary,0)}/yr · ${fmt(j.salary/365)}/24h · Tier ${j.tier}</div>
+          <div class="sub">${esc(j.company)} · ${fmt(j.salary,0)}/yr · ~${fmt(j.salary/365)}/day · ~${fmt(j.salary/365/24)}/hr · Tier ${j.tier}</div>
           <div class="sub">${reqText(j.req)}</div>
         </div>
         <button class="btn btn-sm btn-primary" ${have?'disabled':''} onclick="const e=applyJob('${j.id}');if(e)toast(e);renderWork();saveGame()">Apply</button>
@@ -6533,7 +6563,9 @@ const CANDLE_THEMES = {
   mono: { up:"#e8eaed", down:"#5c6370", bg:"#12141a", grid:"#2a2e3a", wick:"#8b92a5" },
   gold: { up:"#ffc107", down:"#ff6f00", bg:"#120e08", grid:"#2a2218", wick:"#c9a227" },
 };
+const MIN_TRADE_STAKE = 5; // minimum $ for timed trades & invest buys
 let candleState = { symbol:"AAPL", kind:"stock", tf:"10s", theme:"classic", limit:60, stake:25 };
+window.MIN_TRADE_STAKE = MIN_TRADE_STAKE;
 
 function ensureCandles(sym, kind){
   kind = kind || "stock";
@@ -6676,7 +6708,7 @@ function renderCandlePanel(){
     (asset ? renderCandleSVG(asset.candles, candleState.theme) : '<div class="empty-state">No data</div>') +
     '<div class="meta mt-8">Buying power '+fmt((S.brokerage||0)+(S.checking||0))+'</div>' +
     '<label>Order size (USD)</label>' +
-    '<input type="number" id="c-amt" value="50" min="1">' +
+    '<input type="number" id="c-amt" value="50" min="5" step="any">' +
     '<div class="trade-bs">' +
     '<button type="button" class="btn sell-btn" id="c-sell">Sell</button>' +
     '<button type="button" class="btn buy-btn" id="c-buy">Buy</button>' +
@@ -6947,10 +6979,11 @@ function settleTimedOrders(){
     // payout 85% profit on win, lose stake on loss
     let payout = 0;
     if (win) {
-      payout = tr.stake * 1.85;
+      payout = Math.round(tr.stake * 1.85 * 100) / 100; // full return (stake + profit)
+      const profit = Math.round((payout - tr.stake) * 100) / 100;
       S.checking = (S.checking||0) + payout;
-      if (typeof addTx === "function") addTx("invest", "Timed "+tr.side.toUpperCase()+" WIN "+tr.symbol, payout, "checking");
-      toast("WIN +" + fmt(payout - tr.stake) + " · " + tr.symbol);
+      if (typeof addTx === "function") addTx("invest", "Timed "+tr.side.toUpperCase()+" WIN "+tr.symbol+" (+"+profit+")", payout, "checking");
+      toast("WIN " + fmt(payout) + " back · profit " + fmt(profit) + " · " + tr.symbol);
     } else {
       if (typeof addTx === "function") addTx("invest", "Timed "+tr.side.toUpperCase()+" LOSS "+tr.symbol, -tr.stake, "checking");
       toast("LOSS −" + fmt(tr.stake) + " · " + tr.symbol);
@@ -6965,6 +6998,7 @@ function placeTimedTrade(side){
   if (amtEl && amtEl.value) candleState.stake = Number(amtEl.value);
   const stake = Number(candleState.stake || (amtEl && amtEl.value));
   if (!(stake > 0)) return "Enter order size";
+  if (stake < MIN_TRADE_STAKE) return "Minimum stake is " + fmt(MIN_TRADE_STAKE);
   if ((S.checking||0) < stake) return "Need " + fmt(stake) + " in checking";
   const durSec = { "3s": 3, "5s": 5, "10s": 10, "15s": 15, "30s": 30, "60s": 60, "30m": 1800, "1h": 3600, "24h": 86400 }[candleState.tf] || 10;
   // Map UI tf to real-seconds duration for the timed trade
@@ -7063,7 +7097,7 @@ renderCandlePanel = function(force){
   });
   host.innerHTML =
     '<div class="card"><h3>Live chart · timed trades</h3>' +
-    '<div class="meta mb-8">Pick duration, stake from checking. BUY wins if price rises at close; SELL wins if price falls. Payout 1.85× on win.</div>' +
+    '<div class="meta mb-8">Pick duration, stake from checking (min $5). BUY wins if price rises at close; SELL wins if price falls. Payout 1.85× on win.</div>' +
     '<div class="candle-toolbar">' +
     '<select id="c-sym" style="flex:1;min-width:90px;padding:8px;border-radius:8px;background:var(--card);color:var(--text);border:1px solid var(--border)">' +
     symbols.map(s => '<option value="'+s+'"'+(s===sym?' selected':'')+'>'+s+'</option>').join('') +
@@ -7082,7 +7116,7 @@ renderCandlePanel = function(force){
     (asset ? renderCandleSVG(asset.candles, candleState.theme) : '<div class="empty-state">No data</div>') +
     '<div class="meta mt-8">Checking ' + fmt(S.checking||0) + ' · scroll chart for history</div>' +
     '<label>Stake</label>' +
-    '<input type="number" id="c-amt" value="' + (candleState.stake || 25) + '" min="1" step="any" inputmode="decimal" style="font-size:16px">' +
+    '<input type="number" id="c-amt" value="' + (candleState.stake || 25) + '" min="5" step="any" inputmode="decimal" style="font-size:16px">' +
     '<div class="btn-row mt-8" style="gap:6px;flex-wrap:wrap">' +
     '<button class="btn btn-secondary btn-sm" type="button" data-stake="10">10</button>' +
     '<button class="btn btn-secondary btn-sm" type="button" data-stake="25">25</button>' +
@@ -8674,3 +8708,28 @@ console.log("[Ledger Life] Luba real AI + coins + photo");
 </script>
 </body>
 </html>
+
+<script>
+(function(){
+  if (typeof buyStock === "function") {
+    const _bs = buyStock;
+    buyStock = function(symbol, dollars) {
+      dollars = Number(dollars);
+      if (!(dollars > 0)) return "Enter amount";
+      if (typeof MIN_TRADE_STAKE !== "undefined" && dollars < MIN_TRADE_STAKE) return "Minimum is $" + MIN_TRADE_STAKE;
+      return _bs(symbol, dollars);
+    };
+    window.buyStock = buyStock;
+  }
+  if (typeof buyCrypto === "function") {
+    const _bc = buyCrypto;
+    buyCrypto = function(symbol, dollars) {
+      dollars = Number(dollars);
+      if (!(dollars > 0)) return "Enter amount";
+      if (typeof MIN_TRADE_STAKE !== "undefined" && dollars < MIN_TRADE_STAKE) return "Minimum is $" + MIN_TRADE_STAKE;
+      return _bc(symbol, dollars);
+    };
+    window.buyCrypto = buyCrypto;
+  }
+})();
+</script>
