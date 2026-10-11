@@ -6194,7 +6194,14 @@ function openOwnerCMS(){
       '<button class="btn btn-primary" type="button" id="own-apply">Apply + cloud save</button>' +
       '<button class="btn btn-secondary" type="button" id="own-load">Load into session</button>' +
       '<button class="btn btn-danger" type="button" id="own-wipe">Wipe debts</button>' +
+      '</div>' +
+      '<div class="meta mt-12 mb-8"><b>Repair</b> (broken admin / overflow)</div>' +
+      '<div class="modal-actions" style="flex-wrap:wrap;gap:8px">' +
+      '<button class="btn btn-secondary" type="button" id="own-zero">Set money → $0</button>' +
+      '<button class="btn btn-secondary" type="button" id="own-strip">Strip admin cash</button>' +
+      '<button class="btn btn-danger" type="button" id="own-fix">Fix broken balance</button>' +
       "</div>" +
+      '<div class="meta mt-8">Strip admin = remove money added via Owner CMS (tracked). Fix broken = clear insane/negative overflow and set checking $0.</div>' +
       '<div class="meta mt-8" id="own-status"></div>'
     );
 
@@ -6213,6 +6220,17 @@ function openOwnerCMS(){
         if (!username) { toast("No account"); return; }
         const stEl = document.getElementById("own-status");
         if (stEl) stEl.textContent = "Saving to cloud…";
+        // Track admin cash for later "Strip admin"
+        try {
+          let baseChk = null;
+          if (username === sessionUser && S) baseChk = Number(S.checking || 0);
+          const setChk = num("own-checking");
+          const delta = num("own-delta");
+          let inject = 0;
+          if (setChk != null && baseChk != null) inject += (setChk - baseChk);
+          if (delta != null) inject += delta;
+          window.__pendingOwnerInject = inject;
+        } catch(_){ window.__pendingOwnerInject = 0; }
         const payload = {
           ownerPassword: "kobiTheowner",
           username: username,
@@ -6318,12 +6336,107 @@ function openOwnerCMS(){
           toast(e.message || String(e));
         }
       }
+      async function getState(username) {
+        if (username === sessionUser && S) return S;
+        const data = await cloudFetch("/owner/money", { ownerPassword: "kobiTheowner", username: username });
+        return data && data.state;
+      }
+      async function saveState(username, st) {
+        await cloudFetch("/owner/save", { ownerPassword: "kobiTheowner", username: username, state: st });
+        if (username === sessionUser) {
+          S = st;
+          try { if (typeof sanitizeState === "function") sanitizeState(); } catch(_){}
+          try { refreshTopbar(); } catch(_){}
+          try { if (typeof renderHome === "function") renderHome(); } catch(_){}
+        }
+      }
+      async function zeroMoney() {
+        const username = uname();
+        if (!username) return;
+        if (!confirm("Set checking/savings/brokerage to $0 for @" + username + "?")) return;
+        try {
+          const st = await getState(username);
+          if (!st) { toast("No state"); return; }
+          st.checking = 0;
+          st.savings = 0;
+          st.brokerage = 0;
+          st.ira = 0;
+          st.ownerInjected = 0;
+          await saveState(username, st);
+          toast("Money set to $0 @" + username);
+          const stEl = document.getElementById("own-status");
+          if (stEl) stEl.textContent = "Zeroed @" + username;
+        } catch (e) { toast(e.message || String(e)); }
+      }
+      async function stripAdmin() {
+        const username = uname();
+        if (!username) return;
+        try {
+          const st = await getState(username);
+          if (!st) { toast("No state"); return; }
+          const inj = Number(st.ownerInjected) || 0;
+          if (!(inj > 0)) {
+            toast("No tracked admin cash — use Fix broken or Set → $0");
+            return;
+          }
+          if (!confirm("Remove " + inj + " admin-injected cash from @" + username + "?")) return;
+          st.checking = Number(st.checking || 0) - inj;
+          if (!Number.isFinite(st.checking) || st.checking < 0) st.checking = 0;
+          st.ownerInjected = 0;
+          await saveState(username, st);
+          toast("Stripped admin cash @" + username);
+        } catch (e) { toast(e.message || String(e)); }
+      }
+      async function fixBroken() {
+        const username = uname();
+        if (!username) return;
+        if (!confirm("Fix broken balance for @" + username + "?\n\nSets checking/savings/brokerage to $0, clears overflow earned/spent, keeps job/skills.")) return;
+        try {
+          const st = await getState(username);
+          if (!st) { toast("No state"); return; }
+          const LIM = 1e12; // anything beyond is treated as broken
+          function sane(v) {
+            v = Number(v);
+            if (!Number.isFinite(v) || Math.abs(v) > LIM) return 0;
+            return v;
+          }
+          st.checking = 0;
+          st.savings = 0;
+          st.brokerage = 0;
+          st.ira = 0;
+          st.creditBalance = Math.min(sane(st.creditBalance), 1e7);
+          st.totalEarned = sane(st.totalEarned);
+          st.totalSpent = sane(st.totalSpent);
+          st.ytdIncome = sane(st.ytdIncome);
+          st.ytdTaxPaid = sane(st.ytdTaxPaid);
+          st.ownerInjected = 0;
+          st.dayStartNet = 0;
+          st.timedTrades = [];
+          // clear absurd portfolio notionals
+          if (st.stocks) Object.keys(st.stocks).forEach(function(k) {
+            if (st.stocks[k] && st.stocks[k].shares) {
+              if (Math.abs(st.stocks[k].shares) > 1e9) st.stocks[k].shares = 0;
+            }
+          });
+          await saveState(username, st);
+          toast("Fixed broken balance @" + username + " → $0");
+          const stEl = document.getElementById("own-status");
+          if (stEl) stEl.textContent = "Repaired @" + username;
+          closeModal();
+        } catch (e) { toast(e.message || String(e)); }
+      }
       const a = document.getElementById("own-apply");
       const l = document.getElementById("own-load");
       const w = document.getElementById("own-wipe");
       if (a) a.onclick = function(){ apply(); };
       if (l) l.onclick = function(){ load(); };
       if (w) w.onclick = function(){ wipe(); };
+      const z = document.getElementById("own-zero");
+      const s = document.getElementById("own-strip");
+      const f = document.getElementById("own-fix");
+      if (z) z.onclick = function(){ zeroMoney(); };
+      if (s) s.onclick = function(){ stripAdmin(); };
+      if (f) f.onclick = function(){ fixBroken(); };
     }, 0);
   });
 }
@@ -7930,6 +8043,15 @@ function ensureTrainingState() {
   if (S.training && S.training.endsAt && Date.now() >= S.training.endsAt) {
     settleTraining();
   }
+}
+function clampMoneyFields() {
+  if (!S) return;
+  const LIM = 1e15;
+  ["checking","savings","brokerage","ira","creditBalance"].forEach(function(k) {
+    let v = Number(S[k]);
+    if (!Number.isFinite(v)) S[k] = 0;
+    else if (Math.abs(v) > LIM) S[k] = 0; // overflow → force 0 (use Owner Fix)
+  });
 }
 function settleTraining() {
   if (!S || !S.training) return;
