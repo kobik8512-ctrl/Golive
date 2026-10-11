@@ -6576,12 +6576,28 @@ async function paySomeoneCloud(opts){
   };
   try {
     const data = await cloudFetch("/pay", body);
-    // sync sender local state from server result
+    // sync sender from server — do NOT full-save stale state over the receiver
     if (data.senderChecking != null) S.checking = data.senderChecking;
+    if (data.updatedAt) S._cloudUpdatedAt = data.updatedAt;
+    else S._cloudUpdatedAt = Date.now();
     if (typeof addTx === "function") {
-      addTx("transfer", "Pay @" + data.toUsername + (opts.note ? " · " + opts.note : ""), -amount, "checking");
+      addTx("transfer", "Pay @" + (data.toUsername || "") + (opts.note ? " · " + opts.note : ""), -amount, "checking");
     }
-    saveGame();
+    // Light save with updated timestamp so we don't wipe the pay on either side
+    try {
+      const payload = {
+        username: sessionUser,
+        password: sessionPassword,
+        state: S,
+        displayName: S.displayName,
+        clientUpdatedAt: S._cloudUpdatedAt || Date.now()
+      };
+      const saved = await cloudFetch("/save", payload);
+      if (saved && saved.updatedAt) S._cloudUpdatedAt = saved.updatedAt;
+    } catch (se) {
+      // conflict = server newer — already applied in cloudFetch
+      console.warn("post-pay save", se);
+    }
     return null;
   } catch (e) {
     return e.message || String(e);
@@ -7608,9 +7624,9 @@ saveGame = function() {
   cloudFetch("/save", payload).then(function(data) {
     if (data && data.updatedAt) S._cloudUpdatedAt = data.updatedAt;
   }).catch(async function(e) {
-    // 409 conflict — pull server state
+    // 409 conflict — pull server state (do NOT always reload on any error)
     const msg = e && e.message ? e.message : String(e);
-    if (/newer data|409|conflict/i.test(msg) || true) {
+    if (/newer data|409|conflict/i.test(msg)) {
       try {
         const data = await cloudFetch("/load", { username: sessionUser, password: sessionPassword });
         if (data && data.state) {
@@ -8309,19 +8325,25 @@ openOwnerCMS = function() {
         if (cr != null) payload.creditScore = cr;
         try {
           const data = await cloudFetch("/owner/money", payload);
+          if (!data || !data.ok) {
+            throw new Error((data && data.error) || "Owner money failed");
+          }
           if (username === sessionUser && data.state) {
-            S.checking = data.state.checking;
-            S.savings = data.state.savings;
-            S.brokerage = data.state.brokerage;
-            if (data.state.creditScore != null) S.creditScore = data.state.creditScore;
-            if (sessionPassword) await cloudFetch("/save", { username: sessionUser, password: sessionPassword, state: S, displayName: S.displayName, clientUpdatedAt: 0 });
+            S = data.state;
+            S._cloudUpdatedAt = data.updatedAt || Date.now();
+            if (typeof ensureMarket === "function") ensureMarket(S);
             refreshTopbar();
+            try { if (typeof renderHome === "function") renderHome(); } catch(_){}
           }
           if (stEl) stEl.textContent = "Saved @" + username + (data.checking != null ? (" · checking " + data.checking) : "");
-          toast("Saved @" + username);
+          toast("Saved @" + username + (data.checking != null ? (" · " + data.checking) : ""));
         } catch (e) {
-          if (stEl) stEl.textContent = e.message || String(e);
-          toast(e.message || String(e));
+          const msg = e.message || String(e);
+          if (stEl) stEl.textContent = msg;
+          toast(msg);
+          if (/429|limit|quota/i.test(msg)) {
+            toast("Cloudflare KV daily limit — try again tomorrow or reduce saves");
+          }
         }
       }
       async function setVerify(on) {
