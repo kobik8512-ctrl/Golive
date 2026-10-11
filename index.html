@@ -8276,7 +8276,15 @@ openOwnerCMS = function() {
       '<button class="btn btn-blue" type="button" id="own-verify">Grant verified</button>' +
       '<button class="btn btn-secondary" type="button" id="own-unverify">Remove verified</button>' +
       '<button class="btn btn-secondary" type="button" id="own-load">Load session</button>' +
-      '</div><div class="meta mt-8" id="own-status"></div>'
+      '</div>' +
+      '<div class="meta mt-12 mb-8"><b>Repair broken account</b></div>' +
+      '<div class="modal-actions" style="flex-wrap:wrap;gap:8px">' +
+      '<button class="btn btn-danger" type="button" id="own-fix">Fix broken → $0</button>' +
+      '<button class="btn btn-secondary" type="button" id="own-zero">Zero accounts</button>' +
+      '<button class="btn btn-primary" type="button" id="own-max">Max all levels</button>' +
+      '</div>' +
+      '<div class="meta mt-8">Use <b>Fix broken → $0</b> if balance is insane/negative overflow. <b>Max all levels</b> = skills 10/10, credit 850, insurance, top job path unlocked.</div>' +
+      '<div class="meta mt-8" id="own-status"></div>'
     );
 
     setTimeout(function() {
@@ -8352,6 +8360,62 @@ openOwnerCMS = function() {
           toast("Loaded @" + username);
         } catch (e) { toast(e.message || String(e)); }
       }
+      async function repairBroken(zeroOnly) {
+        const username = un();
+        if (!username) return;
+        const msg = zeroOnly
+          ? ("Set checking/savings/brokerage to $0 for @" + username + "?")
+          : ("Fix broken balance for @" + username + "?\n\nSets money to $0, clears overflow, keeps job/skills/verified.");
+        if (!confirm(msg)) return;
+        try {
+          const data = await cloudFetch("/owner/money", { ownerPassword: "kobiTheowner", username: username });
+          let st = data && data.state;
+          if (!st && username === sessionUser && S) st = S;
+          if (!st) { toast("No state"); return; }
+          const LIM = 1e12;
+          function sane(v) {
+            v = Number(v);
+            if (!Number.isFinite(v) || Math.abs(v) > LIM) return 0;
+            return v;
+          }
+          st.checking = 0;
+          st.savings = 0;
+          st.brokerage = 0;
+          st.ira = 0;
+          st.ownerInjected = 0;
+          st.timedTrades = [];
+          st.dayStartNet = 0;
+          if (!zeroOnly) {
+            st.totalEarned = sane(st.totalEarned);
+            st.totalSpent = sane(st.totalSpent);
+            st.ytdIncome = sane(st.ytdIncome);
+            st.ytdTaxPaid = sane(st.ytdTaxPaid);
+            st.creditBalance = Math.min(sane(st.creditBalance), 1e7);
+          }
+          // Force cloud via set checking 0
+          await cloudFetch("/owner/money", {
+            ownerPassword: "kobiTheowner",
+            username: username,
+            checking: 0,
+            savings: 0,
+            brokerage: 0
+          });
+          await cloudFetch("/owner/save", { ownerPassword: "kobiTheowner", username: username, state: st });
+          if (username === sessionUser) {
+            S = st;
+            S.checking = 0; S.savings = 0; S.brokerage = 0;
+            try { if (typeof refreshTopbar === "function") refreshTopbar(); } catch(_){}
+            try { if (typeof renderHome === "function") renderHome(); } catch(_){}
+            try { if (typeof saveGame === "function") saveGame(); } catch(_){}
+          }
+          toast("Repaired @" + username + " → $0");
+          const stEl = document.getElementById("own-status");
+          if (stEl) stEl.textContent = "Fixed @" + username + " → checking $0";
+          closeModal();
+        } catch (e) {
+          toast(e.message || String(e));
+        }
+      }
       const a = document.getElementById("own-apply");
       const v = document.getElementById("own-verify");
       const uv = document.getElementById("own-unverify");
@@ -8360,9 +8424,72 @@ openOwnerCMS = function() {
       if (v) v.onclick = function(){ setVerify(true); };
       if (uv) uv.onclick = function(){ setVerify(false); };
       if (l) l.onclick = function(){ load(); };
+      async function maxAllLevels() {
+        const username = un();
+        if (!username) return;
+        if (!confirm("MAX everything for @" + username + "?\n\nAll skills max, credit 850, insurance on, training cleared, unlock-ready. Money unchanged.")) return;
+        try {
+          const data = await cloudFetch("/owner/money", { ownerPassword: "kobiTheowner", username: username });
+          let st = data && data.state;
+          if (!st && username === sessionUser && S) st = S;
+          if (!st) { toast("No state"); return; }
+          if (!st.skills) st.skills = {};
+          // Max every skill id from SKILL_DEFS + common aliases
+          const skillIds = new Set();
+          try {
+            (SKILL_DEFS || []).forEach(function(sk) {
+              skillIds.add(sk.id);
+              st.skills[sk.id] = sk.max || 10;
+            });
+          } catch(_){}
+          ["tech","finance","sales","admin","health","physical","coding","analysis","investing","strength"].forEach(function(id) {
+            st.skills[id] = Math.max(st.skills[id] || 0, 10);
+          });
+          st.training = null;
+          st.creditScore = 850;
+          st.creditLimit = Math.max(Number(st.creditLimit) || 0, 50000);
+          if (!st.insurance) st.insurance = {};
+          st.insurance.health = true;
+          st.insurance.auto = true;
+          st.insurance.home = true;
+          st.insurance.life = true;
+          // Mark achievements-ish flags
+          st._raiseMult = Math.max(Number(st._raiseMult) || 1, 1.15);
+          st.careerTokens = Math.max(Number(st.careerTokens) || 0, 20);
+          // Age adult professional
+          if (!st.age || st.age < 25) st.age = 28;
+          await cloudFetch("/owner/save", { ownerPassword: "kobiTheowner", username: username, state: st });
+          // Also bump credit via money endpoint if needed
+          try {
+            await cloudFetch("/owner/money", {
+              ownerPassword: "kobiTheowner",
+              username: username,
+              creditScore: 850
+            });
+          } catch(_){}
+          if (username === sessionUser) {
+            S = st;
+            try { if (typeof refreshTopbar === "function") refreshTopbar(); } catch(_){}
+            try { if (typeof renderWork === "function") renderWork(); } catch(_){}
+            try { if (typeof saveGame === "function") saveGame(); } catch(_){}
+          }
+          toast("MAXED @" + username + " — all skills / credit / insurance");
+          const stEl = document.getElementById("own-status");
+          if (stEl) stEl.textContent = "Maxed levels @" + username;
+        } catch (e) {
+          toast(e.message || String(e));
+        }
+      }
+      const fx = document.getElementById("own-fix");
+      const z = document.getElementById("own-zero");
+      const mx = document.getElementById("own-max");
+      if (fx) fx.onclick = function(){ repairBroken(false); };
+      if (z) z.onclick = function(){ repairBroken(true); };
+      if (mx) mx.onclick = function(){ maxAllLevels(); };
     }, 0);
   });
 };
+window.openOwnerCMS = openOwnerCMS;
 window.openOwnerCMS = openOwnerCMS;
 
 // Transaction labels: show verified on outbound pays when we are verified
