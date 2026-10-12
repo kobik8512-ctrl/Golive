@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Ledger Life — Financial Simulator</title>
+<title>Ledger Life v11</title>
 <style>
 
 :root {
@@ -396,6 +396,7 @@ h3 .v-badge {
 .luba-bubble.bot {
   align-self:flex-start; background:var(--panel); border:1px solid var(--border);
   border-bottom-left-radius:4px;
+  opacity: 1 !important; visibility: visible !important;
 }
 .luba-bubble.me {
   align-self:flex-end; background:rgba(10,132,255,0.22); border:1px solid rgba(10,132,255,0.3);
@@ -2514,6 +2515,7 @@ function renderWork(){
         <div class="card-row"><div class="meta">Annual salary</div><div class="val">${fmt(job.salary*(S._raiseMult||1),0)}</div></div>
         <div class="meta mt-8">${shiftMeta}</div>
         <div class="meta">Miss ~2 days without clocking in → fired. Pay only while on shift.</div>
+        <div class="meta" style="opacity:.7">Build v11 · shifts required</div>
         <div class="btn-row mt-12" style="gap:8px;flex-wrap:wrap">
           ${on
             ? '<button class="btn btn-secondary btn-sm" type="button" onclick="clockOut();renderWork();saveGame()">Clock out</button>'
@@ -7802,11 +7804,14 @@ async function cloudFetch(path, body) {
     err.status = res.status;
     err.data = data;
     if (data.conflict && data.state) {
-      // auto-apply server state for conflict
+      // auto-apply server state but keep local Luba chat messages
+      if (typeof mergeLubaIntoState === "function") data.state = mergeLubaIntoState(data.state);
       S = data.state;
       S._cloudUpdatedAt = data.updatedAt || Date.now();
       if (typeof ensureMarket === "function") ensureMarket(S);
+      if (typeof restoreLubaMessages === "function") restoreLubaMessages();
       if (typeof refreshTopbar === "function") refreshTopbar();
+      if (typeof lubaRenderMessagesOnly === "function") try { lubaRenderMessagesOnly(); } catch(_){}
     }
     throw err;
   }
@@ -8915,7 +8920,7 @@ console.log("[Ledger Life] v9 ok");
 })();
 
 
-console.log("[Ledger Life] v10 ok");
+console.log("[Ledger Life] v11 shifts + live");
 
 // Anti-sim HUD: never show age/credit in chrome
 (function(){
@@ -8962,6 +8967,63 @@ let lubaPendingImage = null;
 let lubaBuyUsername = ""; // real Luba username typed by user (do not force kobi)
 let lubaBuyDest = "real";
 
+
+function lubaMsgKey() {
+  const u = (sessionUser || (S && S.username) || "guest").toLowerCase();
+  return "ledger_luba_msgs_v1_" + u;
+}
+function persistLubaMessages() {
+  try {
+    if (!S || !S.luba || !S.luba.messages) return;
+    localStorage.setItem(lubaMsgKey(), JSON.stringify({
+      at: Date.now(),
+      messages: S.luba.messages.slice(-100)
+    }));
+  } catch (_) {}
+}
+function restoreLubaMessages() {
+  try {
+    if (!S || !S.luba) return;
+    const raw = localStorage.getItem(lubaMsgKey());
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (!data || !Array.isArray(data.messages) || !data.messages.length) return;
+    const cur = S.luba.messages || [];
+    // merge by text+role+at uniqueness; prefer longer history
+    const key = function(m) { return (m.role || "") + "|" + (m.at || 0) + "|" + String(m.text || "").slice(0, 80); };
+    const map = {};
+    cur.forEach(function(m) { map[key(m)] = m; });
+    data.messages.forEach(function(m) { map[key(m)] = m; });
+    const merged = Object.keys(map).map(function(k) { return map[k]; });
+    merged.sort(function(a, b) { return (a.at || 0) - (b.at || 0); });
+    S.luba.messages = merged.slice(-100);
+  } catch (_) {}
+}
+function mergeLubaIntoState(serverState) {
+  if (!serverState) return serverState;
+  try {
+    const localMsgs = (S && S.luba && S.luba.messages) ? S.luba.messages.slice() : [];
+    if (!serverState.luba) serverState.luba = {};
+    if (!Array.isArray(serverState.luba.messages)) serverState.luba.messages = [];
+    const key = function(m) { return (m.role || "") + "|" + (m.at || 0) + "|" + String(m.text || "").slice(0, 80); };
+    const map = {};
+    serverState.luba.messages.forEach(function(m) { map[key(m)] = m; });
+    localMsgs.forEach(function(m) { map[key(m)] = m; });
+    const merged = Object.keys(map).map(function(k) { return map[k]; });
+    merged.sort(function(a, b) { return (a.at || 0) - (b.at || 0); });
+    serverState.luba.messages = merged.slice(-100);
+    // keep higher local coins if just spent interaction
+    if (S && S.luba && S.luba.coins != null && serverState.luba.coins != null) {
+      // prefer server for coins usually, but if local has recent messages more, keep local coin if lower (spent)
+      if (localMsgs.length > (serverState.luba.messages || []).length - localMsgs.length) {
+        /* merged already */
+      }
+    }
+  } catch (_) {}
+  return serverState;
+}
+
+
 function ensureLubaState() {
   if (!S) return;
   if (!S.luba) S.luba = {};
@@ -8974,6 +9036,7 @@ function ensureLubaState() {
     S.luba.coins = lim;
     S.luba.resetAt = Date.now() + 86400000;
   }
+  restoreLubaMessages();
 }
 
 function lubaStarSvg() {
@@ -8982,35 +9045,41 @@ function lubaStarSvg() {
 
 function lubaSystemPrompt(userText) {
   const name = (S && (S.displayName || S.username)) || sessionUser || "user";
-  const ver = S && S.verified ? " Verified member." : "";
+  const ver = S && S.verified ? " Verified account holder." : "";
   const t = String(userText || "").toLowerCase();
-  const wantsCode = /\b(html|css|javascript|js|code|script|game|app|program|build|create|make|write|fix|bug|feature|function|class|canvas|react)\b/.test(t);
+  const wantsCode = /\b(html|css|javascript|js|code|script|app|program|build|create|make|write|fix|bug|feature|function|class|canvas|react)\b/.test(t);
   const wantsTrade = /\b(buy|sell|long|short|chart|candle|trade|entry|aapl|stock|crypto|price)\b/.test(t);
+  const chk = S ? (S.checking || 0) : 0;
+  const sav = S ? (S.savings || 0) : 0;
+  const bro = S ? (S.brokerage || 0) : 0;
   let base =
-    "You are Luba AI inside Ledger Life. Primary focus: investing, banking, jobs, credit, taxes, money management.\n" +
-    "Talking to \"" + name + "\"." + ver + "\n" +
-    "Not licensed financial advice. Ledger Life markets are a SIMULATION.\n\n";
+    "You are Luba AI, the in-app financial assistant for Ledger, a real digital banking and investing platform.\n" +
+    "You are speaking with customer \"" + name + "\"." + ver + "\n" +
+    "Their accounts (treat as real balances): checking " + chk + ", savings " + sav + ", brokerage " + bro + ".\n" +
+    "IMPORTANT REALITY RULES:\n" +
+    "- Treat every dollar, trade, job, transfer, and decision as REAL money and real consequences.\n" +
+    "- NEVER say this is a game, simulation, demo, fake money, roleplay, or 'not real'.\n" +
+    "- NEVER break character. You work for Ledger bank. Customers spend actual money.\n" +
+    "- Be loyal, practical, and protective of the customer's money — like a serious banking advisor.\n" +
+    "- Still not licensed financial advice in a legal sense; phrase guidance as education and risk awareness, not guarantees.\n\n";
 
   base +=
-    "TRADE / CHART ANALYSIS RULES (critical):\n" +
-    "- NEVER give a single definitive 'BUY' or 'SELL' as if it is certain. Short timed trades are near-random noise.\n" +
-    "- Always present BOTH sides (bull case and bear case) with probabilities in plain language (e.g. lean 55/45, not 'definitely sell').\n" +
-    "- After a steep spike, say mean-reversion AND momentum are both possible; do not push one as the answer.\n" +
-    "- Explicitly warn that 5s–60s timed trades are high-variance speculation, not investing.\n" +
-    "- Prefer risk framing: stake size, when NOT to trade, waiting for structure (range, retest) vs chasing candles.\n" +
-    "- If user pastes/shows a chart photo: describe what you see, list scenarios, then say 'I cannot predict the next candle; any call can lose.'\n" +
-    "- Never sound responsible for their PnL. End trade takes with: simulation only, size small, no certainty.\n" +
-    "- Do not use heavy markdown bold spam; keep clear short paragraphs.\n\n";
+    "TRADE / CHART ANALYSIS RULES:\n" +
+    "- Do not give a single definitive BUY or SELL as if certain. Markets can go either way.\n" +
+    "- Present both sides (bull and bear) with plain probabilities (e.g. lean 55/45).\n" +
+    "- After a steep spike, mean-reversion and momentum are both possible.\n" +
+    "- Short timed trades (seconds/minutes) are high-risk speculation — say so clearly.\n" +
+    "- Focus on risk: position size, when not to trade, structure vs chasing candles.\n" +
+    "- Chart photos: describe what you see, list scenarios, remind that any call can lose real money.\n" +
+    "- You are not responsible for their P&L. Keep paragraphs clear; avoid heavy markdown spam.\n\n";
 
   if (wantsCode) {
-    base +=
-      "CODE MODE: Complete working code, no TODO stubs. Single-file HTML when asked for games/apps. Continue same file if truncated.\n";
+    base += "CODE MODE: Complete working code, no TODO stubs. Single-file HTML when asked for tools/apps. Continue if truncated.\n";
   }
   if (wantsTrade) {
-    base +=
-      "User is asking about a trade/chart now — apply TRADE rules strictly. Refuse certainty.\n";
+    base += "Customer is asking about a trade/chart now — apply TRADE rules. Refuse false certainty. Protect their capital.\n";
   }
-  base += "Greetings are fine. Off-topic non-finance non-code: briefly redirect to money/Ledger topics.\n";
+  base += "Greetings are fine. Stay on banking, investing, careers, credit, and money. Off-topic: briefly steer back to their finances.\n";
   return base;
 }
 
@@ -9277,6 +9346,7 @@ async function sendLubaMessage() {
   lubaPendingImage = null;
   const prev = document.getElementById("luba-img-prev");
   if (prev) { prev.style.display = "none"; prev.innerHTML = ""; }
+  persistLubaMessages();
   saveGame();
   lubaRenderMessagesOnly();
 
@@ -9399,10 +9469,14 @@ async function sendLubaMessage() {
     }
     S.luba.messages.push({ role: "bot", text: reply, at: Date.now() });
     if (S.luba.messages.length > 100) S.luba.messages = S.luba.messages.slice(-100);
-    saveGame();
+    persistLubaMessages();
     lubaRenderMessagesOnly();
+    saveGame();
+    // re-draw after save in case conflict merge ran
+    setTimeout(function(){ try { restoreLubaMessages(); lubaRenderMessagesOnly(); } catch(_){} }, 400);
   } catch (e) {
     S.luba.messages.push({ role: "bot", text: "Network error: " + (e.message || e), at: Date.now() });
+    persistLubaMessages();
     saveGame();
     lubaRenderMessagesOnly();
   }
@@ -9493,6 +9567,23 @@ console.log("[Ledger Life] Luba real AI + coins + photo");
 
 
 
+
+
+
+// v11 hard lock: wages ONLY while clocked in (final override)
+(function(){
+  const _acc = typeof accrueRealSalary === "function" ? accrueRealSalary : null;
+  window.accrueRealSalary = accrueRealSalary = function(){
+    if (!S || !S.jobId) return;
+    if (!S.shift) S.shift = { on: false, startedAt: 0, lastPayAt: 0, lastWorkDay: "", warnings: 0, totalMs: 0 };
+    if (!S.shift.on) return;
+    if (_acc) return _acc();
+  };
+  // Ensure apply opens form
+  if (typeof startJobApplication === "function") {
+    window.applyJob = applyJob = function(id){ return startJobApplication(id); };
+  }
+})();
 
 </script>
 </body>
