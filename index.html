@@ -1324,63 +1324,182 @@ function meetsReq(req){
 function availableJobs(){
   return JOB_TREE.filter(j => meetsReq(j.req));
 }
-function applyJob(jobId){
-  const job = JOB_TREE.find(j => j.id === jobId);
-  if (!job) return "Job not found";
-  if (!meetsReq(job.req)) return "Skills requirement not met";
-  S.jobId = jobId;
-  S.jobDays = 0;
-  S.lastSalaryAt = Date.now();
-  toast("Hired: " + job.title + " at " + job.company);
-  addTx("career", "Started job: "+job.title, 0, "checking");
-  return null;
-}
-function quitJob(){
-  if (!S.jobId) return "No job";
-  S.jobId = null;
-  S.jobDays = 0;
-  toast("You left your job");
-  return null;
+function ensureShiftState(){
+  if (!S) return;
+  if (!S.shift) S.shift = { on: false, startedAt: 0, lastPayAt: 0, lastWorkDay: "", warnings: 0, totalMs: 0 };
 }
 function dailySalary(){
   const job = currentJob();
   if (!job) return 0;
-  // annual salary → real 24h day rate
   let mult = (S._raiseMult || 1);
-  // Entry service roles: modest tips (still realistic, not free cash)
-  if ((job.tier || 0) === 0) mult *= 1.12;
+  if ((job.tier || 0) === 0) mult *= 1.12; // tips on service
   return (job.salary / 365) * mult;
 }
 function hourlySalary(){
-  return dailySalary() / 24;
+  // 8-hour workday assumption: annual / 365 / 8
+  return dailySalary() / 8;
 }
-/** Pay wages based on real elapsed time (ms) since last pay */
+/** Job application — must fill form; not instant free hire */
+function startJobApplication(jobId){
+  const job = JOB_TREE.find(j => j.id === jobId);
+  if (!job) return "Job not found";
+  if (!meetsReq(job.req)) return "Skills requirement not met";
+  if (S.jobId) return "Resign from your current job first";
+  openModal(
+    "<h2>Job application</h2>" +
+    '<div class="meta mb-8">' + (job.title || "") + " · " + (job.company || "") + " · " + fmt(job.salary,0) + "/yr</div>" +
+    "<label>Full name</label><input type=\"text\" id=\"app-name\" value=\"" + (S.displayName || "").replace(/"/g,"") + "\" placeholder=\"Your legal name\">" +
+    "<label>Years of related experience</label><input type=\"number\" id=\"app-exp\" min=\"0\" max=\"40\" value=\"0\" placeholder=\"0\">" +
+    "<label>Why should we hire you?</label><textarea id=\"app-why\" rows=\"3\" placeholder=\"1–2 sentences (required)\" style=\"width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text)\"></textarea>" +
+    "<label>Available to start</label><select id=\"app-start\"><option value=\"immediate\">Immediately</option><option value=\"week\">In 1 week</option></select>" +
+    '<div class="modal-actions"><button class="btn btn-primary" type="button" id="app-submit">Submit application</button>' +
+    '<button class="btn btn-secondary" type="button" id="app-cancel">Cancel</button></div>'
+  );
+  setTimeout(function(){
+    const sub = document.getElementById("app-submit");
+    const can = document.getElementById("app-cancel");
+    if (can) can.onclick = function(){ closeModal(); };
+    if (sub) sub.onclick = function(){
+      const name = ((document.getElementById("app-name")||{}).value || "").trim();
+      const why = ((document.getElementById("app-why")||{}).value || "").trim();
+      const exp = Number((document.getElementById("app-exp")||{}).value || 0);
+      if (name.length < 2) { toast("Enter your name"); return; }
+      if (why.length < 12) { toast("Write a real reason (at least a short sentence)"); return; }
+      // Soft hire chance: skills already checked; experience helps flavor only
+      S.jobId = jobId;
+      S.jobDays = 0;
+      S.jobWarnings = 0;
+      ensureShiftState();
+      S.shift = { on: false, startedAt: 0, lastPayAt: 0, lastWorkDay: "", warnings: 0, totalMs: 0 };
+      S.lastSalaryAt = Date.now();
+      closeModal();
+      toast("Hired: " + job.title + " at " + job.company + " — Clock in to earn");
+      if (typeof addTx === "function") addTx("career", "Hired: " + job.title, 0, "checking");
+      if (typeof saveGame === "function") saveGame();
+      if (typeof renderWork === "function") renderWork();
+    };
+  }, 0);
+  return null;
+}
+function applyJob(jobId){
+  return startJobApplication(jobId);
+}
+function quitJob(){
+  if (!S.jobId) return "No job";
+  ensureShiftState();
+  if (S.shift && S.shift.on) clockOut(true);
+  S.jobId = null;
+  S.jobDays = 0;
+  S.jobWarnings = 0;
+  S.shift = { on: false, startedAt: 0, lastPayAt: 0, lastWorkDay: "", warnings: 0, totalMs: 0 };
+  toast("You resigned");
+  return null;
+}
+function clockIn(){
+  if (!S.jobId) return "No job";
+  ensureShiftState();
+  if (S.shift.on) return "Already on shift";
+  const now = Date.now();
+  S.shift.on = true;
+  S.shift.startedAt = now;
+  S.shift.lastPayAt = now;
+  const dayKey = new Date().toDateString();
+  if (S.shift.lastWorkDay !== dayKey) {
+    S.jobDays = (S.jobDays || 0) + 1;
+    S.shift.lastWorkDay = dayKey;
+  }
+  // Showing up clears one warning path
+  toast("Clocked in — wages only while on shift (max 8h)");
+  if (typeof saveGame === "function") saveGame();
+  return null;
+}
+function clockOut(silent){
+  if (!S || !S.shift || !S.shift.on) return silent ? null : "Not on shift";
+  // final pay slice
+  accrueRealSalary();
+  const ms = Date.now() - (S.shift.startedAt || Date.now());
+  S.shift.totalMs = (S.shift.totalMs || 0) + Math.max(0, ms);
+  S.shift.on = false;
+  S.shift.startedAt = 0;
+  S.shift.lastPayAt = 0;
+  if (!silent) toast("Clocked out");
+  if (typeof saveGame === "function") saveGame();
+  return null;
+}
+window.clockIn = clockIn;
+window.clockOut = clockOut;
+window.startJobApplication = startJobApplication;
+/** Pay only while clocked in; 8h shift cap; no AFK paycheck */
 function accrueRealSalary(){
   if (!S || !S.jobId) return;
+  ensureShiftState();
   const now = Date.now();
-  if (!S.lastSalaryAt) S.lastSalaryAt = now;
-  const elapsedMs = now - S.lastSalaryAt;
-  if (elapsedMs < 1000) return; // min 1s
-  const ratePerMs = dailySalary() / 86400000; // $ per real ms
+  // Auto clock-out after 8 real hours
+  if (S.shift.on && S.shift.startedAt && (now - S.shift.startedAt) > 8 * 3600000) {
+    clockOut(true);
+    toast("Shift ended (8h max) — clock in again to keep earning");
+  }
+  if (!S.shift.on) return; // NO pay when not working
+  if (!S.shift.lastPayAt) S.shift.lastPayAt = now;
+  const elapsedMs = now - S.shift.lastPayAt;
+  if (elapsedMs < 1000) return;
+  // Hourly rate for an 8h day
+  const ratePerMs = hourlySalary() / 3600000;
   const pay = ratePerMs * elapsedMs;
   if (pay < 0.0001) return;
+  S.shift.lastPayAt = now;
   S.lastSalaryAt = now;
   S.checking = (S.checking || 0) + pay;
   S.ytdIncome = (S.ytdIncome || 0) + pay;
   S.totalEarned = (S.totalEarned || 0) + pay;
-  // batch tx every ~minute of accrual to avoid spam
   if (!S._salaryBuf) S._salaryBuf = 0;
   S._salaryBuf += pay;
-  if (S._salaryBuf >= Math.max(0.5, dailySalary() / 48)) {
-    if (typeof addTx === "function") addTx("income", "Wages (" + ((currentJob()||{}).title || "Job") + ")", S._salaryBuf, "checking");
+  if (S._salaryBuf >= Math.max(0.25, hourlySalary() / 12)) {
+    if (typeof addTx === "function") addTx("income", "Wages shift (" + ((currentJob()||{}).title || "Job") + ")", S._salaryBuf, "checking");
     S._salaryBuf = 0;
   }
-  // soft progress ping every ~$1 so grind feels alive
   if (!S._wagePing) S._wagePing = 0;
   S._wagePing += pay;
-  if (S._wagePing >= 1) {
+  if (S._wagePing >= 0.5) {
     S._wagePing = 0;
     try { if (typeof refreshTopbar === "function") refreshTopbar(); } catch(_){}
+  }
+}
+/** Miss work → warnings → fired */
+function checkAttendance(){
+  if (!S || !S.jobId) return;
+  ensureShiftState();
+  const now = Date.now();
+  const dayKey = new Date().toDateString();
+  // If employed and last work day is older than 1 calendar day and not on shift
+  if (S.shift.on) return;
+  const last = S.shift.lastWorkDay || "";
+  if (!last) {
+    // never worked since hire — if hired > 24h ago, warn
+    if (S.lastSalaryAt && now - S.lastSalaryAt > 86400000) {
+      S.shift.warnings = (S.shift.warnings || 0) + 1;
+      S.lastSalaryAt = now; // throttle warns
+      toast("HR notice: you haven't clocked in — warning " + S.shift.warnings + "/2");
+    }
+  } else if (last !== dayKey) {
+    // parse last work day
+    const lastT = Date.parse(last);
+    if (lastT && now - lastT > 36 * 3600000) {
+      // more than ~1.5 days without a shift
+      if (!S.shift._warnedDay || S.shift._warnedDay !== dayKey) {
+        S.shift.warnings = (S.shift.warnings || 0) + 1;
+        S.shift._warnedDay = dayKey;
+        toast("No-show risk — warning " + S.shift.warnings + "/2. Clock in today.");
+      }
+    }
+  }
+  if ((S.shift.warnings || 0) >= 2) {
+    const title = (currentJob() || {}).title || "your job";
+    S.jobId = null;
+    S.shift = { on: false, startedAt: 0, lastPayAt: 0, lastWorkDay: "", warnings: 0, totalMs: 0 };
+    toast("Fired from " + title + " (no-shows)");
+    if (typeof addTx === "function") addTx("career", "Terminated: no-shows", 0, "checking");
+    if (typeof saveGame === "function") saveGame();
   }
 }
 function trainSkill(skillId){
@@ -1658,8 +1777,7 @@ function onNewDay(){
   if (S._lastCalDay === todayKey) return; // already ran real daily once
   S._lastCalDay = todayKey;
 
-  // wages accrue in real time via accrueRealSalary() — not per game day
-  if (S.jobId) S.jobDays = (S.jobDays || 0) + 1;
+  // Shifts logged only via clock-in (not calendar day)
   // side hustles
   const side = sideDailyIncome();
   if (side > 0) {
@@ -1732,8 +1850,7 @@ function onNewDay(){
   maybeNews();
   maybeLifeEvent();
 
-  // job tenure
-  if (S.jobId) S.jobDays++;
+  // job tenure / shifts: only via clockIn()
 
   // track net
   const nw = netWorth();
@@ -2379,19 +2496,33 @@ function renderWork(){
     const job = currentJob();
     let html = "";
     if (job) {
+      if (typeof ensureShiftState === "function") ensureShiftState();
       const dayPay = dailySalary();
-      const hourPay = dayPay / 24;
+      const hourPay = hourlySalary();
+      const on = !!(S.shift && S.shift.on);
+      const warns = (S.shift && S.shift.warnings) || 0;
+      let shiftMeta = on ? "ON SHIFT — earning now" : "Off the clock — no pay until you clock in";
+      if (on && S.shift.startedAt) {
+        const mins = Math.floor((Date.now() - S.shift.startedAt) / 60000);
+        shiftMeta = "ON SHIFT · " + mins + " min · max 8h";
+      }
       html += `<div class="card job-card">
         <h3>${esc(job.title)}</h3>
-        <div class="meta">${esc(job.company)} · ${S.jobDays||0} shifts logged</div>
-        <div class="card-row mt-8"><div class="meta">Pay / real 24h</div><div class="val pos">${fmt(dayPay)}</div></div>
-        <div class="card-row"><div class="meta">Pay / real hour</div><div class="val pos">${fmt(hourPay)}</div></div>
+        <div class="meta">${esc(job.company)} · ${S.jobDays||0} shifts logged · warnings ${warns}/2</div>
+        <div class="card-row mt-8"><div class="meta">Pay / shift hour</div><div class="val pos">${fmt(hourPay)}</div></div>
+        <div class="card-row"><div class="meta">Pay / full day (8h)</div><div class="val pos">${fmt(hourPay*8)}</div></div>
         <div class="card-row"><div class="meta">Annual salary</div><div class="val">${fmt(job.salary*(S._raiseMult||1),0)}</div></div>
-        <div class="meta mt-8">Wages deposit continuously in real time while employed.</div><div class="meta" id="live-wage-rate">Live rate updates on Home / Work</div>
-        <button class="btn btn-danger btn-sm mt-12" onclick="quitJob();renderWork();saveGame()">Resign</button>
+        <div class="meta mt-8">${shiftMeta}</div>
+        <div class="meta">Miss ~2 days without clocking in → fired. Pay only while on shift.</div>
+        <div class="btn-row mt-12" style="gap:8px;flex-wrap:wrap">
+          ${on
+            ? '<button class="btn btn-secondary btn-sm" type="button" onclick="clockOut();renderWork();saveGame()">Clock out</button>'
+            : '<button class="btn btn-primary btn-sm" type="button" onclick="const e=clockIn();if(e)toast(e);renderWork();saveGame()">Clock in</button>'}
+          <button class="btn btn-danger btn-sm" type="button" onclick="quitJob();renderWork();saveGame()">Resign</button>
+        </div>
       </div>`;
     } else {
-      html += `<div class="empty-state"><p>You are unemployed. Apply below — meet skill requirements to unlock better roles.</p></div>`;
+      html += `<div class="empty-state"><p>Unemployed. Apply below — fill the application, then <b>clock in</b> to earn. No AFK salary.</p></div>`;
     }
     html += `<div class="section-title">Open roles</div>`;
     html += availableJobs().map(j => {
@@ -6724,7 +6855,7 @@ const CANDLE_THEMES = {
   gold: { up:"#ffc107", down:"#ff6f00", bg:"#120e08", grid:"#2a2218", wick:"#c9a227" },
 };
 const MIN_TRADE_STAKE = 5; // minimum $ for timed trades & invest buys
-let candleState = { symbol:"AAPL", kind:"stock", tf:"10s", theme:"classic", limit:60, stake:25 };
+let candleState = { symbol:"AAPL", kind:"stock", tf:"10s", theme:"classic", limit:60, stake:25, live: true, liveSource: "", lastLiveAt: 0 };
 window.MIN_TRADE_STAKE = MIN_TRADE_STAKE;
 
 function ensureCandles(sym, kind){
@@ -6809,6 +6940,7 @@ gameTick = function(){
   if (S && S.tick % 2 === 0) pushCandleTick();
   if (S && investTab === "charts" && S.tick % 3 === 0) {
     try {
+      if (typeof updateLiveBadge === "function") updateLiveBadge();
       if (typeof softUpdateCandlePanel === "function") softUpdateCandlePanel();
       else if (document.activeElement && document.activeElement.id === "c-amt") { /* don't wipe stake */ }
       else renderCandlePanel();
@@ -7080,6 +7212,134 @@ window.renderWork = renderWork;
 if (!window._candleOrders) window._candleOrders = [];
 
 // Faster live tick for the open chart symbol
+
+// ---------- LIVE MARKET DATA ----------
+
+function updateLiveBadge(){
+  try {
+    const el = document.querySelector(".candle-head .meta, .luba-head .t, [data-live-badge]");
+    // mark on chart card
+    let badge = document.getElementById("live-feed-badge");
+    if (!badge) {
+      const host = document.querySelector("#invest-charts .card, #invest-candle, .candle-wrap");
+      // insert near stake row
+      const stake = document.getElementById("c-amt");
+      if (stake && stake.parentNode) {
+        badge = document.createElement("div");
+        badge.id = "live-feed-badge";
+        badge.className = "meta";
+        badge.style.marginTop = "6px";
+        stake.parentNode.appendChild(badge);
+      }
+    }
+    if (badge) {
+      if (candleState.live && candleState.lastLiveAt && Date.now() - candleState.lastLiveAt < 30000) {
+        badge.innerHTML = '<span style="color:#00c853">● LIVE</span> ' + (candleState.liveSource || "") + " · real prices";
+      } else if (candleState.live) {
+        badge.innerHTML = '<span style="color:#ffc107">● LIVE connecting…</span>';
+      } else {
+        badge.innerHTML = '<span style="color:#8b92a5">○ SIM</span> random walk';
+      }
+    }
+  } catch(_){}
+}
+
+async function fetchLiveCandles() {
+  if (!S || !CLOUD_API || !candleState.live) return null;
+  try {
+    const data = await cloudFetch("/candles", {
+      symbol: candleState.symbol,
+      kind: candleState.kind,
+      limit: candleState.limit || 60
+    });
+    if (!data || !data.candles || !data.candles.length) return null;
+    const book = candleState.kind === "crypto" ? S.cryptos : S.stocks;
+    if (!book || !book[candleState.symbol]) return null;
+    const asset = book[candleState.symbol];
+    asset.candles = data.candles.map(function(c) {
+      return { o: c.o, h: c.h, l: c.l, c: c.c, t: c.t };
+    });
+    if (data.price != null) {
+      asset.prev = asset.price;
+      asset.price = Number(data.price);
+    } else {
+      asset.prev = asset.price;
+      asset.price = asset.candles[asset.candles.length - 1].c;
+    }
+    asset.live = true;
+    candleState.liveSource = data.source || "live";
+    candleState.lastLiveAt = Date.now();
+    return data;
+  } catch (e) {
+    console.warn("live candles", e);
+    if (!window._liveFailToast) {
+      window._liveFailToast = true;
+      try { toast("Live feed offline — using sim until worker is updated"); } catch(_){}
+    }
+    candleState.liveSource = "sim";
+    return null;
+  }
+}
+
+async function fetchLiveQuote() {
+  if (!S || !CLOUD_API || !candleState.live) return null;
+  try {
+    const data = await cloudFetch("/quote", {
+      symbol: candleState.symbol,
+      kind: candleState.kind
+    });
+    if (!data || !(data.price > 0)) return null;
+    const book = candleState.kind === "crypto" ? S.cryptos : S.stocks;
+    if (!book || !book[candleState.symbol]) return null;
+    const asset = book[candleState.symbol];
+    const px = Number(data.price);
+    asset.prev = asset.price;
+    asset.price = px;
+    if (!asset.candles) asset.candles = [];
+    let last = asset.candles[asset.candles.length - 1];
+    const now = Date.now();
+    // new 1m candle or update current
+    if (!last || now - (last.t || 0) > 60000) {
+      asset.candles.push({ o: px, h: px, l: px, c: px, t: now });
+      if (asset.candles.length > 200) asset.candles.shift();
+    } else {
+      last.c = px;
+      last.h = Math.max(last.h, px);
+      last.l = Math.min(last.l, px);
+      last.t = now;
+    }
+    asset.live = true;
+    candleState.liveSource = data.source || "live";
+    candleState.lastLiveAt = now;
+    if (data.changePct != null) asset._chgPct = data.changePct;
+    return data;
+  } catch (e) {
+    console.warn("live quote", e);
+    return null;
+  }
+}
+
+if (!window._liveMarketTimer) {
+  window._liveMarketTimer = setInterval(async function() {
+    try {
+      if (!candleState.live || !S) return;
+      // Full candle refresh every ~45s, quote tick every cycle
+      if (!candleState.lastLiveAt || Date.now() - candleState.lastLiveAt > 40000) {
+        await fetchLiveCandles();
+      } else {
+        await fetchLiveQuote();
+      }
+      if (typeof softUpdateCandlePanel === "function") softUpdateCandlePanel();
+      else if (typeof renderCandlePanel === "function" && document.getElementById("c-amt") !== document.activeElement) {
+        try { renderCandlePanel(); } catch(_){}
+      }
+    } catch(_){}
+  }, 5000);
+  // initial pull
+  setTimeout(function(){ try { fetchLiveCandles(); } catch(_){} }, 1500);
+}
+
+
 pushCandleTick = function(){
   if (!S) return;
   function step(asset, mult){
@@ -7126,12 +7386,14 @@ pushCandleTick = function(){
     asset.history.push(asset.price);
     if (asset.history.length > 100) asset.history.shift();
   }
-  // Always animate the selected chart symbol strongly
+  // Live mode: selected symbol comes from real feed — only sim others lightly
   const kind = candleState.kind;
   const sym = candleState.symbol;
   const book = kind === "crypto" ? S.cryptos : S.stocks;
-  if (book && book[sym]) step(book[sym], kind==="crypto" ? 2.2 : 1.4);
-  // Light random others
+  if (!(candleState.live && book && book[sym] && book[sym].live)) {
+    if (book && book[sym]) step(book[sym], kind==="crypto" ? 2.2 : 1.4);
+  }
+  // Light random others (background only)
   Object.keys(S.stocks||{}).slice(0, 12).forEach(s => { if (s !== sym) step(S.stocks[s], 0.6); });
   Object.keys(S.cryptos||{}).slice(0, 8).forEach(s => { if (s !== sym) step(S.cryptos[s], 1.0); });
 };
@@ -7286,7 +7548,7 @@ renderCandlePanel = function(force){
   });
   host.innerHTML =
     '<div class="card"><h3>Live chart · timed trades</h3>' +
-    '<div class="meta mb-8">Pick duration, stake from checking (min $5). Stake is locked on open. WIN returns 1.85×; LOSS keeps the stake gone.</div>' +
+    '<div class="meta mb-8">LIVE market prices (Yahoo/Binance via server). Stake locked on open · WIN 1.85× · LOSS forfeits stake.</div>' +
     '<div class="candle-toolbar">' +
     '<select id="c-sym" style="flex:1;min-width:90px;padding:8px;border-radius:8px;background:var(--card);color:var(--text);border:1px solid var(--border)">' +
     symbols.map(s => '<option value="'+s+'"'+(s===sym?' selected':'')+'>'+s+'</option>').join('') +
@@ -7731,9 +7993,13 @@ window.exportSaveFull = function(){ toast("Cloud sync is on — no file export n
 if (!window._wageTimer) {
   window._wageTimer = setInterval(function(){
     try {
-      if (typeof accrueRealSalary === "function" && S && S.jobId) {
+      if (!S) return;
+      if (typeof checkAttendance === "function") checkAttendance();
+      if (typeof accrueRealSalary === "function" && S.jobId) {
         accrueRealSalary();
-        if (S.tick % 10 === 0) refreshTopbar();
+      }
+      if (S.shift && S.shift.on && typeof refreshTopbar === "function") {
+        if ((S.tick || 0) % 5 === 0) refreshTopbar();
       }
     } catch(_){}
   }, 2000);
