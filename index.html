@@ -2762,16 +2762,43 @@ function renderProfile(){
     <div class="section-title">Account</div>
     <button class="btn btn-secondary btn-block" onclick="saveGame();toast('Game saved')">Save now</button>
     <button class="btn btn-secondary btn-block mt-8" onclick="if(confirm('Sign out? Progress is saved.')){saveGame();location.reload()}">Sign out</button>
-    <button class="btn btn-danger btn-block mt-8" onclick="if(confirm('Delete this life permanently?')){deleteLife()}">Delete account</button>
+    <button class="btn btn-danger btn-block mt-8" onclick="deleteLife()">Delete account</button>
     <div class="meta mt-12 text-sm" style="text-align:center">Ledger Life Private Banking · Cloud accounts</div>
   `;
 }
-function deleteLife(){
-  const users = allUsers();
-  delete users[sessionUser];
-  saveUsers(users);
-  location.reload();
+async function deleteLife(){
+  if (!confirm("Delete this account permanently? This cannot be undone.")) return;
+  const user = sessionUser;
+  const pass = sessionPassword;
+  try {
+    // Cloud delete first
+    if (cloudMode && CLOUD_API && user && pass) {
+      try {
+        await cloudFetch("/delete", { username: user, password: pass });
+      } catch (e) {
+        console.warn("cloud delete", e);
+        // still wipe local
+      }
+    }
+  } catch (_) {}
+  try {
+    const users = allUsers();
+    if (user) delete users[user];
+    saveUsers(users);
+  } catch (_) {}
+  try {
+    if (typeof clearSession === "function") clearSession();
+    localStorage.removeItem("ledger_life_session_v1");
+    localStorage.removeItem("ledger_luba_msgs_v1_" + String(user || "").toLowerCase());
+  } catch (_) {}
+  sessionUser = null;
+  sessionPassword = null;
+  S = null;
+  toast("Account deleted");
+  // Force auth screen without auto-login
+  setTimeout(function(){ location.href = location.pathname + "?deleted=1"; }, 200);
 }
+window.deleteLife = deleteLife;
 
 // ---------- WIRING ----------
 document.querySelectorAll(".nav-item").forEach(btn => {
@@ -7419,32 +7446,41 @@ function settleTimedOrders(){
   const now = Date.now();
   const left = [];
   let changed = false;
+  // ~48% win rate feel: need a real move past a tiny threshold; flat = loss (house edge)
+  // Payout 1.80× on win → slight house edge vs true 50/50
+  const PAYOUT_MULT = 1.80;
   S.timedTrades.forEach(tr => {
     if (now < tr.expiresAt) { left.push(tr); return; }
+    if (tr._settled) return; // never double-pay
+    tr._settled = true;
     changed = true;
     const book = tr.kind === "crypto" ? S.cryptos : S.stocks;
     const asset = book && book[tr.symbol];
-    const exit = asset ? Number(asset.price) : Number(tr.entry);
+    let exit = asset ? Number(asset.price) : Number(tr.entry);
     const entry = Number(tr.entry);
     const stake = Number(tr.stake) || 0;
-    const up = exit >= entry;
-    const win = (tr.side === "buy" && up) || (tr.side === "sell" && !up);
-    // Ensure stake was held: if open failed to deduct, deduct now before resolve
+    if (!(entry > 0) || !Number.isFinite(exit)) exit = entry;
+    // Minimum move ~0.015% so flat/noise markets don't auto-win buys
+    const movePct = (exit - entry) / entry;
+    const eps = 0.00015;
+    let win = false;
+    if (tr.side === "buy") win = movePct > eps;
+    else if (tr.side === "sell") win = movePct < -eps;
+    // else flat / wrong direction = loss
     if (!tr.deducted && stake > 0) {
       S.checking = Number(S.checking || 0) - stake;
       tr.deducted = true;
     }
     if (win) {
-      // Return stake + profit (1.85× total)
-      const payout = stake * 1.85;
+      const payout = stake * PAYOUT_MULT;
       const profit = payout - stake;
       S.checking = Number(S.checking || 0) + payout;
-      if (typeof addTx === "function") addTx("invest", "Timed "+tr.side.toUpperCase()+" WIN "+tr.symbol, payout, "checking");
-      toast("WIN +" + fmt(profit) + " profit · " + fmt(payout) + " back · " + tr.symbol);
+      if (typeof addTx === "function") addTx("invest", "Timed "+tr.side.toUpperCase()+" WIN "+tr.symbol, profit, "checking");
+      toast("WIN +" + fmt(profit) + " · total back " + fmt(payout) + " · " + tr.symbol);
     } else {
-      // Stake stays gone — real loss
-      if (typeof addTx === "function") addTx("invest", "Timed "+tr.side.toUpperCase()+" LOSS "+tr.symbol, -stake, "checking");
-      toast("LOSS −" + fmt(stake) + " · " + tr.symbol);
+      // Stake already deducted at open — log loss once
+      if (typeof addTx === "function") addTx("invest", "Timed "+tr.side.toUpperCase()+" LOSS "+tr.symbol, 0, "checking");
+      toast("LOSS −" + fmt(stake) + " · " + tr.symbol + (Math.abs(movePct) <= eps ? " (no move)" : ""));
     }
   });
   S.timedTrades = left;
@@ -7564,7 +7600,7 @@ renderCandlePanel = function(force){
   });
   host.innerHTML =
     '<div class="card"><h3>Live chart · timed trades</h3>' +
-    '<div class="meta mb-8">LIVE market prices (Yahoo/Binance via server). Stake locked on open · WIN 1.85× · LOSS forfeits stake.</div>' +
+    '<div class="meta mb-8">LIVE market prices (Yahoo/Binance via server). Stake locked on open · WIN 1.80× · LOSS forfeits stake.</div>' +
     '<div class="candle-toolbar">' +
     '<select id="c-sym" style="flex:1;min-width:90px;padding:8px;border-radius:8px;background:var(--card);color:var(--text);border:1px solid var(--border)">' +
     symbols.map(s => '<option value="'+s+'"'+(s===sym?' selected':'')+'>'+s+'</option>').join('') +
@@ -7658,6 +7694,11 @@ function softUpdateCandlePanel(){
   const book = kind === "crypto" ? S.cryptos : S.stocks;
   const asset = book && book[sym];
   if (!asset) return;
+  // Seed candles if missing so the chart never goes blank
+  if (typeof ensureCandles === "function") ensureCandles(sym, kind);
+  if (!asset.candles || !asset.candles.length) {
+    if (typeof ensureCandles === "function") ensureCandles(sym, kind);
+  }
   // update price labels
   const amts = host.querySelectorAll(".amt");
   if (amts.length) amts[0].textContent = fmt(asset.price);
@@ -7667,15 +7708,16 @@ function softUpdateCandlePanel(){
     chgEl.textContent = fmtPct(chg);
     chgEl.className = "chg " + (chg >= 0 ? "pos" : "neg");
   }
-  // replace chart svg only
-  const scroll = host.querySelector(".candle-scroll");
-  if (scroll && asset.candles) {
+  // replace chart block (candle-scroll wrapper or bare svg)
+  const scroll = host.querySelector(".candle-scroll") || host.querySelector("svg.candle-chart");
+  if (scroll && asset.candles && asset.candles.length) {
     const tmp = document.createElement("div");
     tmp.innerHTML = renderCandleSVG(asset.candles, candleState.theme);
     const neu = tmp.firstChild;
     if (neu) {
       scroll.replaceWith(neu);
-      neu.scrollLeft = neu.scrollWidth;
+      const sc = neu.classList && neu.classList.contains("candle-scroll") ? neu : host.querySelector(".candle-scroll");
+      if (sc) sc.scrollLeft = sc.scrollWidth;
     }
   }
   // update open positions countdowns
@@ -8193,6 +8235,14 @@ setTimeout(function(){ try { tryOpenLubaBuyShop(); } catch(_){} }, 2000);
 
 // Auto-login on boot
 (function autoLoginBoot() {
+  try {
+    if (/[?&]deleted=1/.test(location.search || "")) {
+      try { localStorage.removeItem("ledger_life_session_v1"); } catch(_){}
+      // clean URL
+      try { history.replaceState({}, "", location.pathname); } catch(_){}
+      return;
+    }
+  } catch(_){}
   const sess = loadSession();
   if (!sess) return;
   // show brief restoring state on auth screen
@@ -9370,7 +9420,7 @@ async function sendLubaMessage() {
     return;
   }
 
-  const heavy = /(html|css|javascript|js|code|script|game|app|program|build|create|make|write|fix|5k|5000|lines)/i.test(text || "") || !!img;
+  const heavy = /\b(html|css|javascript|js|code|script|game|app|program|build|create|make|write|fix|5k|5000|lines)\b/i.test(text || "") || !!img;
   const cost = heavy ? 2 : 1;
   if ((S.luba.coins || 0) < cost) {
     S.luba.messages.push({ role: "bot", text: "Not enough coins (need " + cost + "). Buy more or wait for the 24h refresh.", at: Date.now() });
@@ -9417,16 +9467,55 @@ async function sendLubaMessage() {
     const wantsCode = /\b(html|css|javascript|js|code|script|game|app|program|build|create|make|write|fix|bug|feature|canvas|react|5k|5000|lines)\b/i.test(text || "");
     const maxOut = wantsCode ? 8192 : 2048;
     const maxContinues = wantsCode ? 10 : 2;
+    // Real Gemini model ids (proxy worker forwards to Google)
     const modelChain = [
-      "gemini-3.8-flash",
-      "gemini-3.5-flash",
-      "gemini-3.6-flash",
-      "gemini-3.7-flash",
-      "gemini-3.1-flash-lite",
-      "gemini-3.5-flash-lite",
+      "gemini-2.5-flash",
+      "gemini-2.0-flash",
       "gemini-2.5-flash-lite",
-      "gemini-2.5-flash"
+      "gemini-1.5-flash",
+      "gemini-1.5-flash-latest",
+      "gemini-2.0-flash-lite"
     ];
+
+    async function lubaFetchJson(model, payload) {
+      const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+      const timer = ctrl ? setTimeout(function(){ try { ctrl.abort(); } catch(_){} }, 55000) : null;
+      try {
+        const res = await fetch(LUBA_WORKER, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: model,
+            payload: payload,
+            username: sessionUser || (S && S.username) || ""
+          }),
+          signal: ctrl ? ctrl.signal : undefined
+        });
+        const raw = await res.text();
+        let data = null;
+        try { data = JSON.parse(raw); } catch (_) { data = null; }
+        if (!data) {
+          // Cloudflare HTML/text errors (524 timeout, 502, etc.)
+          if (/524|timeout|timed out/i.test(raw) || res.status === 524) {
+            return { error: { message: "Server timeout (524). AI took too long — try a shorter question." }, status: 524 };
+          }
+          if (/502|bad gateway/i.test(raw) || res.status === 502) {
+            return { error: { message: "Gateway error (502). Try again in a moment." }, status: 502 };
+          }
+          if (/503|unavailable/i.test(raw) || res.status === 503) {
+            return { error: { message: "Service busy (503). Try again." }, status: 503 };
+          }
+          return { error: { message: "Bad response from AI server (HTTP " + res.status + "). Try again." }, status: res.status };
+        }
+        data._http = res.status;
+        return data;
+      } catch (fe) {
+        const msg = fe && fe.name === "AbortError" ? "Request timed out. Try a shorter message." : (fe.message || String(fe));
+        return { error: { message: msg } };
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    }
 
     let accumulated = "";
     let lastErr = "";
@@ -9448,32 +9537,25 @@ async function sendLubaMessage() {
       let data = null;
       let gotModel = false;
       for (; modelIndex < modelChain.length; modelIndex++) {
-        try {
-          const res = await fetch(LUBA_WORKER, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model: modelChain[modelIndex],
-              payload: payload,
-              username: sessionUser || (S && S.username) || ""
-            })
-          });
-          data = await res.json().catch(function() { return {}; });
-          if (data && !data.error && data.candidates && data.candidates[0]) {
-            gotModel = true;
-            break;
-          }
-          const msg = (data && data.error && (data.error.message || data.error)) || ("HTTP " + res.status);
-          lastErr = String(msg);
-          if (/not found|no longer available|not available|invalid model/i.test(lastErr)) continue;
-          if (/high demand|overloaded|429|503|quota|rate limit/i.test(lastErr)) continue;
-          break;
-        } catch (fe) {
-          lastErr = fe.message || String(fe);
-          continue;
+        data = await lubaFetchJson(modelChain[modelIndex], payload);
+        // retry once on 524 with same model
+        if (data && data.status === 524) {
+          await new Promise(function(r){ setTimeout(r, 1200); });
+          data = await lubaFetchJson(modelChain[modelIndex], payload);
         }
+        if (data && !data.error && data.candidates && data.candidates[0]) {
+          gotModel = true;
+          break;
+        }
+        const msg = (data && data.error && (data.error.message || data.error)) || "Luba is busy";
+        lastErr = String(msg);
+        if (/not found|no longer available|not available|invalid model|404/i.test(lastErr)) continue;
+        if (/high demand|overloaded|429|503|quota|rate limit|timeout|524|502/i.test(lastErr)) continue;
+        // network-ish → try next model
+        if (/failed to fetch|network|abort/i.test(lastErr)) continue;
+        break;
       }
-      if (!gotModel || !data) {
+      if (!gotModel || !data || !data.candidates) {
         if (!accumulated) accumulated = lastErr || "Luba is busy. Try again.";
         break;
       }
@@ -9504,21 +9586,29 @@ async function sendLubaMessage() {
     if (wantsCode && continueCount > 0) {
       reply += "\n\n— (auto-continued " + continueCount + "× for length) —";
     }
+    // Refund coin if the whole call failed (error-looking reply only)
+    const failed = !accumulated && !!lastErr;
+    if (failed) {
+      S.luba.coins = (S.luba.coins || 0) + cost;
+      reply = "⚠️ " + reply + "\n\n(Coin refunded — try again in a few seconds.)";
+    }
     S.luba.messages.push({ role: "bot", text: reply, at: Date.now() });
     if (S.luba.messages.length > 100) S.luba.messages = S.luba.messages.slice(-100);
     persistLubaMessages();
-    lubaBusy = false;
-    lubaRenderMessagesOnly(); // respects scroll position if user scrolled up
+    lubaRenderMessagesOnly();
     saveGame();
     setTimeout(function(){ try { restoreLubaMessages(); lubaRenderMessagesOnly(); } catch(_){} }, 400);
   } catch (e) {
-    S.luba.messages.push({ role: "bot", text: "Network error: " + (e.message || e), at: Date.now() });
+    S.luba.coins = (S.luba.coins || 0) + cost;
+    S.luba.messages.push({ role: "bot", text: "⚠️ " + (e.message || e) + "\n\n(Coin refunded — try again.)", at: Date.now() });
     persistLubaMessages();
     saveGame();
     lubaRenderMessagesOnly();
+  } finally {
+    lubaBusy = false;
+    if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = "Send"; }
+    try { lubaRenderMessagesOnly(); } catch(_){}
   }
-  lubaBusy = false;
-  if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = "Send"; }
 }
 
 window.renderLuba = renderLuba;
